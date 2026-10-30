@@ -101,6 +101,14 @@ function varisOf(kalan, hiz, bugun) {
   if (hiz == null || !(Math.abs(hiz) > 0.02) || !(kalan * hiz > 0)) return null;
   return gunEkle(bugun, Math.round(kalan / hiz * 7));
 }
+/* a9: varış süresi aralık olarak (hafta): kalan / (hız ± 1,96·SE). Yavaş uç 0'a inerse 'yok' (henüz tahmin yok) */
+function varisAralik(kalan, hiz, se) {
+  if (hiz == null || !(kalan * hiz > 0)) return null;
+  var h = Math.abs(hiz), p = 1.96 * (se > 0 ? se : 0), hizli = h + p, yavas = h - p;
+  if (!(yavas > 0.02)) return 'yok';
+  var az = Math.max(1, Math.round(Math.abs(kalan) / hizli)), cok = Math.max(az, Math.round(Math.abs(kalan) / yavas));
+  return { az: az, cok: cok };
+}
 function varsayilanHiz(basKg, hedefKg) {
   if (hedefKg < basKg) return { min: -r05(basKg * 0.01), max: -r05(basKg * 0.005) };
   return { min: r05(basKg * 0.0025), max: r05(basKg * 0.005) };
@@ -152,6 +160,7 @@ function hesapla(bw, bulk, bugun, kcal) {
     simdi: simdi, degisim: simdi - bulk.basKg, hiz: hiz, min: min, max: max, durum: durum,
     kcal: durum === 'yavas' || durum === 'hizli' ? kcalOf(hiz, min, max) : null,
     sonTarti: son ? son.date : null, kalan: kalan, varis: varisOf(kalan, hiz, bugun),
+    varisAralik: durum === 'erken' || durum === 'veri' ? null : varisAralik(kalan, hiz, ay ? ay.se : 0),
     hedefKg: +bulk.hedefKg, basKg: +bulk.basKg,
     tdee: hr.tdee != null ? hr.tdee : null, ortKcal: hr.ortKcal != null ? hr.ortKcal : null,
     hedefKcal: hr.tdee != null ? hedefKcalOf(hr.tdee, min, max) : null
@@ -272,6 +281,14 @@ function bolumYok(l) {
   return o;
 }
 
+/* "~6–9 hafta (9 Ara civarı)"; aralık yoksa tek tarih; yavaş uç belirsizse "henüz tahmin yok" */
+function varisYaz(r) {
+  var a = r.varisAralik;
+  if (a === 'yok') return '<span class="mut">henüz tahmin yok</span>';
+  if (!r.varis) return '—';
+  if (!a) return AT.h(AT.tarih(r.varis));
+  return '~' + (a.az === a.cok ? a.az : a.az + '–' + a.cok) + ' hafta <span class="mut">(' + AT.h(AT.tarih(r.varis, 1)) + ' civarı)</span>';
+}
 function bolumVar(l, b) {
   var r = hesapla(l, b, AT.iso(new Date()), AT.S.kcal), yon = yonOf(b);
   var bugun = AT.iso(new Date()), gun = Math.max(0, gunFark(bugun, b.bas));
@@ -285,7 +302,7 @@ function bolumVar(l, b) {
   var son = sonKayit(l), ulasti = r.kalan * yon <= 0;
   o += '<dl class="kv">' +
     '<div><dt>Hedefe kalan</dt><dd>' + (ulasti ? 'Hedefe ulaştın' : AT.h(isaret(r10(r.kalan))) + ' kg') + '</dd></div>' +
-    '<div><dt>Bu hızla varış</dt><dd>' + (r.varis ? AT.h(AT.tarih(r.varis)) + ' <span class="mut">(~' + Math.max(1, Math.round(gunFark(r.varis, bugun) / 7)) + ' hafta)</span>' : '—') + '</dd></div>' +
+    '<div><dt>Bu hızla varış</dt><dd>' + varisYaz(r) + '</dd></div>' +
     (r.hedefKcal != null ? '<div><dt>Hedef hız için</dt><dd>günde ~' + AT.h(kcalSay(r.hedefKcal)) + '</dd></div>' : '') +
     harcamaSatir(bugun) +
     '</dl>';
@@ -402,5 +419,5 @@ AT.bolum.bulk = function () { var l = gecerli(AT.S.bw); return AT.S.bulk ? bolum
 AT.bolum.tarti = tarti;
 AT.demoBw = demoBw;
 /* test/başka modüller için saf hesaplar */
-AT.bulkHesap = { cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varsayilanHiz: varsayilanHiz, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
+AT.bulkHesap = { cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
 })(window.AT);

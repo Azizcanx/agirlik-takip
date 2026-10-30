@@ -58,6 +58,7 @@ function tumEgz() {
   var l = window.HAREKETLER && window.HAREKETLER.length ? window.HAREKETLER : HAZIR.map(function (x) { return { ad: x[0], kas: x[1] }; });
   return l.concat(S.ozel);
 }
+function ikincilOf(ad) { var t = tumEgz().filter(function (x) { return x.ad === ad; })[0]; return t && Array.isArray(t.ikincil) ? t.ikincil : []; }
 function kasOf(ad) { var t = tumEgz().filter(function (x) { return x.ad === ad; })[0]; return t ? t.kas : 'Diğer'; }
 
 function bitenSeanslar() {
@@ -390,11 +391,16 @@ function seansSatir(s, pr) {
 function kasBolum(l) {
   var lim = new Date(); lim.setDate(lim.getDate() - 6); var limS = iso(lim), kasSet = {};
   KAS.forEach(function (k) { kasSet[k] = 0; });
-  l.forEach(function (s) { if (s.date >= limS) s.exs.forEach(function (e) { var k = e.kas || kasOf(e.ad); kasSet[k] = (kasSet[k] || 0) + yapilanSetler(e).length; }); });
+  /* a10: ana kas 1, hareketin ikincil kasları (hareketler.js) set başına 0,5; gösterimde yuvarlanır */
+  l.forEach(function (s) { if (s.date >= limS) s.exs.forEach(function (e) {
+    var k = e.kas || kasOf(e.ad), n = yapilanSetler(e).length; if (!n) return;
+    kasSet[k] = (kasSet[k] || 0) + n;
+    ikincilOf(e.ad).forEach(function (y) { if (y !== k) kasSet[y] = (kasSet[y] || 0) + n * 0.5; });
+  }); });
   var kasl = KAS.concat(Object.keys(kasSet).filter(function (k) { return KAS.indexOf(k) < 0 && kasSet[k]; }));
   var mxk = Math.max.apply(0, kasl.map(function (k) { return kasSet[k] || 0; })) || 1;
-  return '<h2>Son 7 günde kaslar <small>· set sayısı</small></h2><div class="panel"><div class="kasbar">' + kasl.map(function (k) {
-    var n = kasSet[k] || 0;
+  return '<h2>Son 7 günde kaslar <small>· set sayısı, yardımcı kas yarım</small></h2><div class="panel"><div class="kasbar">' + kasl.map(function (k) {
+    var n = Math.round(kasSet[k] || 0);
     return '<div' + (n ? '' : ' class="sifir"') + '><span>' + h(k) + '</span><div class="ibar"><i style="width:' + Math.round(n / mxk * 100) + '%"></i></div><b>' + n + '<small>set</small></b></div>';
   }).join('') + '</div><p class="mut kucuk">Kas başına haftada 10 ve üstü set iyi bir hedef. Soluk olanlar bu hafta hiç çalışılmadı.</p></div>';
 }
@@ -486,6 +492,7 @@ function gucBolum(l) {
   var pr = prHesapla(), prs = [];
   l.forEach(function (s) { if (pr[s.id] && pr[s.id][secEgz]) prs.push({ s: s, t: pr[s.id][secEgz] }); });
   o += '<details class="katla"><summary>Rekorlar <small>' + prs.length + '</small></summary>';
+  o += tekrarTablosu(secEgz, l, enE);   /* b1 */
   if (!prs.length) o += '<p class="mut kucuk">Bu harekette henüz yeni rekor yok (ilk seans başlangıç sayılır).</p>';
   else o += '<div class="liste">' + prs.slice(-8).reverse().map(prSatir).join('') + '</div>';
   return o + '</details>';
@@ -504,6 +511,22 @@ function vIlerleme() {
 }
 function bwAlan() { return AT.bolum.bulk ? AT.bolum.bulk() : bwBolum(); }
 
+/* b1: 1–12 tekrar için gerçek en iyi kg (en az o kadar tekrar yapılmış en ağır set) ve en iyi tahmini maxtan
+   geri hesap (Epley tersi). Gerçek tahmini geçerse tahmin sütunu da gerçeği gösterir. Rekor bildirimi tetiklemez. */
+function tekrarTablosu(ad, l, enE) {
+  if (!(enE > 0)) return '';
+  var en = []; for (var r = 1; r <= MAX_TEKRAR; r++) en[r] = 0;
+  l.forEach(function (se) { se.exs.forEach(function (e) {
+    if (e.ad !== ad) return;
+    yapilanSetler(e).forEach(function (x) { var kg = num(x.kg), n = Math.min(MAX_TEKRAR, num(x.reps)); for (var r = 1; r <= n; r++) if (kg > en[r]) en[r] = kg; });
+  }); });
+  var o = '<table class="tekrar-tablo"><thead><tr><th>Tekrar</th><th>En iyin</th><th>Tahmini</th></tr></thead><tbody>';
+  for (var r = 1; r <= MAX_TEKRAR; r++) {
+    var t = r === 1 ? enE : enE / (1 + r / 30), g = en[r];
+    o += '<tr><td>' + r + '</td><td>' + (g > 0 ? fmt(g, 2) + ' kg' : '<span class="mut">–</span>') + '</td><td>' + (g >= t ? '<b>' + fmt(g, 2) + '</b>' : '~' + fmt(Math.round(t * 2) / 2, 1)) + ' kg</td></tr>';
+  }
+  return o + '</tbody></table>';
+}
 function prSatir(x) {
   var d = parse(x.s.date), yil = d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '';
   return '<div class="satir pr"><div class="pr-d"><b>' + d.getDate() + '</b><span>' + AYLAR[d.getMonth()].slice(0, 3) + yil + '</span></div><div class="grow">' +

@@ -384,6 +384,14 @@ button.satir.komut kbd{flex:none}
 .setgrid button.n{min-height:50px;padding:0;border:0;border-radius:10px;background:none;color:var(--mut);font-weight:500;font-variant-numeric:tabular-nums}
 .setgrid button.n:hover{background:var(--s2);color:var(--tx)}
 .setgrid .n.isinma{color:var(--warn);font-weight:700}
+/* b1: tekrar başına en iyi / tahmini (Güç > Rekorlar) */
+.tekrar-tablo{width:100%;border-collapse:collapse;margin:0 0 16px;font-variant-numeric:tabular-nums;font-size:15px}
+.tekrar-tablo th{font-weight:500;font-size:13px;color:var(--mut);text-align:right;padding:6px 0;border-bottom:1px solid var(--line)}
+.tekrar-tablo td{text-align:right;padding:7px 0;border-bottom:1px solid var(--line)}
+.tekrar-tablo th:first-child,.tekrar-tablo td:first-child{text-align:left;color:var(--mut)}
+.tekrar-tablo td:last-child{color:var(--mut)}
+.tekrar-tablo td:last-child b{color:var(--tx)}
+
 /* b2: dinlenme uzadı, sıradaki set */
 .setgrid.gecikti input{border-color:var(--warn)}
 .setgrid.gecikti .n{color:var(--warn);font-weight:700}
