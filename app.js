@@ -517,7 +517,7 @@ var SOZLUK = [
 ];
 function vAyarlar() {
   var demoVar = S.sessions.some(function (s) { return s.demo; }) || S.bw.some(function (b) { return b.demo; }) || (S.kcal || []).some(function (k) { return k.demo; });
-  var o0 = '<h1>Ayarlar</h1><p class="sub">Kayıtların yalnız bu cihazda durur; internete gönderilmez.</p>';
+  var o0 = '<h1>Ayarlar</h1><p class="sub">' + (AT.esitBagli && AT.esitBagli() ? 'Kayıtların bu cihazda ve şifreli olarak GitHub\'daki gizli dosyanda durur.' : 'Kayıtların yalnız bu cihazda durur; internete gönderilmez.') + '</p>';
   var a0 = '<h2>Yedek</h2><div class="panel liste">' +
     '<button class="satir" data-act="disa"><span class="grow"><b>Yedeği indir</b><span>Tüm kayıtlar tek dosyada (JSON)</span></span></button>' +
     '<button class="satir" data-act="ice"><span class="grow"><b>Yedeği geri yükle</b><span>İndirdiğin yedek dosyasını seç; şu anki verinin yerine geçer</span></span></button></div>' +

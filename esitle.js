@@ -144,6 +144,7 @@ function planla(ms) { clearTimeout(zaman); zaman = setTimeout(function () { esit
 function hataMetni(k) {
   return k === 'sifre' ? 'Şifre öbür cihazdakiyle aynı değil' : k === 'anahtar' ? 'GitHub anahtarı geçersiz ya da süresi dolmuş' : 'İnternet yok; bağlanınca eşitlenir';
 }
+AT.esitBagli = function () { return !!ayar(); };
 AT.degisti = function () { if (!uygulaniyor && ayar()) planla(15000); };
 
 /* ---------- Ayarlar bölümü ---------- */
