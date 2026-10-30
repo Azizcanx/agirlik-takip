@@ -74,10 +74,26 @@ function seansHacim(se) { return se.exs.reduce(function (t, e) { return t + haci
 function seansSetSayisi(se) { return se.exs.reduce(function (t, e) { return t + yapilanSetler(e).length; }, 0); }
 
 /* set için soluk sayı: notlar.js bugünkü hedefi (aynı kg × hedef tekrar) varsa o, yoksa geçen seferin aynı sıradaki seti */
-function hedefPv(ad, prev, wi) {
+function hedefPv(ad, prev, wi, ex, si) {
   var hd = AT.hedefSet ? AT.hedefSet(ad) : null;
-  if (hd && hd.kg > 0 && hd.tekrar > 0) return { kg: String(hd.kg), reps: String(hd.tekrar) };
+  if (hd && hd.kg > 0 && hd.tekrar > 0) {
+    /* a8: bu seansta aynı kg'daki son bitmiş iş seti hedefin 2+ altında kaldıysa sonraki setlerin hedefi o tekrara iner (yalnız soluk sayı) */
+    var r = hd.tekrar;
+    if (ex) ex.sets.slice(0, si).forEach(function (x) { if (x.done && x.tip !== 'isinma' && num(x.kg) === hd.kg && num(x.reps) > 0) r = num(x.reps) <= hd.tekrar - 2 ? num(x.reps) : hd.tekrar; });
+    return { kg: String(hd.kg), reps: String(r) };
+  }
   return prev[wi] || prev[prev.length - 1] || null;
+}
+/* b2: dinlenme harekete özel sürenin 2 katını geçtiyse o hareketin sıradaki seti hafifçe vurgulanır (yeniden çizmeden) */
+function setVurgu() {
+  Array.prototype.forEach.call(document.querySelectorAll('.setgrid.gecikti'), function (x) { x.classList.remove('gecikti'); });
+  var a = S.active; if (!a) return;
+  var son = null, se = -1;
+  a.exs.forEach(function (e, ei) { e.sets.forEach(function (x) { if (x.done && x.t && (!son || x.t > son.t)) { son = x; se = ei; } }); });
+  if (!son) return;
+  var e = a.exs[se], si = -1; e.sets.forEach(function (x, i) { if (si < 0 && !x.done) si = i; });
+  if (si < 0 || Date.now() - son.t < 2 * dinlenmeOf(e.ad) * 1000) return;
+  var inp = $('input[data-e="' + se + '"][data-s="' + si + '"][data-f="kg"]'); if (inp) inp.closest('.setgrid').classList.add('gecikti');
 }
 function oncekiSetler(ad) {
   var l = bitenSeanslar();
@@ -300,6 +316,12 @@ function baslaSheet() {
   sheet(o);
 }
 
+/* a16: son antrenman 5 günden eskiyse tek sessiz satır (bildirim yok) */
+function sonGunSatir(son) {
+  if (!son) return '';
+  var g = Math.round((parse(iso(new Date())) - parse(son.date)) / 864e5);
+  return g > 5 ? '<p class="son-gun">Son antrenman ' + g + ' gün önce</p>' : '';
+}
 function vBugun() {
   var a = S.active, o = '';
   if (!a) {
@@ -308,7 +330,7 @@ function vBugun() {
     var sr = siradaki();
     var a1 = (hic ? ilkAdimlar() : '') + (sr
       ? '<button class="btn-ac btn-big" data-act="basla-tekrar" data-id="' + h(sr.id) + '">Sıradaki: ' + h(sadeAd(sr.name)) + '<kbd>N</kbd></button><button class="btn-ghost mini basla-baska" data-act="basla">Başka antrenman seç</button>'
-      : '<button class="btn-ac btn-big" data-act="basla">Antrenmana başla<kbd>N</kbd></button>') + (AT.bolum.tarti ? AT.bolum.tarti() : '');
+      : '<button class="btn-ac btn-big" data-act="basla">Antrenmana başla<kbd>N</kbd></button>') + sonGunSatir(son) + (AT.bolum.tarti ? AT.bolum.tarti() : '');
     var b1 = AT.bolum.notlar ? AT.bolum.notlar() : '';
     if (son) {
       b1 += '<h2>Son antrenman</h2><div class="panel liste">' + seansSatir(son, prHesapla()) + '</div>';
@@ -335,7 +357,7 @@ function vBugun() {
     o += '<div class="setgrid' + rg + '"><span class="lbl">Set</span><span class="lbl">kg</span><span class="lbl">Tekrar</span>' + (S.rpe ? '<span class="lbl">Zorluk</span>' : '') + '<span class="lbl">Bitti</span></div>';
     var isNo = 0;
     e.sets.forEach(function (s, si) {
-      var isin = s.tip === 'isinma', wi = isin ? -1 : isNo++, pv = isin ? null : hedefPv(e.ad, prev, wi);
+      var isin = s.tip === 'isinma', wi = isin ? -1 : isNo++, pv = isin ? null : hedefPv(e.ad, prev, wi, e, si);
       var etk = isin ? 'I' : String(wi + 1), ad = isin ? 'ısınma seti' : 'normal set';
       o += '<div class="setgrid' + (s.done ? ' is-done' : '') + rg + '"><button class="n' + (s.tip ? ' ' + s.tip : '') + '" data-act="set-tip" data-e="' + ei + '" data-s="' + si + '" aria-label="Set ' + (si + 1) + ': ' + ad + ' (dokun: tipini değiştir)" title="' + ad + '">' + etk + '</button>' +
         '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="kg" value="' + h(s.kg) + '" placeholder="' + (pv ? fmt(num(pv.kg), 2) : 'kg') + '" aria-label="' + h(e.ad) + ' set ' + (si + 1) + ' kg">' +
@@ -566,6 +588,7 @@ function render() {
   }
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   var f = $('#dosya'); if (f) f.addEventListener('change', iceAl);
+  if (tab === 'bugun') setVurgu();
 }
 
 /* ---------- sheet / toast ---------- */
@@ -699,7 +722,7 @@ var islem = {
   tamam: function (d) {
     var e = S.active.exs[+d.e], s = e.sets[+d.s];
     if (s.done) { s.done = false; delete s.t; kaydet(); return render(); }
-    var wi = e.sets.slice(0, +d.s).filter(function (x) { return x.tip !== 'isinma'; }).length, p = s.tip === 'isinma' ? null : hedefPv(e.ad, oncekiSetler(e.ad), wi);
+    var wi = e.sets.slice(0, +d.s).filter(function (x) { return x.tip !== 'isinma'; }).length, p = s.tip === 'isinma' ? null : hedefPv(e.ad, oncekiSetler(e.ad), wi, e, +d.s);
     // ipucundan doldurma: Türkçe ondalık virgül (78,75); binlik ayıracı yok ki num() geri okuyabilsin
     if (s.kg === '' && p) s.kg = String(num(p.kg)).replace('.', ',');
     if (s.reps === '' && p) s.reps = String(num(p.reps));
@@ -884,5 +907,6 @@ var sonW = 0;
 window.addEventListener('resize', function () { clearTimeout(tickT); tickT = setTimeout(function () { var w = grafikW(); if (w !== sonW) { sonW = w; if (tab === 'ilerleme' && !yaziyor(document.activeElement)) render(); } }, 150); });
 if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', temaUygula);
 setInterval(function () { var g = $('#gecen'); if (g && S.active) g.textContent = gecenSure(S.active.start); }, 30000);
+setInterval(function () { if (tab === 'bugun' && S.active) setVurgu(); }, 10000);
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
 })();

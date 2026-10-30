@@ -16,6 +16,9 @@ function altVucut(ex) { return kasi(ex) === 'Bacak' || /deadlift/i.test(ex.ad); 
 /* artış: alt vücut +5 (hafifse +2,5), üst vücut +2,5 (20 kg altı dambıl/kablo +1) */
 function artis(ex, kg) { return altVucut(ex) ? (kg < 40 ? 2.5 : 5) : (kg < 20 ? 1 : 2.5); }
 function kgYaz(n) { return AT.fmt(n, 2) + ' kg'; }
+/* a6: artış mevcut kg'ın %10'undan büyükse (8 kg dambıla +1 kg) önce tekrar tepesi en çok +3 uzar */
+var BUYUK_ADIM = 0.10, EK_TEKRAR = 3;
+function haftaBasi(s) { var d = AT.parse(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return AT.iso(d); }
 
 /* egzersiz geçmişi: ad -> [{ date, sets, ex }] (seans başına tek kayıt, kronolojik) */
 function gecmis(seanslar) {
@@ -139,6 +142,10 @@ function oneriler(h, bugun) {
     var ne = AT.tarih(son.date, true), n = ws.length, ek = artis(son.ex, kg), yeni = kg + ek;
     var bolge = (altVucut(son.ex) ? 'Alt vücut' : 'Üst vücut') + ': +' + AT.fmt(ek, 2) + ' kg';
     var x = { g: g, n: l.length };
+    /* a7: bu hafta (Pzt'den beri) bu harekette kg zaten artırıldıysa ikinci kez artırma */
+    var onceki = l.length >= 2 ? calisma(l[l.length - 2].sets) : null, okg = onceki && onceki.length ? AT.num(onceki[0].kg) : 0;
+    var buHaftaArtti = son.date >= haftaBasi(bugun) && okg > 0 && kg > okg;
+    var buyuk = ek / kg > BUYUK_ADIM;
 
     // deload: son 3 seans aynı kg'da ve tekrar ilerlemiyor
     var u3 = l.slice(-3).map(function (z) { return calisma(z.sets); });
@@ -154,7 +161,20 @@ function oneriler(h, bugun) {
         m[a] = x; return;
       }
     }
-    if (mn >= tepe) {
+    if (mn >= tepe && buyuk && mn < tepe + EK_TEKRAR && !(rpe != null && rpe >= RPE_ZOR)) {
+      /* a6: küçük kiloda +ek büyük sıçrama: önce tekrar (tepe+3'e kadar) */
+      var ht = Math.min(tepe + EK_TEKRAR, mn + 1);
+      x.sinif = 2; x.hedef = { kg: kg, tekrar: ht, n: n };
+      x.not = { tip: 'iyi', baslik: a + ': ' + kgYaz(kg) + ' ile ' + n + ' set × ' + ht + ' tekrar',
+        aciklama: 'Geçen sefer (' + ne + ') ' + n + '×' + mn + ' @ ' + kgYaz(kg) + '. +' + AT.fmt(ek, 2) + ' kg bu kiloda %' + Math.round(ek / kg * 100) +
+          ' sıçrama; önce tekrarı artır, hepsi ' + (tepe + EK_TEKRAR) + ' olunca ' + kgYaz(yeni) + '.' };
+    } else if (buHaftaArtti && (mn >= tepe || (rpe != null && rpe <= RPE_KOLAY && mn >= alt))) {
+      /* a7: haftada en fazla bir kg artışı */
+      var hk = Math.min(tepe + (buyuk ? EK_TEKRAR : 0), mn + 1);
+      x.sinif = 2; x.hedef = { kg: kg, tekrar: hk, n: n };
+      x.not = { tip: 'iyi', baslik: a + ': ' + kgYaz(kg) + ' ile ' + n + ' set × ' + hk + ' tekrar',
+        aciklama: 'Bu hafta zaten ' + kgYaz(okg) + ' → ' + kgYaz(kg) + ' arttı (' + ne + ', ' + rs.join(', ') + ' tekrar). Haftada bir artış yeter: bugün aynı kg, artışı gelecek haftaya bırak.' };
+    } else if (mn >= tepe) {
       if (rpe != null && rpe >= RPE_ZOR) {
         x.sinif = 2; x.hedef = { kg: kg, tekrar: tepe, n: n };
         x.not = { tip: 'bilgi', baslik: a + ': ' + kgYaz(kg) + ' ile ' + n + ' set × ' + tepe + ' tekrar',
@@ -244,7 +264,9 @@ AT.notlarHesapla = hesapla;   // test için saf giriş
    app.js antrenman ekranında soluk sayıları (placeholder) bununla doldurur. Seans listesi değişmedikçe önbellekte. */
 var hedefOnb = { k: null, m: null };
 AT.hedefSet = function (ad) {
-  var l = AT.bitenSeanslar(), bugun = AT.iso(new Date()), k = bugun + ':' + l.length + ':' + (l.length ? l[l.length - 1].id + (l[l.length - 1].end || '') : '');
+  /* önbellek anahtarı: gün + seans sayısı + son 3 seansın içeriği (geçmiş antrenman düzenlenince de tazelenir) */
+  var uz = 0; try { uz = (localStorage.getItem('agirlik-takip-v1') || '').length; } catch (e) {}
+  var l = AT.bitenSeanslar(), bugun = AT.iso(new Date()), k = bugun + ':' + l.length + ':' + uz + ':' + JSON.stringify(l.slice(-3).map(function (x) { return [x.id, x.date, x.exs]; }));
   if (hedefOnb.k !== k) { try { hedefOnb.m = oneriler(gecmis(l), bugun); } catch (e) { hedefOnb.m = {}; } hedefOnb.k = k; }
   var x = hedefOnb.m[ad]; return x && x.hedef ? x.hedef : null;
 };
