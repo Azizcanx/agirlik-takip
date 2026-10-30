@@ -30,10 +30,21 @@ function gecmis(seanslar) {
   });
   return m;
 }
-function enIyi1RM(sets) { return sets.reduce(function (t, s) { return Math.max(t, AT.e1rm(AT.num(s.kg), AT.num(s.reps), s.rpe)); }, 0); }
+/* tahmini max: 12 tekrar üstü sayılmaz (AT.tahminiMax); eski app.js ile çalışırsa e1rm */
+function tmax(s) { return (AT.tahminiMax || AT.e1rm)(AT.num(s.kg), AT.num(s.reps), s.rpe); }
+/* aralık altı geri hesap (Boostcamp'in açıkladığı fikir, kendi kodumuz): çalışma setlerinin EN İYİSİ bile alt sınırın
+   altındaysa, alt tekrar için kg = tahmini max / (1 + alt/30), 20 kg altı 1, üstü 2,5 kg adıma aşağı yuvarlı.
+   Yalnız bazı setler kaçtıysa, sonuç mevcut kg'dan hafif değilse ya da tahmini max yoksa 0 (bugünkü kural sürer) */
+function geriKg(ws, kg, alt) {
+  if (Math.max.apply(0, tekrarlar(ws)) >= alt) return 0;
+  var e = enIyi1RM(ws); if (!(e > 0)) return 0;
+  var adim = kg < 20 ? 1 : 2.5, k = Math.floor(e / (1 + alt / 30) / adim + 1e-9) * adim;
+  return k > 0 && k < kg ? Math.round(k * 100) / 100 : 0;
+}
+function enIyi1RM(sets) { return sets.reduce(function (t, s) { return Math.max(t, tmax(s)); }, 0); }
 function enIyiSet(sets) {
   var b = null, bv = 0;
-  sets.forEach(function (s) { var v = AT.e1rm(AT.num(s.kg), AT.num(s.reps), s.rpe); if (v > bv) { bv = v; b = s; } });
+  sets.forEach(function (s) { var v = tmax(s); if (v > bv) { bv = v; b = s; } });
   return b;
 }
 /* çalışma setleri: seansın en ağır kg'sındaki setler (ısınma/geri iniş setleri hariç) */
@@ -158,6 +169,13 @@ function oneriler(h, bugun) {
       x.sinif = 1; x.hedef = { kg: yeni, tekrar: mn, n: n };
       x.not = { tip: 'iyi', baslik: a + ': bugün ' + kgYaz(yeni) + ' dene',
         aciklama: 'Geçen sefer (' + ne + ') ' + rs.join(', ') + ' tekrar @ ' + kgYaz(kg) + ', ' + rpeYaz + ': fazla kolay. ' + bolge + ', aynı tekrar (' + n + '×' + mn + ').' };
+    } else if (geriKg(ws, kg, alt) > 0) {
+      // en iyi set bile aralığın altında: alt sınır tekrarı için kg, tahmini maxtan geri (Epley tersi), adıma aşağı yuvarlı
+      var gk = geriKg(ws, kg, alt);
+      x.sinif = 2; x.hedef = { kg: gk, tekrar: alt, n: n };
+      x.not = { tip: 'bilgi', baslik: a + ': ' + kgYaz(gk) + ' ile ' + n + ' set × ' + alt + ' tekrar',
+        aciklama: 'Geçen sefer (' + ne + ') ' + rs.join(', ') + ' tekrar @ ' + kgYaz(kg) + ': en iyi set bile ' + alt + '–' + tepe +
+          ' aralığının altında. Tahmini maxına göre ' + alt + ' tekrar için ' + kgYaz(gk) + ' uygun; oradan yeniden yüksel, hepsi ' + tepe + ' olunca ' + kgYaz(kg) + '\'a dön.' };
     } else {
       var hedef = Math.min(tepe, Math.max(ilk, mn + 1));
       x.sinif = 2; x.hedef = { kg: kg, tekrar: hedef, n: n };

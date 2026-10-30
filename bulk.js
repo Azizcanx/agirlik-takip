@@ -42,6 +42,18 @@ function trendSeri(l) {
   return out;
 }
 function sonTrend(l) { var tr = trendSeri(l); return tr.length ? tr[tr.length - 1].kg : null; }
+/* grafik çizgisi: çift üstel ortalama (2×EMA − EMA'nın EMA'sı, aynı α). Düz artışta gecikmesiz, böylece çizginin sonu
+   üstteki "ortalama kilo" (regresyon) ile örtüşür; tek günlük sıçramaya tepkisi ~2α. tr: trendSeri çıktısı */
+function cizgiSeri(tr) {
+  if (!tr.length) return [];
+  var e2 = tr[0].kg;
+  return tr.map(function (p) { e2 += ALFA * (p.kg - e2); return { date: p.date, kg: 2 * p.kg - e2, ham: p.ham }; });
+}
+/* gösterilen ortalama kilo: 14+ günlük regresyon varsa doğrunun son tartı günündeki değeri, yoksa EMA */
+function ortalamaKilo(l, bas) {
+  var ay = hizAyrinti(l, bas);
+  return ay && ay.gun >= ERKEN_GUN && isFinite(ay.deger) ? ay.deger : sonTrend(l);
+}
 /* doğrusal regresyon eğimi (kg/gün); x = gün. n<2 ya da yayılım 0 ise null */
 function egim(pts) {
   var n = pts.length; if (n < 2) return null;
@@ -69,7 +81,9 @@ function hizAyrinti(l, bas) {
   var n = pts.length, mx = 0, my = 0, sxx = 0, rss = 0;
   pts.forEach(function (p) { mx += p.x; my += p.y; }); mx /= n; my /= n;
   pts.forEach(function (p) { sxx += (p.x - mx) * (p.x - mx); var r = p.y - (my + e * (p.x - mx)); rss += r * r; });
-  return { hiz: e * 7, se: n > 2 && sxx ? Math.sqrt(rss / (n - 2) / sxx) * 7 : 0, gun: gunFark(son, w[0].date) };
+  var xs = gunFark(son, w[0].date);
+  /* deger: regresyon doğrusunun son tartı günündeki değeri (gecikmesiz "ortalama kilo"; α=0,1 EMA ~9 gün geriden gelir, haftada 0,4 kg bulkta ~0,5 kg düşük) */
+  return { hiz: e * 7, se: n > 2 && sxx ? Math.sqrt(rss / (n - 2) / sxx) * 7 : 0, gun: xs, deger: my + e * (xs - mx) };
 }
 function hizHesap(l, bas) { var a = hizAyrinti(l, bas); return a ? a.hiz : null; }
 function yonOf(bulk) { return bulk.hedefKg < bulk.basKg ? -1 : 1; }
@@ -104,9 +118,17 @@ function kcalGecerli(l) {
    Şart: pencerede en az 10 kalori günü ve en az 14 günlük tartı yayılımı; yoksa null + ne kadar eksik olduğu.
    Dönüş: {tdee, ortKcal, kcalGun, tartiGun, hiz} ya da {eksik: {kcalGun, tartiGun}} */
 var TDEE_GUN = 28, TDEE_KCAL_GUN = 10, ESKI_GUN = 10;   /* son tartı 10 günden eskiyse hız/harcama/kalori önerisi yok (bayat) */
+/* yarım girilmiş gün: penceredeki kalori medyanının yarısından az olan gün (ör. yalnız kahvaltı yazılmış) harcamayı
+   yapay düşürür; ortalamaya girmez. En az 5 gün yoksa süzme (medyan anlamsız) */
+function yarimGunAt(k) {
+  if (k.length < 5) return k;
+  var s = k.map(function (x) { return +x.kcal; }).sort(function (a, b) { return a - b; }), m = s.length;
+  var med = m % 2 ? s[(m - 1) / 2] : (s[m / 2 - 1] + s[m / 2]) / 2;
+  return k.filter(function (x) { return +x.kcal >= med * 0.5; });
+}
 function harcama(bw, kcal, bugun) {
   var bas = gunEkle(bugun, -(TDEE_GUN - 1));
-  var k = kcalGecerli(kcal).filter(function (x) { return x.date >= bas && x.date <= bugun; });
+  var k = yarimGunAt(kcalGecerli(kcal).filter(function (x) { return x.date >= bas && x.date <= bugun; }));
   var l = gecerli(bw).filter(function (x) { return x.date >= bas && x.date <= bugun; });
   var ay = hizAyrinti(l, bas), tartiGun = ay ? ay.gun : 0, tum = gecerli(bw), sonT = tum.length ? tum[tum.length - 1].date : null;
   if (sonT && gunFark(bugun, sonT) > ESKI_GUN) return { eksik: { kcalGun: k.length, tartiGun: tartiGun, eski: gunFark(bugun, sonT) } };
@@ -119,8 +141,9 @@ function hedefKcalOf(tdee, min, max) { return Math.round((tdee + (min + max) / 2
 function hesapla(bw, bulk, bugun, kcal) {
   if (!bulk) return null;
   var l = gecerli(bw), son = l.length ? l[l.length - 1] : null;
-  var simdi = son ? sonTrend(l) : +bulk.basKg;
   var ay = hizAyrinti(l, bulk.bas), hiz = ay ? ay.hiz : null, min = +bulk.min, max = +bulk.max;
+  /* ortalama kilo: 14+ günlük regresyon varsa doğrunun bugünkü değeri (kalan ve varış da bundan), yoksa EMA; grafik çizgisi EMA kalır */
+  var simdi = !son ? +bulk.basKg : ay && ay.gun >= ERKEN_GUN && isFinite(ay.deger) ? ay.deger : sonTrend(l);
   /* ilk 2 hafta: hız gösterilir ama kalori önerisi yok ('erken'); sonra aralık dışına standart hata kadar taşarsa uyar */
   var durum = ay && ay.gun < ERKEN_GUN ? 'erken' : durumOf(hiz, min, max, yonOf(bulk), ay ? Math.min(ay.se, 0.15) : 0);
   if (son && gunFark(bugun, son.date) > ESKI_GUN) durum = 'veri';   /* bayat: öneri yok; notlar.js "X gündür tartılmadın" der */
@@ -229,10 +252,10 @@ function kaloriGecmisi(bugun) {
 
 function bolumYok(l) {
   var o = '<h2>Vücut ağırlığı</h2><div class="panel">';
-  var son = sonKayit(l), tr = trendSeri(l), trSon = tr.length ? tr[tr.length - 1].kg : null;
+  var son = sonKayit(l), tr = trendSeri(l), trSon = tr.length ? ortalamaKilo(l) : null;
   if (son) {
     o += '<div class="hero"><b>' + AT.h(AT.fmt(trSon)) + ' <small>kg</small></b><span>ortalama kilo · son tartı ' + AT.h(AT.fmt(son.kg)) + ' kg, ' + AT.h(AT.tarih(son.date, 1)) + demoTag(son) + '</span></div>';
-    o += grafik(tr, null, 'Ortalama vücut ağırlığı');
+    o += grafik(cizgiSeri(tr), null, 'Ortalama vücut ağırlığı');
     var hs = harcamaSatir(AT.iso(new Date()));
     if (hs) o += '<dl class="kv">' + hs + '</dl>';
     o += '<div class="row"><button class="btn-ghost mini" data-act="bw-geri">Son kaydı sil</button></div>';
@@ -266,7 +289,7 @@ function bolumVar(l, b) {
     (r.hedefKcal != null ? '<div><dt>Hedef hız için</dt><dd>günde ~' + AT.h(kcalSay(r.hedefKcal)) + '</dd></div>' : '') +
     harcamaSatir(bugun) +
     '</dl>';
-  var seri = trendSeri(l).filter(function (p) { return p.date >= b.bas; }), ref = null;
+  var seri = cizgiSeri(trendSeri(l)).filter(function (p) { return p.date >= b.bas; }), ref = null;
   if (son && son.date > b.bas) {
     var orta = (r.min + r.max) / 2;
     ref = [
@@ -379,5 +402,5 @@ AT.bolum.bulk = function () { var l = gecerli(AT.S.bw); return AT.S.bulk ? bolum
 AT.bolum.tarti = tarti;
 AT.demoBw = demoBw;
 /* test/başka modüller için saf hesaplar */
-AT.bulkHesap = { gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varsayilanHiz: varsayilanHiz, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
+AT.bulkHesap = { cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varsayilanHiz: varsayilanHiz, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
 })(window.AT);

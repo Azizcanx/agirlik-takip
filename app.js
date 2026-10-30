@@ -34,6 +34,10 @@ function e1rm(kg, reps, rpe) {
   var y = x >= 16 ? 0.5 : x <= 2.92 ? (0.347619 * x * x - 4.60714 * x + 99.9667) / 100 : (-2.64249 * x + 97.0955) / 100;
   return kg / y;
 }
+/* rekor, grafik, durağanlık ve kart için tahmini max: 12 tekrarın üstünde formüller bozulur (Strong da yalnız ≤12'yi sayar),
+   o setler 0 döner (toplam, set sayısı ve hedef hesapları etkilenmez; CSV ham e1rm'i yazar) */
+var MAX_TEKRAR = 12;
+function tahminiMax(kg, reps, rpe) { return reps > MAX_TEKRAR ? 0 : e1rm(kg, reps, rpe); }
 function haftaBasi(s) { var d = parse(s); var g = (d.getDay() + 6) % 7; d.setDate(d.getDate() - g); return iso(d); }
 function $(s, r) { return (r || document).querySelector(s); }
 
@@ -45,7 +49,10 @@ function yukle() {
   /* tek seferlik: eski varsayılan açık temadan koyuya (Aziz: "açık çok göz alıyor"); sonra seçim kullanıcının */
   if (!S.temaV) { if (S.tema === 'acik') S.tema = 'koyu'; S.temaV = 2; }
 }
-function kaydet() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Kaydedilemedi (depolama dolu?)'); } }
+function kaydet() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Kaydedilemedi (depolama dolu?)'); }
+  if (AT.degisti) AT.degisti();   /* esitle.js: değişiklikten sonra eşitleme */
+}
 /* window.HAREKETLER (hareketler.js) varsa geniş liste: [{ad, tr, kas, ikincil, ekipman, tip}]; yoksa HAZIR */
 function tumEgz() {
   var l = window.HAREKETLER && window.HAREKETLER.length ? window.HAREKETLER : HAZIR.map(function (x) { return { ad: x[0], kas: x[1] }; });
@@ -97,7 +104,7 @@ function miniGecmis(ad) {
   if (l.length < 2) return '<p class="hint gecen">' + bas + '</p>';
   return '<details class="mini-gecmis" data-ad="' + h(ad) + '"' + (acikGecmis[ad] ? ' open' : '') + '><summary class="hint gecen">' + bas + '<span class="neden">son ' + l.length + '</span></summary><ul>' +
     l.map(function (x) {
-      var m = x.sets.reduce(function (t, s) { return Math.max(t, e1rm(num(s.kg), num(s.reps), s.rpe)); }, 0);
+      var m = x.sets.reduce(function (t, s) { return Math.max(t, tahminiMax(num(s.kg), num(s.reps), s.rpe)); }, 0);
       return '<li><span class="t">' + tarih(x.date, 1) + '</span><span class="s">' + gecenYaz(x.sets) + '</span><span class="m">' + (m > 0 ? 'max ~' + fmt(m) : '') + '</span></li>';
     }).join('') + '</ul></details>';
 }
@@ -109,7 +116,7 @@ function prHesapla() {
     se.exs.forEach(function (e) {
       var sets = yapilanSetler(e); if (!sets.length) return;
       var b = en[e.ad], m1 = 0, m1s = null, mk = 0;
-      sets.forEach(function (s) { var v = e1rm(num(s.kg), num(s.reps), s.rpe); if (v > m1) { m1 = v; m1s = s; } mk = Math.max(mk, num(s.kg)); });
+      sets.forEach(function (s) { var v = tahminiMax(num(s.kg), num(s.reps), s.rpe); if (v > m1) { m1 = v; m1s = s; } mk = Math.max(mk, num(s.kg)); });
       if (b) {
         var t = [];
         if (m1 > b.e1 + 0.05) t.push({ ad: 'Tahmini max', yeni: m1, fark: m1 - b.e1, set: m1s });
@@ -409,7 +416,7 @@ function egzNoktalar(ad) {
   bitenSeanslar().forEach(function (se) {
     se.exs.forEach(function (e) {
       if (e.ad !== ad) return;
-      var m = 0; yapilanSetler(e).forEach(function (s) { m = Math.max(m, e1rm(num(s.kg), num(s.reps), s.rpe)); });
+      var m = 0; yapilanSetler(e).forEach(function (s) { m = Math.max(m, tahminiMax(num(s.kg), num(s.reps), s.rpe)); });
       if (m > 0) pts.push({ x: parse(se.date).getTime(), y: m, t: tarih(se.date, 1), se: se, e: e });
     });
   });
@@ -426,15 +433,23 @@ function gucBolum(l) {
   o += '<label class="alan"><select id="egzsec" aria-label="Hareket seç">' + adlar.map(function (a) { return '<option value="' + h(a) + '"' + (a === secEgz ? ' selected' : '') + '>' + h(a) + '</option>'; }).join('') + '</select></label>';
   var pts = egzNoktalar(secEgz);
   var enAgir = 0, enAgirT = '', enSet = { v: 0 }, enHac = 0, enHacT = '', enE = 0, enET = '';
-  pts.forEach(function (p) {
-    if (p.y > enE) { enE = p.y; enET = p.t; }
-    yapilanSetler(p.e).forEach(function (s) { var kg = num(s.kg); if (kg > enAgir) { enAgir = kg; enAgirT = p.t; } var v = kg * num(s.reps); if (v > enSet.v) enSet = { v: v, kg: kg, r: num(s.reps), t: p.t }; });
-    var hc = hacim(p.e); if (hc > enHac) { enHac = hc; enHacT = p.t; }
+  pts.forEach(function (p) { if (p.y > enE) { enE = p.y; enET = p.t; } });
+  /* en ağır / en iyi set / seans toplamı: tahmini maxı olmayan (yalnız 12+ tekrarlı) seanslar dahil hepsinden */
+  l.forEach(function (se) {
+    se.exs.forEach(function (e) {
+      if (e.ad !== secEgz) return; var t = tarih(se.date, 1);
+      yapilanSetler(e).forEach(function (s) { var kg = num(s.kg); if (kg > enAgir) { enAgir = kg; enAgirT = t; } var v = kg * num(s.reps); if (v > enSet.v) enSet = { v: v, kg: kg, r: num(s.reps), t: t }; });
+      var hc = hacim(e); if (hc > enHac) { enHac = hc; enHacT = t; }
+    });
   });
   var ilkP = pts[0], sonP = pts[pts.length - 1], fark = sonP && ilkP && pts.length > 1 ? sonP.y - ilkP.y : 0;
-  o += '<div class="panel"><div class="hero"><b>' + fmt(enE) + ' <small>kg</small></b><span>tahmini max: tek tekrarda kaldırabileceğin kilo · en iyisi ' + h(enET) + '</span></div>';
-  if (fark > 0) o += '<p class="durum iyi">İlk kayıttan bu yana +' + fmt(fark) + ' kg güçlendin.</p>';
-  o += cizgi(pts, { baslik: secEgz + ' tahmini max', birim: 'kg' }) + '</div>';
+  if (pts.length) {
+    o += '<div class="panel"><div class="hero"><b>' + fmt(enE) + ' <small>kg</small></b><span>tahmini max: tek tekrarda kaldırabileceğin kilo · en iyisi ' + h(enET) + '</span></div>';
+    if (fark > 0) o += '<p class="durum iyi">İlk kayıttan bu yana +' + fmt(fark) + ' kg güçlendin.</p>';
+    o += cizgi(pts, { baslik: secEgz + ' tahmini max', birim: 'kg' }) + '</div>';
+  } else {
+    o += '<p class="mut kucuk">Bu harekette ' + MAX_TEKRAR + ' tekrar ve altı set yok; tahmini max yalnız ' + MAX_TEKRAR + ' ve altı tekrardan hesaplanır.</p>';
+  }
   o += '<div class="panel"><dl class="kv">' +
     '<div><dt>En ağır kaldırdığın</dt><dd>' + fmt(enAgir) + ' kg<small>' + h(enAgirT) + '</small></dd></div>' +
     '<div><dt>En iyi set</dt><dd>' + (enSet.kg != null ? fmt(enSet.kg) + ' kg × ' + enSet.r + '<small>' + h(enSet.t) + '</small>' : '–') + '</dd></div>' +
@@ -509,6 +524,7 @@ function vAyarlar() {
     '<input type="file" id="dosya" accept="application/json,.json" hidden>' +
     '<p class="mut kucuk">Arada bir yedek al: tarayıcı verisi silinirse kayıtlar da gider.</p>';
   if (AT.bolum.otoyedek) a0 += AT.bolum.otoyedek();
+  if (AT.bolum.esitle) a0 += AT.bolum.esitle();   /* esitle.js: PC ↔ telefon */
   if (AT.bolum.disa) a0 += '<details class="katla"><summary>Excel ve diğer uygulamalar <small>Strong, Hevy</small></summary>' + AT.bolum.disa() + '</details>';
   var o = '<h2>Görünüm</h2><div class="seg" role="group" aria-label="Tema">' + [['sistem', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu']].map(function (t) {
     return '<button data-act="tema" data-v="' + t[0] + '" aria-pressed="' + ((S.tema || 'sistem') === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
@@ -851,11 +867,13 @@ document.addEventListener('keydown', function (ev) {
    AT.bolum.<ad>() -> HTML döndürür, AT.islem['eylem'] = function (dataset) {} -> data-act tıklaması. */
 var AT = window.AT = {
   islem: islem, bolum: {}, KAS: KAS, AYLAR: AYLAR, p2: p2, iso: iso, parse: parse, h: h, num: num, fmt: fmt, tarih: tarih, uid: uid,
-  e1rm: e1rm, haftaBasi: haftaBasi, $: $, kaydet: kaydet, render: render, toast: toast, sheet: sheet, kapat: kapat, onayla: onayla,
+  e1rm: e1rm, tahminiMax: tahminiMax, MAX_TEKRAR: MAX_TEKRAR, haftaBasi: haftaBasi, $: $, kaydet: kaydet, render: render, toast: toast, sheet: sheet, kapat: kapat, onayla: onayla,
   bitenSeanslar: bitenSeanslar, yapilanSetler: yapilanSetler, tumSetler: tumSetler, hacim: hacim, seansHacim: seansHacim, kasOf: kasOf, prHesapla: prHesapla,
   cizgi: cizgi, cubuk: cubuk, indir: indir, geriAl: geriAl, kol: kol, masaustu: masaustu
 };
 Object.defineProperty(AT, 'S', { get: function () { return S; } });
+/* esitle.js: öbür cihazdan birleşen durumu uygula (tema gibi cihaza özel alanlar x içinde zaten bu cihazınki) */
+AT.yeniDurum = function (x) { S = Object.assign(bos(), x); kaydet(); temaUygula(); if (!yaziyor(document.activeElement)) render(); };   /* yazarken ekranı yenileme */
 
 document.addEventListener('DOMContentLoaded', function () {
   yukle(); temaUygula(); render(); unutulanKontrol();

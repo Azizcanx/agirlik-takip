@@ -359,6 +359,10 @@ html.tema-gecis,html.tema-gecis *{transition:background-color .35s ease,color .3
 /* Bugün: sıradaki antrenman düğmesinin altındaki seçim */
 .basla-baska{display:block;margin:6px auto 0;color:var(--mut)!important}
 
+/* eşitleme (esitle.js) */
+#esitleme a{color:var(--ac);text-underline-offset:3px}
+#esitleme .alan small{color:var(--dim);font-size:13px}
+
 /* haftalık özet (haftalik.js) */
 .hafta-dugme{vertical-align:baseline;margin-left:4px;min-height:30px;padding:0 8px}
 .hafta .ayb{margin:0 0 4px}

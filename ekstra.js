@@ -121,7 +121,7 @@ function kartVeri() {
   var ex = {};
   ses.forEach(function (s) {
     s.exs.forEach(function (e) {
-      var m = 0; AT.yapilanSetler(e).forEach(function (z) { m = Math.max(m, AT.e1rm(AT.num(z.kg), AT.num(z.reps), z.rpe)); });
+      var m = 0; AT.yapilanSetler(e).forEach(function (z) { m = Math.max(m, (AT.tahminiMax || AT.e1rm)(AT.num(z.kg), AT.num(z.reps), z.rpe)); });
       if (!(m > 0)) return;
       var x = ex[e.ad] || (ex[e.ad] = { ad: e.ad, n: 0, ilk: m, en: 0 });
       x.n++; x.en = Math.max(x.en, m);
