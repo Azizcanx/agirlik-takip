@@ -667,6 +667,21 @@ function seansSheet(id) {
   sheet(o);
 }
 
+/* a12 yardımcıları: son gerçek tartı (bugün hariç, son 14 gün), onay penceresi, kayıt */
+function sonTarti() {
+  var t = iso(new Date()), lim = new Date(); lim.setDate(lim.getDate() - 14); var limS = iso(lim);
+  var l = S.bw.filter(function (b) { return !b.demo && b.date < t && b.date >= limS && num(b.kg) > 0; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  return l.length ? l[l.length - 1] : null;
+}
+function tartiSor(v, metin, etiket) {
+  sheet('<h3>Tartıyı kontrol et</h3><p class="mut">' + h(metin) + '</p><div class="yigin"><button class="btn-ac btn-big" data-act="bw-ekle-kesin" data-v="' + h(String(v)) + '">' + h(etiket) + '</button>' +
+    '<button class="btn-big btn-ghost" data-act="kapat">Düzelt</button></div>');
+}
+function tartiKaydet(v) {
+  if (!(v > 20 && v < 400)) return toast('Geçerli bir kg gir');
+  var t = iso(new Date()); S.bw = S.bw.filter(function (b) { return !(b.date === t && !b.demo); });
+  S.bw.push({ id: uid(), date: t, kg: Math.round(v * 10) / 10 }); kaydet(); render(); toast('Kaydedildi');
+}
 /* antrenmandaki son set zamanı (yoksa başlangıç) */
 function sonHareket(a) { var m = a.start || 0; a.exs.forEach(function (e) { e.sets.forEach(function (x) { if (x.done && x.t > m) m = x.t; }); }); return m; }
 function saat(ts) { var d = new Date(ts); return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
@@ -794,11 +809,16 @@ var islem = {
   'egz-sec': function (d) { secEgz = d.ad; render(); },
   tema: function (d) { S.tema = d.v; S.temaV = 2; kaydet(); temaGecis(); render(); },
   'tema-cevir': function () { var koyu = document.documentElement.dataset.theme === 'koyu'; islem.tema({ v: koyu ? 'acik' : 'koyu' }); },
+  /* a12: yanlış tartı koruması. 824 → "82,4 mü?"; son tartıdan (14 gün içinde) 3 kg+ farkta onay. Kayıt yine kullanıcının */
   'bw-ekle': function () {
-    var v = num($('#bwkg').value); if (!(v > 20 && v < 400)) return toast('Geçerli bir kg gir');
-    var t = iso(new Date()); S.bw = S.bw.filter(function (b) { return !(b.date === t && !b.demo); });
-    S.bw.push({ id: uid(), date: t, kg: Math.round(v * 10) / 10 }); kaydet(); render(); toast('Kaydedildi');
+    var v = num($('#bwkg').value);
+    if (v >= 400 && v < 4000 && v % 1 === 0) return tartiSor(Math.round(v) / 10, v + ' yazdın. ' + fmt(Math.round(v) / 10) + ' kg mı demek istedin?', fmt(Math.round(v) / 10) + ' kg kaydet');
+    if (!(v > 20 && v < 400)) return toast('Geçerli bir kg gir');
+    var st = sonTarti();
+    if (st && Math.abs(v - st.kg) > 3) return tartiSor(v, 'Son tartın ' + fmt(st.kg) + ' kg idi (' + tarih(st.date, 1) + '). ' + fmt(Math.round(v * 10) / 10) + ' kg doğru mu?', 'Evet, kaydet');
+    tartiKaydet(v);
   },
+  'bw-ekle-kesin': function (d) { kapat(); tartiKaydet(num(d.v)); },
   'bw-geri': function () {
     var l = S.bw.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }), x = l[l.length - 1]; if (!x) return;
     S.bw = S.bw.filter(function (b) { return b.id !== x.id; }); kaydet(); render();
