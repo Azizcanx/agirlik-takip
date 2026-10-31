@@ -62,7 +62,14 @@ function birlestir(b, l, r) {
 /* ---------- şifreleme ---------- */
 function b64(u8) { var s = ''; for (var i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function unb64(s) { var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+var anahtarOnb = {};
 function anahtar(sifre, tuz) {
+  var k = sifre + '|' + b64(tuz);
+  if (!anahtarOnb[k]) anahtarOnb[k] = turet(sifre, tuz).catch(function (e) { delete anahtarOnb[k]; throw e; });
+  return anahtarOnb[k];
+}
+var sifTuz = null;   /* bu oturumda şifrelemede kullanılan tuz (şifre değişince yenilenir) */
+function turet(sifre, tuz) {
   return crypto.subtle.importKey('raw', new TextEncoder().encode(sifre), 'PBKDF2', false, ['deriveKey']).then(function (k) {
     return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: tuz, iterations: 150000, hash: 'SHA-256' }, k, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   });
@@ -71,7 +78,8 @@ function akis(u8, tur) {   /* gzip varsa sıkıştır/aç */
   return new Response(new Blob([u8]).stream().pipeThrough(tur === 'z' ? new CompressionStream('gzip') : new DecompressionStream('gzip'))).arrayBuffer().then(function (a) { return new Uint8Array(a); });
 }
 function sifrele(obj, sifre) {
-  var tuz = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), ham = new TextEncoder().encode(JSON.stringify(obj));
+  if (!sifTuz || sifTuz.sifre !== sifre) sifTuz = { sifre: sifre, tuz: crypto.getRandomValues(new Uint8Array(16)) };
+  var tuz = sifTuz.tuz, iv = crypto.getRandomValues(new Uint8Array(12)), ham = new TextEncoder().encode(JSON.stringify(obj));
   var z = typeof CompressionStream === 'function';
   return Promise.all([anahtar(sifre, tuz), z ? akis(ham, 'z') : ham]).then(function (x) {
     return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, x[0], x[1]);
@@ -88,7 +96,8 @@ function coz(metin, sifre) {
 function ayar() { try { return JSON.parse(localStorage.getItem(LS_AYAR) || 'null'); } catch (e) { return null; } }
 function ayarYaz(a) { if (a) localStorage.setItem(LS_AYAR, JSON.stringify(a)); else localStorage.removeItem(LS_AYAR); }
 function istek(a, yol, yontem, govde) {
-  return fetch(API + yol, { method: yontem || 'GET', headers: { Authorization: 'Bearer ' + a.token, Accept: 'application/vnd.github+json' }, body: govde ? JSON.stringify(govde) : undefined, cache: 'no-store' })
+  var b = govde ? JSON.stringify(govde) : undefined;
+  return fetch(API + yol, { method: yontem || 'GET', headers: { Authorization: 'Bearer ' + a.token, Accept: 'application/vnd.github+json' }, body: b, cache: 'no-store', keepalive: !!b && b.length < 60000 })
     .then(function (r) {
       if (r.status === 401) { var h = new Error('anahtar'); h.kod = 'anahtar'; throw h; }
       if (!r.ok) { var e = new Error('github ' + r.status); e.kod = 'ag'; throw e; }
@@ -145,7 +154,7 @@ function hataMetni(k) {
   return k === 'sifre' ? 'Şifre öbür cihazdakiyle aynı değil' : k === 'anahtar' ? 'GitHub anahtarı geçersiz ya da süresi dolmuş' : 'İnternet yok; bağlanınca eşitlenir';
 }
 AT.esitBagli = function () { return !!ayar(); };
-AT.degisti = function () { if (!uygulaniyor && ayar()) planla(15000); };
+AT.degisti = function () { if (!uygulaniyor && ayar()) planla(3000); };
 
 /* ---------- Ayarlar bölümü ---------- */
 function saat(t) { var d = new Date(t); return AT.tarih(AT.iso(d), 1) + ' ' + AT.p2(d.getHours()) + ':' + AT.p2(d.getMinutes()); }
@@ -153,7 +162,7 @@ function icerik(durum) {
   var a = ayar();
   if (!DESTEK) return '<p class="mut">Bu tarayıcı eşitlemeyi desteklemiyor.</p>';
   if (!a) return '<p class="mut">Kayıtların PC ve telefonda aynı olsun: GitHub hesabındaki gizli bir dosyada, kendi şifrenle kilitli durur. Ücretsiz.</p>' +
-    '<label class="alan"><span>GitHub anahtarı <a href="https://github.com/settings/tokens/new?scopes=gist&description=Agirlik%20Takip%20esitleme" target="_blank" rel="noopener">anahtar al</a> <small>(süre: No expiration)</small></span><input id="es-token" type="password" autocomplete="off" placeholder="ghp_…"></label>' +
+    '<label class="alan"><span>GitHub anahtarı ya da PC\'den gelen link <a href="https://github.com/settings/tokens/new?scopes=gist&description=Agirlik%20Takip%20esitleme" target="_blank" rel="noopener">anahtar al</a> <small>(süre: No expiration)</small></span><input id="es-token" type="password" autocomplete="off" placeholder="ghp_… ya da bağlantı linki"></label>' +
     '<label class="alan"><span>Şifre (iki cihazda aynı)</span><input id="es-sifre" type="password" autocomplete="new-password" placeholder="en az 6 karakter"></label>' +
     '<button class="btn-ac btn-big" data-act="es-bagla">Bağla</button>';
   var hata = a.hata || sonHata;
@@ -172,8 +181,11 @@ AT.bolum.esitle = function () {
     '<div class="panel" id="esitleme">' + icerik() + '</div></details>';
 };
 
+function linkCoz(m) { return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m))))); }
 function bagla(token, sifre) {
   token = String(token || '').trim(); sifre = String(sifre || '');
+  var lm = /esitle=([^&\s#]+)/.exec(token);   /* PC'den gelen bağlantı linki yapıştırıldıysa anahtar + şifre ondan */
+  if (lm) { try { var lx = linkCoz(lm[1]); token = String(lx.t || ''); sifre = String(lx.s || ''); } catch (e) { return AT.toast('Bağlantı linki bozuk'); } }
   if (!/^(gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}$/.test(token)) return AT.toast('GitHub anahtarı ghp_ ya da github_pat_ ile başlar');
   if (sifre.length < 6) return AT.toast('Şifre en az 6 karakter olmalı');
   ayarYaz({ token: token, sifre: sifre });
@@ -200,7 +212,7 @@ AT.islem['es-link'] = function () {
 document.addEventListener('DOMContentLoaded', function () {
   var m = /[#&]esitle=([^&]+)/.exec(location.hash);
   if (m) {
-    try { var x = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))); history.replaceState(null, '', location.pathname + location.search); setTimeout(function () { bagla(x.t, x.s); }, 300); }
+    try { var x = linkCoz(m[1]); history.replaceState(null, '', location.pathname + location.search); setTimeout(function () { bagla(x.t, x.s); }, 300); }
     catch (e) { AT.toast('Bağlantı linki bozuk'); }
     return;
   }
@@ -208,6 +220,9 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 document.addEventListener('visibilitychange', function () { if (!ayar()) return; if (document.hidden) esitle(false); else planla(800); });
 window.addEventListener('online', function () { if (ayar()) planla(1000); });
+window.addEventListener('focus', function () { if (ayar()) planla(500); });
+window.addEventListener('pageshow', function (e) { if (e.persisted && ayar()) planla(500); });
+setInterval(function () { if (ayar() && !document.hidden) esitle(false); }, 60000);
 
 AT._esitle = { birlestir: birlestir, liste: liste, harita: harita, sifrele: sifrele, coz: coz, veriAl: veriAl };   /* test için */
 })(window.AT);
