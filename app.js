@@ -292,6 +292,11 @@ function gecenYaz(prev) {
 }
 /* tekrarlanabilir antrenmanlar: farklı adlı son 5 seans (en yeni önce) */
 function sadeAd(n) { return String(n || '').replace(/\s*\(örnek\)\s*$/i, '').trim(); }
+/* "Squat · Romanian Deadlift · +2": ilk iki hareket, kalanların sayısı */
+function hareketOnizle(se) {
+  var a = se.exs.map(function (e) { return e.ad; });
+  return a.slice(0, 2).join(' · ') + (a.length > 2 ? ' · +' + (a.length - 2) : '');
+}
 function siradaki() {
   var l = sablonlar(), lim = new Date(); lim.setDate(lim.getDate() - 21); var limS = iso(lim);
   l = l.filter(function (s) { return s.date >= limS; });
@@ -347,7 +352,7 @@ function vBugun() {
     o += '<h1>Bugün</h1><p class="sub">' + tarih(iso(new Date())) + '</p>';
     var sr = siradaki();
     var a1 = (hic ? ilkAdimlar() : '') + (sr
-      ? '<button class="btn-ac btn-big" data-act="basla-tekrar" data-id="' + h(sr.id) + '">Sıradaki: ' + h(sadeAd(sr.name)) + '<kbd>N</kbd></button><button class="btn-ghost mini basla-baska" data-act="basla">Başka antrenman seç</button>'
+      ? '<button class="btn-ac btn-big btn-sira" data-act="basla-tekrar" data-id="' + h(sr.id) + '"><span>Sıradaki: ' + h(sadeAd(sr.name)) + '<kbd>N</kbd></span><small>' + h(hareketOnizle(sr)) + '</small></button><button class="btn-ghost mini basla-baska" data-act="basla">Başka antrenman seç</button>'
       : '<button class="btn-ac btn-big" data-act="basla">Antrenmana başla<kbd>N</kbd></button>') + sonGunSatir(son) + (AT.bolum.tarti ? AT.bolum.tarti() : '');
     var b1 = AT.bolum.notlar ? AT.bolum.notlar() : '';
     if (son) {
@@ -367,7 +372,8 @@ function vBugun() {
   if (!a.exs.length) o += '<div class="empty">Henüz hareket yok.<br>Aşağıdan “+ Hareket ekle” ile başla.</div>';
   a.exs.forEach(function (e, ei) {
     var prev = oncekiSetler(e.ad);
-    o += '<section class="panel"><div class="ex-head"><span class="grow"><b>' + h(e.ad) + '</b><span class="tag">' + h(e.kas) + '</span></span>' +
+    var exBitti = e.sets.length && e.sets.every(function (x) { return x.done; });
+    o += '<section class="panel' + (exBitti ? ' ex-bitti' : '') + '"><div class="ex-head"><span class="grow"><b>' + h(e.ad) + '</b>' + (exBitti ? '<span class="ex-tik" aria-label="bitti">✓</span>' : '') + '<span class="tag">' + h(e.kas) + '</span></span>' +
       (AT.bolum.plakaDugme ? AT.bolum.plakaDugme(ei) : '') +
       '<button class="mini btn-ghost" data-act="egz-sil" data-e="' + ei + '" aria-label="Hareketi çıkar">Çıkar</button></div>';
     o += miniGecmis(e.ad);

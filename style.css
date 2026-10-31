@@ -356,6 +356,13 @@ html.tema-gecis,html.tema-gecis *{transition:background-color .35s ease,color .3
 .ozet-rekor span{font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums}
 .ozet-rekor i{font-style:normal;color:var(--iyi);font-weight:600}
 
+/* Sıradaki düğmesi: iki satır (ad + hareket önizlemesi) */
+.btn-sira{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:64px;padding:8px 16px}
+.btn-sira small{font-weight:400;font-size:13px;opacity:.78;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* antrenmanda bütün setleri biten hareket */
+.ex-tik{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--iyit);color:var(--iyi);font-size:12px;font-weight:700}
+section.panel.ex-bitti .ex-head b{color:var(--mut)}
+
 /* Bugün: sıradaki antrenman düğmesinin altındaki seçim */
 .basla-baska{display:block;margin:6px auto 0;color:var(--mut)!important}
 .son-gun{text-align:center;font-size:14px;color:var(--mut);margin:8px 0 0}
@@ -453,7 +460,7 @@ button.satir.tk:hover .tk-kutu{border-color:var(--acl)}
 .baslik-input{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1.2;min-height:0;padding:2px 0;margin:0 0 2px;background:transparent;border:0;border-bottom:1.5px dashed transparent;border-radius:0}
 .baslik-input:hover{border-bottom-color:var(--line)}
 .baslik-input:focus{border-bottom-color:var(--ac)}
-.ilerle{display:flex;align-items:center;gap:12px;margin:0 0 18px}
+.ilerle{display:flex;align-items:center;gap:12px;margin:0 0 18px;position:sticky;top:0;z-index:4;background:var(--bg);padding:10px 0;box-shadow:0 1px 0 var(--line)}   /* antrenmanda kaydırınca üstte kalır */
 .ilerle .ibar{flex:1;height:8px}
 .ilerle span{font-size:14px;color:var(--mut);white-space:nowrap;font-variant-numeric:tabular-nums}
 .ilerle b{color:var(--tx);font-weight:600}
@@ -529,7 +536,7 @@ details.katla.seansnot textarea{margin-bottom:12px}
    Telefonda: marka, kısayol düğmesi ve <kbd> ipuçları gizli; .duzen alt alta (sıra aynı).
    ≥1024px: solda sabit menü, iki sütun (.duzen), ortada açılan pencere, sağ altta dinlenme sayacı. */
 kbd{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--mut);background:var(--s1);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:0 6px;line-height:1.5;display:inline-block;font-variant-numeric:tabular-nums}
-.marka,#tabs .kisayol,.btn-big>kbd,.kisaipucu,.altnot .pc{display:none}
+.marka,#tabs .kisayol,.btn-big kbd,.kisaipucu,.altnot .pc{display:none}
 @media (min-width:1024px){
   #app{max-width:none;margin:0;padding-left:232px}
   #view{max-width:1160px;width:100%;margin:0 auto;padding:44px 48px 72px}
@@ -565,7 +572,7 @@ kbd{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--mut);back
   .kol>.empty:first-child{padding-top:12px}
   .duzen.yan>.kol:last-child>.seansnot:first-child{margin-top:0}
 
-  .btn-big>kbd{display:inline-block;margin-left:10px;background:transparent;color:inherit;opacity:.7;border-color:currentColor}
+  .btn-big kbd{display:inline-block;margin-left:10px;background:transparent;color:inherit;opacity:.7;border-color:currentColor}
   .kisaipucu{display:block;margin:14px 0 0;font-size:13px;color:var(--dim);text-align:center}
   .altnot .pc{display:inline}
 
