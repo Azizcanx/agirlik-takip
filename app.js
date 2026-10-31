@@ -580,11 +580,11 @@ var SOZLUK = [
 function vAyarlar() {
   var demoVar = S.sessions.some(function (s) { return s.demo; }) || S.bw.some(function (b) { return b.demo; }) || (S.kcal || []).some(function (k) { return k.demo; });
   var o0 = '<h1>Ayarlar</h1><p class="sub">' + (AT.esitBagli && AT.esitBagli() ? 'Kayıtların bu cihazda ve şifreli olarak GitHub\'daki gizli dosyanda durur.' : 'Kayıtların yalnız bu cihazda durur; internete gönderilmez.') + '</p>';
-  var a0 = '<h2>Yedek</h2><div class="panel liste">' +
-    '<button class="satir" data-act="disa"><span class="grow"><b>Yedeği indir</b><span>Tüm kayıtlar tek dosyada (JSON)</span></span></button>' +
-    '<button class="satir" data-act="ice"><span class="grow"><b>Yedeği geri yükle</b><span>İndirdiğin yedek dosyasını seç; şu anki verinin yerine geçer</span></span></button></div>' +
-    '<input type="file" id="dosya" accept="application/json,.json" hidden>' +
-    '<p class="mut kucuk">Arada bir yedek al: tarayıcı verisi silinirse kayıtlar da gider.</p>';
+  /* yedek, otomatik yedek, eşitleme ve Excel tek grupta; ayrıntılar katlanır (durumları özet satırında) */
+  var a0 = '<h2>Yedek ve eşitleme</h2><div class="panel liste">' +
+    '<button class="satir" data-act="disa"><span class="grow"><b>Yedeği indir</b><span>Tüm kayıtlar tek dosyada; arada bir al</span></span></button>' +
+    '<button class="satir" data-act="ice"><span class="grow"><b>Yedeği geri yükle</b><span>Şu anki verinin yerine geçer</span></span></button></div>' +
+    '<input type="file" id="dosya" accept="application/json,.json" hidden>';
   if (AT.bolum.otoyedek) a0 += AT.bolum.otoyedek();
   if (AT.bolum.esitle) a0 += AT.bolum.esitle();   /* esitle.js: PC ↔ telefon */
   if (AT.bolum.disa) a0 += '<details class="katla"><summary>Excel ve diğer uygulamalar <small>Strong, Hevy</small></summary>' + AT.bolum.disa() + '</details>';
@@ -597,10 +597,10 @@ function vAyarlar() {
     '<div class="alan"><span>Zorluk alanı (RPE): her sete 6–10 arası zorluk yazmak için</span><div class="seg" role="group" aria-label="Zorluk alanı">' + [[0, 'Kapalı'], [1, 'Açık']].map(function (t) {
       return '<button data-act="rpe" data-v="' + t[0] + '" aria-pressed="' + (!!S.rpe === !!t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
     '<p class="mut kucuk alt-not">Bilmiyorsan kapalı bırak; öneriler yine çalışır.</p></div>' +
-    (AT.bolum.ses ? AT.bolum.ses() : '') +
-    '<p class="mut kucuk">Birim: kg.</p></div>';
-  o += '<h2>Örnek veri</h2><div class="panel"><p class="mut">Uygulamanın dolu hâlini görmek için 12 haftalık uydurma kayıt. Her yerde "örnek" etiketi taşır; silince yalnız onlar gider.</p>' +
-    (demoVar ? '<button class="btn-big btn-bad" data-act="demo-sil">Örnek veriyi sil</button>' : '<button class="btn-big btn-ac" data-act="demo-yukle">Örnek veriyi yükle</button>') + '</div>';
+    (AT.bolum.ses ? AT.bolum.ses() : '') + '</div>';
+  o += '<h2>Örnek veri</h2><div class="panel liste">' + (demoVar
+    ? '<button class="satir bad" data-act="demo-sil"><span class="grow"><b>Örnek veriyi sil</b><span>Yalnız "örnek" etiketli kayıtlar gider</span></span></button>'
+    : '<button class="satir" data-act="demo-yukle"><span class="grow"><b>Örnek veriyi yükle</b><span>Dolu hâlini görmek için 12 haftalık uydurma kayıt, "örnek" etiketli</span></span></button>') + '</div>';
   o += '<details class="katla"><summary>Bu kelimeler ne demek?</summary><dl class="sozluk">' + SOZLUK.map(function (x) { return '<dt>' + h(x[0]) + '</dt><dd>' + h(x[1]) + '</dd>'; }).join('') + '</dl></details>';
   o += '<h2>Veriyi sil</h2><div class="panel liste"><button class="satir bad" data-act="hepsini-sil"><span class="grow"><b>Tüm verileri sil</b><span>Antrenmanlar, kilo kayıtları, kendi eklediğin hareketler</span></span></button></div>';
   return o0 + kol(a0, o) + '<p class="altnot">Ağırlık Takip · internetsiz çalışır<span class="pc"> · kısayollar <kbd>?</kbd></span></p>';

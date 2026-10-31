@@ -160,8 +160,17 @@ function icerik(durum) {
   return '<p class="durum ' + (hata ? 'uyari' : 'iyi') + '">' + AT.h(durum || (hata ? hataMetni(hata) : a.son ? 'Eşitlendi · ' + saat(a.son) : 'Bağlandı')) + '</p>' +
     '<div class="row"><button class="btn-ghost mini" data-act="es-simdi">Şimdi eşitle</button><button class="btn-ghost mini" data-act="es-link">Telefona bağlantı linki</button><span class="grow"></span><button class="btn-ghost mini" data-act="es-kaldir">Kaldır</button></div>';
 }
-function ciz(durum) { var e = AT.$('#esitleme'); if (e) e.innerHTML = icerik(durum); }
-AT.bolum.esitle = function () { return '<h2>PC ↔ telefon <small>eşitleme</small></h2><div class="panel" id="esitleme">' + icerik() + '</div>'; };
+/* Ayarlar'da katlanır; özet: kapalı / bağlı / sorun var (sorun varsa kendiliğinden açık) */
+function esitDurumu() { var a = ayar(); return !DESTEK ? 'desteklenmiyor' : !a ? 'kapalı' : (a.hata || sonHata) ? 'sorun var' : 'bağlı'; }
+function ciz(durum) {
+  var e = AT.$('#esitleme'); if (e) e.innerHTML = icerik(durum);
+  var z = AT.$('#esitleme-ozet'); if (z) z.textContent = esitDurumu();
+  var d = e && e.closest ? e.closest('details') : null; if (d && esitDurumu() === 'sorun var') d.open = true;
+}
+AT.bolum.esitle = function () {
+  return '<details class="katla"' + (esitDurumu() === 'sorun var' ? ' open' : '') + '><summary>PC ↔ telefon eşitleme <small id="esitleme-ozet">' + esitDurumu() + '</small></summary>' +
+    '<div class="panel" id="esitleme">' + icerik() + '</div></details>';
+};
 
 function bagla(token, sifre) {
   token = String(token || '').trim(); sifre = String(sifre || '');

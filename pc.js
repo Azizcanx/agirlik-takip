@@ -91,7 +91,12 @@ function yedekHTML() {
   return '<p class="durum uyari">Tarayıcı izni yenilemeni istiyor · klasör: ' + ad + (b.t ? ' · son yedek ' + AT.h(zaman(b.t)) : '') + '</p>' +
     '<div class="row"><button class="btn-ac" data-act="oy-izin">İzin ver</button><span class="grow"></span><button class="btn-ghost mini" data-act="oy-kapat">Kapat</button></div>';
 }
-function ciz() { var e = AT.$('#otoyedek'); if (e) e.innerHTML = yedekHTML(); }
+function yedekDurumu() { return !klasor ? 'kapalı' : izin === 'granted' ? 'açık' : 'izin gerekli'; }
+function ciz() {
+  var e = AT.$('#otoyedek'); if (e) e.innerHTML = yedekHTML();
+  var z = AT.$('#otoyedek-ozet'); if (z) z.textContent = yedekDurumu();
+  var d = e && e.closest ? e.closest('details') : null; if (d && klasor && izin !== 'granted') d.open = true;   /* izin isteniyorsa kendiliğinden açık */
+}
 
 /* Ayarlar > Antrenman paneli içinde bir alan */
 AT.bolum.ses = function () {
@@ -103,7 +108,8 @@ AT.bolum.ses = function () {
 AT.bolum.otoyedek = function () {
   if (!DESTEK) return '';
   setTimeout(function () { izinBak().then(ciz); }, 0);
-  return '<h2>Otomatik yedek <small>bu bilgisayar</small></h2><div class="panel" id="otoyedek">' + yedekHTML() + '</div>';
+  return '<details class="katla"' + (klasor && izin !== 'granted' ? ' open' : '') + '><summary>Otomatik yedek <small id="otoyedek-ozet">' + yedekDurumu() + '</small></summary>' +
+    '<div class="panel" id="otoyedek">' + yedekHTML() + '</div></details>';
 };
 AT.islem.ses = function (d) { AT.S.ses = d.v === '1'; AT.kaydet(); AT.render(); if (AT.S.ses) { sesAc(); calSes(); } };
 AT.islem['oy-sec'] = function () {

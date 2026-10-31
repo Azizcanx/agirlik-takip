@@ -275,7 +275,10 @@ function kaloriGecmisi(bugun) {
   var h = haftalikKcal(AT.S.kcal, bugun, 8);
   if (!h.some(function (x) { return x.gun; })) return '';
   var hr = harcama(AT.S.bw, AT.S.kcal, bugun);
-  return '<details class="katla"><summary>Kalori geçmişi <small>' + (hr.tdee != null ? 'harcama ~' + AT.h(kcalSay(hr.tdee)) : 'haftalık') + '</small></summary>' +
+  /* özet: harcama hazırsa sayı, değilse ne kadar kaldığı (ör. "harcama için 6/10 gün") */
+  var oz = hr.tdee != null ? 'harcama ~' + kcalSay(hr.tdee) : hr.eksik && !hr.eksik.eski && hr.eksik.kcalGun < TDEE_KCAL_GUN ? 'harcama için ' + hr.eksik.kcalGun + '/' + TDEE_KCAL_GUN + ' gün' : 'haftalık';
+  var hs = harcamaSatir(bugun);
+  return '<details class="katla"><summary>Kalori ve harcama <small>' + AT.h(oz) + '</small></summary>' + (hs ? '<dl class="kv">' + hs + '</dl>' : '') +
     AT.cubuk(h.map(function (x) { return { l: AT.tarih(x.bas, 1), v: Math.round(x.ort) }; }), { baslik: 'Haftalık ortalama kalori', birim: 'kcal' }) + '</details>';
 }
 
@@ -285,8 +288,6 @@ function bolumYok(l) {
   if (son) {
     o += '<div class="hero"><b>' + AT.h(AT.fmt(trSon)) + ' <small>kg</small></b><span>ortalama kilo · son tartı ' + AT.h(AT.fmt(son.kg)) + ' kg, ' + AT.h(AT.tarih(son.date, 1)) + demoTag(son) + '</span></div>';
     o += grafik(cizgiSeri(tr), null, 'Ortalama vücut ağırlığı');
-    var hs = harcamaSatir(AT.iso(new Date()));
-    if (hs) o += '<dl class="kv">' + hs + '</dl>';
     o += '<div class="row"><button class="btn-ghost mini" data-act="bw-geri">Son kaydı sil</button></div>';
   } else {
     o += '<p class="mut">Kilonu Bugün ekranından gir; grafik burada oluşur.</p>';
@@ -324,8 +325,7 @@ function bolumVar(l, b) {
     '<div><dt>Hedefe kalan</dt><dd>' + (ulasti ? 'Hedefe ulaştın' : AT.h(isaret(r10(r.kalan))) + ' kg') + '</dd></div>' +
     '<div><dt>Bu hızla varış</dt><dd>' + varisYaz(r) + '</dd></div>' +
     (r.hedefKcal != null ? '<div><dt>Hedef hız için</dt><dd>günde ~' + AT.h(kcalSay(r.hedefKcal)) + '</dd></div>' : '') +
-    harcamaSatir(bugun) +
-    '</dl>';
+    '</dl>';   /* harcama ve ortalama yediğin: Kalori geçmişi katlanırında */
   var seri = cizgiSeri(trendSeri(l)).filter(function (p) { return p.date >= b.bas; }), ref = null;
   if (son && son.date > b.bas) {
     var orta = (r.min + r.max) / 2;
