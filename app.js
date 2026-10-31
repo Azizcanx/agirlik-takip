@@ -581,7 +581,8 @@ var SOZLUK = [
   ['Bulk ve cut', 'Bulk: kas için yavaşça kilo alma dönemi. Cut: kilo verme dönemi.'],
   ['Günlük harcama', 'Bir günde yaktığın toplam kalori (TDEE). Son 4 haftada yediğin kalori ortalamasından kilo değişiminin karşılığı düşülerek hesaplanır (1 kg ≈ 7.700 kcal). Kilon sabitse yediğin kadar harcıyorsun.'],
   ['Hafif hafta', 'İlerleme durunca 1 hafta kiloyu %10 düşürüp toparlanmak (deload). Sonra eski kiloya dönersin.'],
-  ['Zorluk (RPE)', '10 = bir tekrar daha yapamazdım, 9 = bir tekrar daha yapabilirdim, 8 = iki tekrar daha. Ayarlardan açılır, boş bırakılabilir.']
+  ['Zorluk (RPE)', '10 = bir tekrar daha yapamazdım, 9 = bir tekrar daha yapabilirdim, 8 = iki tekrar daha. Ayarlardan açılır, boş bırakılabilir.'],
+  ['Makro', 'Protein, karbonhidrat ve yağ (gram). 1 g protein ve karbonhidrat 4 kcal, 1 g yağ 9 kcal eder; makroyla eklediğin öğünün kalorisi kendiliğinden hesaplanır.']
 ];
 function vAyarlar() {
   var demoVar = S.sessions.some(function (s) { return s.demo; }) || S.bw.some(function (b) { return b.demo; }) || (S.kcal || []).some(function (k) { return k.demo; });

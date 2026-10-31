@@ -201,7 +201,9 @@ function demoBw(basla, bugun) {
   for (var j = 0; j <= 120; j++) {
     var dk = new Date(bas); dk.setDate(dk.getDate() + j); if (dk > son) break;
     if (gunFark(AT.iso(son), AT.iso(dk)) > 45 || rnd() < 0.15) continue;   /* son ~6 hafta, arada unutulan günler */
-    kcal.push({ id: 'dkc' + j, date: AT.iso(dk), kcal: Math.round((2600 + 330 + (rnd() - 0.5) * 600) / 10) * 10, demo: true });
+    var kc = Math.round((2600 + 330 + (rnd() - 0.5) * 600) / 10) * 10, mp = 140 + j * 7 % 21, my = 78 + j * 5 % 15;
+    /* makrolar rnd() çağırmadan türetilir (örnek kilo/kalori dizisi değişmesin); 4·P + 4·K + 9·Y = kcal */
+    kcal.push({ id: 'dkc' + j, date: AT.iso(dk), kcal: kc, p: mp, k: Math.round((kc - 4 * mp - 9 * my) / 4), y: my, demo: true });
   }
   return { bw: bw, kcal: kcal, bulk: { bas: AT.iso(bas), basKg: basKg, hedefKg: 84, min: 0.2, max: 0.4, demo: true } };
 }
@@ -271,13 +273,20 @@ function haftalikKcal(kcal, bugun, n) {
   }
   return out;
 }
+/* makrolu gün varsa: son 7 tamamlanmış günün ortalaması + kilo başına protein (ortalama kiloya göre) */
+function makroSatir(bugun) {
+  var o = makroOrt(AT.S.kcal, bugun, 7); if (!o) return '';
+  var l = gecerli(AT.S.bw), kg = l.length ? ortalamaKilo(l) : null;
+  return '<div><dt>Makrolar <small>' + o.gun + ' gün ort.</small></dt><dd>' + AT.h(makroYaz(o)) + '</dd></div>' +
+    (kg > 0 && o.p > 0 ? '<div><dt>Protein kilo başına</dt><dd>' + AT.h(AT.fmt(o.p / kg, 1)) + ' g/kg</dd></div>' : '');
+}
 function kaloriGecmisi(bugun) {
   var h = haftalikKcal(AT.S.kcal, bugun, 8);
   if (!h.some(function (x) { return x.gun; })) return '';
   var hr = harcama(AT.S.bw, AT.S.kcal, bugun);
   /* özet: harcama hazırsa sayı, değilse ne kadar kaldığı (ör. "harcama için 6/10 gün") */
   var oz = hr.tdee != null ? 'harcama ~' + kcalSay(hr.tdee) : hr.eksik && !hr.eksik.eski && hr.eksik.kcalGun < TDEE_KCAL_GUN ? 'harcama için ' + hr.eksik.kcalGun + '/' + TDEE_KCAL_GUN + ' gün' : 'haftalık';
-  var hs = harcamaSatir(bugun);
+  var hs = harcamaSatir(bugun) + makroSatir(bugun);
   return '<details class="katla"><summary>Kalori ve harcama <small>' + AT.h(oz) + '</small></summary>' + (hs ? '<dl class="kv">' + hs + '</dl>' : '') +
     AT.cubuk(h.map(function (x) { return { l: AT.tarih(x.bas, 1), v: Math.round(x.ort) }; }), { baslik: 'Haftalık ortalama kalori', birim: 'kcal' }) + '</details>';
 }
@@ -340,13 +349,50 @@ function bolumVar(l, b) {
   return o + '</div>' + kaloriGecmisi(bugun);
 }
 
-/* bugünün kalori toplamı + giriş. "+650" öğün ekler, düz sayı günün toplamını değiştirir */
-function kcalBugun(bugun) { var k = kcalGecerli(AT.S.kcal).filter(function (x) { return x.date === bugun; }); return k.length ? k[0] : null; }
+/* ---------- makrolar (isteğe bağlı): günün kalori kaydına p/k/y gram; S.kcal [{id, date, kcal, p?, k?, y?}] ----------
+   "Makro ile ekle": girilen gramlar günün toplamına eklenir, kalorisi 4·P + 4·K + 9·Y olarak kaloriye de eklenir
+   (aynı öğünü ayrıca "+kcal" yazmaya gerek yok). Eşitleme kaydı alan alan birleştirir (esitle.js). */
+var MAKRO = [['p', 'Protein', 4], ['k', 'Karb', 4], ['y', 'Yağ', 9]], MAKRO_ACIK_GUN = 14;
+function makroKcal(m) { return MAKRO.reduce(function (t, x) { return t + (+m[x[0]] > 0 ? +m[x[0]] * x[2] : 0); }, 0); }
+function makroVar(k) { return !!k && MAKRO.some(function (x) { return +k[x[0]] > 0; }); }
+function makroYaz(k) { return MAKRO.map(function (x) { return x[0].toLocaleUpperCase('tr') + ' ' + AT.fmt(+k[x[0]] || 0, 0); }).join(' · ') + ' g'; }
+/* tamamlanmış son n günün (bugün hariç) makro ortalaması; makrolu gün yoksa null */
+function makroOrt(kcal, bugun, n) {
+  var bas = gunEkle(bugun, -n), l = (kcal || []).filter(function (k) { return k && k.date >= bas && k.date < bugun && makroVar(k); });
+  if (!l.length) return null;
+  var o = { gun: l.length };
+  MAKRO.forEach(function (x) { o[x[0]] = l.reduce(function (t, k) { return t + (+k[x[0]] || 0); }, 0) / l.length; });
+  return o;
+}
+
+/* bugünün kalori toplamı + giriş. "+650" öğün ekler, düz sayı günün toplamını değiştirir.
+   Bugünün kaydı ham okunur: 300 kcal altı (ör. ilk öğün bir shake) da görünür ve üstüne eklenir; harcama yine kcalGecerli ile süzer */
+function kcalBugun(bugun) { var k = (AT.S.kcal || []).filter(function (x) { return x && x.date === bugun; }); return k.length ? k[k.length - 1] : null; }
 function kcalGir(bugun) {
-  var k = kcalBugun(bugun);
+  var k = kcalBugun(bugun), bas = gunEkle(bugun, -MAKRO_ACIK_GUN);
+  /* son 2 haftada makro yazıldıysa açık gelir; hiç kullanılmadıysa tek satır kapalı durur */
+  var acik = (AT.S.kcal || []).some(function (x) { return x && x.date >= bas && makroVar(x); });
   return '<div class="row kcalrow"><input id="kcalgir" class="grow" inputmode="text" autocomplete="off" placeholder="' + (k ? 'öğün ekle: +650' : 'kalori, örn. 2800 · öğün +650') + '" aria-label="Bugün yediğin kalori">' +
     '<button data-act="kcal-ekle">' + (k ? 'Ekle' : 'Kaydet') + '</button></div>' +
-    (k ? '<p class="kcal-bugun">Bugün: <b>' + AT.h(kcalSay(k.kcal)) + '</b>' + demoTag(k) + ' <button class="btn-ghost mini" data-act="kcal-sil">Sıfırla</button></p>' : '');
+    '<details class="makro"' + (acik ? ' open' : '') + '><summary>Makro ile ekle</summary><div class="row makrorow">' +
+    MAKRO.map(function (x) { return '<input id="mk-' + x[0] + '" inputmode="decimal" autocomplete="off" placeholder="' + x[1] + ' g" aria-label="' + x[1] + ', gram">'; }).join('') +
+    '<button data-act="makro-ekle">Ekle</button></div><p class="mut kucuk makro-kcal" id="mk-kcal">Kalorisi kendiliğinden eklenir (4·4·9).</p></details>' +
+    (k ? '<p class="kcal-bugun">Bugün: <b>' + AT.h(kcalSay(k.kcal || 0)) + '</b>' + (makroVar(k) ? ' <span class="makro-bugun">' + AT.h(makroYaz(k)) + '</span>' : '') + demoTag(k) +
+      ' <button class="btn-ghost mini" data-act="kcal-sil">Sıfırla</button></p>' : '');
+}
+/* makro kutularına yazarken eklenecek kaloriyi göster */
+if (typeof document !== 'undefined') document.addEventListener('input', function (ev) {
+  if (!ev.target || !/^mk-[pky]$/.test(ev.target.id || '')) return;
+  var m = {}, e = AT.$('#mk-kcal'); MAKRO.forEach(function (x) { var i = AT.$('#mk-' + x[0]); m[x[0]] = i ? AT.num(String(i.value).trim()) : NaN; });
+  var c = makroKcal(m); if (e) e.textContent = c > 0 ? '+' + kcalSay(Math.round(c)) + ' eklenecek' : 'Kalorisi kendiliğinden eklenir (4·4·9).';
+});
+/* bugünün kaydını değiştir: varsa (örnek değilse) kopyası üzerinde, yoksa yeni; id korunur, eşitleme tarih + alan bazında */
+function gunuGuncelle(bugun, fn) {
+  var eski = kcalBugun(bugun), k = eski && !eski.demo ? Object.assign({}, eski) : { id: AT.uid(), date: bugun, kcal: 0 };
+  fn(k);
+  AT.S.kcal = (AT.S.kcal || []).filter(function (x) { return x.date !== bugun; });
+  AT.S.kcal.push(k);
+  return k;
 }
 var duzelt = false;
 function tarti() {
@@ -418,17 +464,42 @@ AT.islem['bulk-bitir-kesin'] = function () { AT.S.bulk = null; AT.kaydet(); AT.k
 AT.islem['kcal-ekle'] = function () {
   var e = AT.$('#kcalgir'), ham = e ? String(e.value).trim().replace(/\s|\./g, '') : '';
   var ekle = /^\+/.test(ham), v = AT.num(ham.replace(/^\+/, ''));
-  var bugun = AT.iso(new Date()), k = kcalBugun(bugun), yeni = ekle ? (k && !k.demo ? +k.kcal : 0) + v : v;   /* örnek kaloriye eklenmez */
+  var bugun = AT.iso(new Date()), k = kcalBugun(bugun), yeni = ekle ? (k && !k.demo ? +k.kcal || 0 : 0) + v : v;   /* örnek kaloriye eklenmez */
   if (!(v > 0) || v > 10000) return AT.toast('Kaloriyi 1–10.000 arası gir (öğün için +650)');
-  if (yeni < KCAL_MIN || yeni > KCAL_MAX) return AT.toast(yeni < KCAL_MIN ? 'Günlük toplam en az ' + KCAL_MIN + ' kcal olmalı; öğün eklemek için +' + AT.fmt(v, 0) + ' yaz' : 'Günlük toplam çok yüksek');
-  AT.S.kcal = (AT.S.kcal || []).filter(function (x) { return x.date !== bugun; });
-  AT.S.kcal.push({ id: AT.uid(), date: bugun, kcal: Math.round(yeni) });
-  AT.kaydet(); AT.render(); AT.toast('Bugün ' + kcalSay(Math.round(yeni)));
+  /* düz sayı günün toplamıdır, 300 altı büyük ihtimalle yanlışlık; "+" ile küçük öğün (ör. shake) eklenebilir */
+  if (!ekle && yeni < KCAL_MIN) return AT.toast('Günlük toplam en az ' + KCAL_MIN + ' kcal olmalı; öğün eklemek için +' + AT.fmt(v, 0) + ' yaz');
+  if (yeni > KCAL_MAX) return AT.toast('Günlük toplam çok yüksek');
+  var g = gunuGuncelle(bugun, function (x) { x.kcal = Math.round(yeni); });   /* makrolar korunur */
+  AT.kaydet(); AT.render(); AT.toast('Bugün ' + kcalSay(g.kcal));
   var n = AT.$('#kcalgir'); if (n && AT.masaustu && AT.masaustu()) n.focus();
 };
+AT.islem['makro-ekle'] = function () {
+  var m = {}, hata = '';
+  MAKRO.forEach(function (x) {
+    var e = AT.$('#mk-' + x[0]), v = e ? String(e.value).trim().replace(/^\+/, '') : '';
+    if (!v) return;
+    var n = AT.num(v);
+    if (!(n >= 0 && n <= 1000)) { hata = hata || x[1] + ' 0–1000 g arası olmalı'; return; }
+    m[x[0]] = n;
+  });
+  if (hata) return AT.toast(hata);
+  if (!makroVar(m)) return AT.toast('En az bir makro yaz (gram)');
+  var bugun = AT.iso(new Date()), eski = kcalBugun(bugun), ek = makroKcal(m);
+  if ((eski && !eski.demo ? +eski.kcal || 0 : 0) + ek > KCAL_MAX) return AT.toast('Günlük toplam çok yüksek');
+  var g = gunuGuncelle(bugun, function (x) {
+    MAKRO.forEach(function (y) { if (m[y[0]] != null) x[y[0]] = Math.round(((+x[y[0]] || 0) + m[y[0]]) * 10) / 10; });
+    x.kcal = Math.round((+x.kcal || 0) + ek);
+  });
+  AT.kaydet(); AT.render(); AT.toast('Bugün ' + kcalSay(g.kcal) + ' · ' + makroYaz(g));
+  var p = AT.$('#mk-p'); if (p && AT.masaustu && AT.masaustu()) p.focus();
+};
 AT.islem['kcal-sil'] = function () {
-  var bugun = AT.iso(new Date()); AT.S.kcal = (AT.S.kcal || []).filter(function (x) { return x.date !== bugun; });
-  AT.kaydet(); AT.render(); AT.toast('Bugünün kalorisi silindi');
+  var bugun = AT.iso(new Date()), k = kcalBugun(bugun);
+  AT.S.kcal = (AT.S.kcal || []).filter(function (x) { return x.date !== bugun; });
+  AT.kaydet(); AT.render();
+  var m = makroVar(k) ? 'Bugünün kalorisi ve makroları silindi' : 'Bugünün kalorisi silindi';
+  if (k && AT.geriAl) AT.geriAl(m, function () { if (!AT.S.kcal.some(function (x) { return x.date === k.date; })) AT.S.kcal.push(k); });
+  else AT.toast(m);
 };
 AT.islem['tarti-duzelt'] = function () { duzelt = true; AT.render(); var e = AT.$('#bwkg'); if (e) e.focus(); };
 
@@ -439,5 +510,5 @@ AT.bolum.bulk = function () { var l = gecerli(AT.S.bw); return AT.S.bulk ? bolum
 AT.bolum.tarti = tarti;
 AT.demoBw = demoBw;
 /* test/başka modüller için saf hesaplar */
-AT.bulkHesap = { cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, haftalikOneri: haftalikOneri, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
+AT.bulkHesap = { makroKcal: makroKcal, makroOrt: makroOrt, makroYaz: makroYaz, cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, haftalikOneri: haftalikOneri, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
 })(window.AT);

@@ -37,7 +37,7 @@ function sirala(sessions) {
 
 var ANT_BASLIK = ['Tarih', 'Antrenman', 'Egzersiz', 'Kas grubu', 'Set no', 'kg', 'Tekrar', 'Hacim (kg)', 'Tahmini 1RM (kg)', 'Örnek'];
 var KILO_BASLIK = ['Tarih', 'Kilo (kg)', '7 günlük ortalama (kg)', 'Örnek'];
-var KCAL_BASLIK = ['Tarih', 'Kalori (kcal)', 'Örnek'];
+var KCAL_BASLIK = ['Tarih', 'Kalori (kcal)', 'Protein (g)', 'Karbonhidrat (g)', 'Yağ (g)', 'Örnek'];
 
 /* Her tamamlanmış set bir satır (başlık hariç). */
 function antrenmanSatirlari(sessions) {
@@ -70,7 +70,9 @@ function kiloSatirlari(bw) {
 function kaloriSatirlari(kcal) {
   var m = {};
   (kcal || []).forEach(function (k) { if (k && /^\d{4}-\d{2}-\d{2}$/.test(k.date) && k.kcal >= 300 && k.kcal <= 15000) m[k.date] = k; });
-  return Object.keys(m).sort().map(function (d) { return [d, Math.round(+m[d].kcal), m[d].demo ? 'evet' : '']; });
+  /* makrolar isteğe bağlı: girilmemişse boş hücre; ondalıklı gram virgülle */
+  function g(v) { v = +v; return v > 0 ? (v % 1 ? { n: v, d: 1 } : v) : ''; }
+  return Object.keys(m).sort().map(function (d) { var k = m[d]; return [d, Math.round(+k.kcal), g(k.p), g(k.k), g(k.y), k.demo ? 'evet' : '']; });
 }
 
 /* ---------- CSV içe aktarma (Strong, Hevy, bizim antrenman/kilo/kalori CSV'leri) ---------- */
@@ -192,7 +194,8 @@ function bicimBul(bas) {
     return { tip: 'bizim', ad: 'Ağırlık Takip', c: { ad: idx('antrenman'), tarih: idx('tarih'), egz: idx('egzersiz'), kas: idx('kasgrubu'),
       kg: idx('kg'), tekrar: idx('tekrar'), rpe: idx('rpe'), ornek: idx('ornek') } };
   if (var_('tarih') && (var_('kalorikcal') || var_('kalori')) && !var_('kilokg') && !var_('kilo'))
-    return { tip: 'kalori', ad: 'Kalori', c: { tarih: idx('tarih'), kcal: idx('kalorikcal', 'kalori'), ornek: idx('ornek') } };
+    return { tip: 'kalori', ad: 'Kalori', c: { tarih: idx('tarih'), kcal: idx('kalorikcal', 'kalori'), ornek: idx('ornek'),
+      p: idx('proteing', 'protein'), k: idx('karbonhidratg', 'karbonhidrat', 'karbg', 'karb'), y: idx('yagg', 'yag') } };
   if (var_('tarih') && (var_('kilokg') || var_('kilo')))
     return { tip: 'kilo', ad: 'Kilo', c: { tarih: idx('tarih'), kg: idx('kilokg', 'kilo'), ornek: idx('ornek') } };
   return null;
@@ -233,6 +236,7 @@ function iceCoz(text, S) {
       if (varC[t.date]) { atlanC++; return; }
       varC[t.date] = 1;
       var o = { id: AT.uid(), date: t.date, kcal: Math.round(k) };
+      ['p', 'k', 'y'].forEach(function (x) { var v = sayiCoz(al(r, c[x])); if (v > 0 && v <= 1000) o[x] = Math.round(v * 10) / 10; });   /* makro sütunları varsa */
       if (/^evet$/i.test(metin(al(r, c.ornek)))) o.demo = true;
       kc.push(o);
     });

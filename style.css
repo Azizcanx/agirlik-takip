@@ -434,6 +434,17 @@ button.satir.tk:hover .tk-kutu{border-color:var(--acl)}
 .kcal-bugun{display:flex;align-items:center;gap:6px;margin:8px 0 0;font-size:15px;color:var(--mut)}
 .kcal-bugun b{color:var(--tx);font-variant-numeric:tabular-nums}
 .kcal-bugun .mini{margin-left:auto;margin-right:-12px;color:var(--mut)}
+.kcal-bugun{flex-wrap:wrap}
+.makro-bugun{font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums}
+/* makro girişi (bulk.js kcalGir): tek satır "Makro ile ekle"; açılınca Protein / Karb / Yağ + Ekle */
+details.makro{margin:6px 0 0}
+details.makro>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:36px;font-size:14px;color:var(--ac)}
+details.makro>summary::-webkit-details-marker{display:none}
+details.makro>summary::after{content:"";width:5px;height:5px;border-right:1.4px solid currentColor;border-bottom:1.4px solid currentColor;transform:rotate(45deg);margin:0 0 3px 2px;transition:transform .15s}
+details.makro[open]>summary::after{transform:rotate(-135deg);margin:3px 0 0 2px}
+.row.makrorow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;margin-top:2px}
+.makrorow input{min-width:0;text-align:center;padding:0 6px}
+.makro-kcal{margin:6px 0 0}
 .altnot{text-align:center;font-size:13px;color:var(--dim);margin:28px 0 0}
 
 /* ---------- anlaşılırlık: rehber, katlanır bölümler, sekme, sözlük ---------- */
