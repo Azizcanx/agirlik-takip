@@ -3,7 +3,7 @@
    şifresiyle şifrelenir (PBKDF2-SHA256 150k → AES-GCM 256; varsa gzip). Anahtar: yalnız "gist" yetkili GitHub token.
    Birleştirme üç yönlü: son eşitlenen hâl (taban) + bu cihaz + öbür cihaz. Kimlikli listelerde (antrenman, kilo,
    kalori, takviye, defter) yeni kayıtlar birleşir, bir cihazda silinen öbüründe de silinir; tekil alanlarda değişen taraf kazanır.
-   Cihaza özel alanlar (tema vb.) eşitlenmez. Tetik: açılış, değişiklikten 15 sn sonra, pencereden çıkış/dönüş, "Şimdi eşitle".
+   Cihaza özel alanlar (tema vb.) eşitlenmez. Tetik: açılış, değişiklikten 3 sn sonra, açıkken dakikada bir, pencereden çıkış/dönüş, "Şimdi eşitle".
    AT.bolum.esitle() → Ayarlar bölümü; AT.degisti() ← app.js kaydet(); AT.yeniDurum(S) → app.js durumu değiştirir. */
 (function (AT) {
 'use strict';
@@ -30,11 +30,27 @@ function liste(b, l, r, ak, alanBazli) {
   var out = [];
   sira.forEach(function (k) {
     var vb = mb[k], vl = ml[k], vr = mr[k];
-    if (vl && vr) out.push(alanBazli && J(vl) !== J(vb) && J(vr) !== J(vb) ? harita(vb, vl, vr) : J(vl) !== J(vb) ? vl : vr);
+    if (vl && vr) out.push(alanBazli && J(vl) !== J(vb) && J(vr) !== J(vb) ? kcalBirles(vb, vl, vr) : J(vl) !== J(vb) ? vl : vr);
     else if (vl) { if (!vb || J(vl) !== J(vb)) out.push(vl); }      /* öbüründe yok: tabanda varsa orada silinmiş (bu cihazda değişmediyse sil) */
     else if (vr) { if (!vb || J(vr) !== J(vb)) out.push(vr); }      /* bu cihazda yok: tabanda varsa burada silinmiş */
   });
   return out;
+}
+/* aynı günün kalorisi iki cihazda değiştiyse: öğünler eklendiği için artışlar toplanır (taban + iki taraftaki fark);
+   taban yoksa (ilk bağlantı) çift saymamak için büyüğü. Örnek (demo) kayıt gerçeğe karışmaz: gerçek olan kalır. */
+var KCAL_ALAN = ['kcal', 'p', 'k', 'y'];
+function kcalBirles(vb, vl, vr) {
+  if (J(vl) === J(vr)) return vl;
+  if (vl.demo && !vr.demo) return vr;
+  if (vr.demo && !vl.demo) return vl;
+  var o = harita(vb, vl, vr);
+  KCAL_ALAN.forEach(function (f) {
+    if (!(f in vl) && !(f in vr)) return;
+    var l = +vl[f] || 0, r = +vr[f] || 0, b = vb ? +vb[f] || 0 : null;
+    var v = b === null ? Math.max(l, r) : Math.max(0, l + r - b);
+    o[f] = Math.round(v * 10) / 10;
+  });
+  return o;
 }
 /* düz nesne (gün → değer): anahtar bazında üç yönlü */
 function harita(b, l, r) {
@@ -127,39 +143,59 @@ function esitle(elle) {
   if (calisiyor) { bekliyor = true; return Promise.resolve(false); }
   if (!navigator.onLine && !elle) return Promise.resolve(false);
   calisiyor = true; ciz('Eşitleniyor…');
-  var yerel = veriAl(AT.S), uzakRev = 0, tabanRev = +a.rev || 0;
+  /* derin kopya: eşitleme sürerken yerinde değişen diziler/nesneler bu fotoğrafı bozmasın */
+  var yerel = JSON.parse(J(veriAl(AT.S))), uzakRev = 0, tabanRev = +a.rev || 0;
   return gistBul(a).then(function (id) {
     if (!id) return null;
     a.gist = id;
     return uzakOku(a).then(function (m) {
       if (!m) return null;
-      try { uzakRev = +JSON.parse(m).rev || 0; } catch (e) { uzakRev = 0; }
+      uzakRev = revOf(m);
       /* bayat okuma koruması: bu cihazın son gördüğünden eski sürüm geldiyse (önbellek/vekil) birleştirme yok, kayıt silinmez */
       if (uzakRev < tabanRev) { var h = new Error('bayat'); h.kod = 'ag'; throw h; }
       return coz(m, a.sifre);
     });
   }).then(function (uzak) {
     if (!ayar()) return false;   /* eşitleme bu arada kaldırıldıysa hiçbir şey yazma */
-    var son = uzak ? birlestir(taban(), yerel, uzak) : yerel;
-    var yaz = !uzak || J(son) !== J(uzak), yerelDegisti = J(son) !== J(yerel), yeniRev = yaz ? Math.max(uzakRev, tabanRev) + 1 : uzakRev;
+    var tb = taban();
+    /* aynı rev ama içerik tabandan farklı: iki cihaz aynı anda yazmış, biri öbürünü ezmiş. Silme çıkarmadan birleştir */
+    if (uzak && tb && uzakRev === tabanRev && J(uzak) !== J(tb)) tb = null;
+    var son = uzak ? birlestir(tb, yerel, uzak) : yerel;
+    var yaz = !uzak || J(son) !== J(uzak), yeniRev = yaz ? Math.max(uzakRev, tabanRev) + 1 : uzakRev;
     return (yaz ? sifrele(son, a.sifre, yeniRev).then(function (m) {
       var govde = { files: {} }; govde.files[DOSYA] = { content: m };
-      if (a.gist) return istek(a, '/gists/' + a.gist, 'PATCH', govde);
-      govde.description = ACIKLAMA; govde.public = false;
-      return istek(a, '/gists', 'POST', govde).then(function (g) { a.gist = g.id; ayarYaz(a); });
+      if (!a.gist) {
+        govde.description = ACIKLAMA; govde.public = false;
+        return istek(a, '/gists', 'POST', govde).then(function (g) { a.gist = g.id; ayarYaz(a); });
+      }
+      /* yazmadan hemen önce: okuduğumuzdan beri öbür cihaz yazdıysa ezme, baştan eşitle */
+      if (document.hidden) return istek(a, '/gists/' + a.gist, 'PATCH', govde);   /* kapanırken gecikme yok; çakışmayı aynı-rev kontrolü yakalar */
+      return uzakOku(a).then(function (m2) {
+        if (revOf(m2) !== uzakRev) { var h = new Error('yarisma'); h.kod = 'yarisma'; throw h; }
+        return istek(a, '/gists/' + a.gist, 'PATCH', govde);
+      });
     }) : Promise.resolve()).then(function () {
       if (!ayar()) return false;
       localStorage.setItem(LS_TABAN, JSON.stringify(son));
-      if (yerelDegisti) { uygulaniyor = true; try { AT.yeniDurum(Object.assign({}, AT.S, son)); } finally { uygulaniyor = false; } }
+      /* eşitleme sürerken bu cihazda girilen kayıtlar (kilo, set, kalori) kaybolmasın: fotoğraftan bu yana olan
+         değişiklikler, gelen hâlin üstüne üç yönlü eklenir; bir sonraki eşitlemede gönderilir */
+      var simdi = veriAl(AT.S), yeni = son;
+      if (J(simdi) !== J(yerel)) { yeni = birlestir(yerel, simdi, son); bekliyor = true; }
+      var yerelDegisti = J(yeni) !== J(simdi);
+      if (yerelDegisti) { uygulaniyor = true; try { AT.yeniDurum(Object.assign({}, AT.S, JSON.parse(J(yeni)))); } finally { uygulaniyor = false; } }
       a.son = Date.now(); a.hata = null; a.rev = yeniRev; ayarYaz(a); sonHata = null;
       return yerelDegisti;
     });
-  }).then(function (d) { calisiyor = false; ciz(); if (elle) AT.toast(d ? 'Eşitlendi, yeni kayıtlar geldi' : 'Eşitlendi'); if (bekliyor) { bekliyor = false; planla(2000); } return d; },
+  }).then(function (d) { calisiyor = false; yarisma = 0; ciz(); if (elle) AT.toast(d ? 'Eşitlendi, yeni kayıtlar geldi' : 'Eşitlendi'); if (bekliyor) { bekliyor = false; planla(2000); } return d; },
     function (e) {
-      calisiyor = false; sonHata = e.kod || 'ag'; var a2 = ayar(); if (a2) { a2.hata = sonHata; ayarYaz(a2); }
+      calisiyor = false;
+      if (e.kod === 'yarisma' && (yarisma = yarisma + 1) <= 3) { planla(1500); return false; }   /* öbür cihaz araya girdi: kısa süre sonra yeniden */
+      yarisma = 0; sonHata = e.kod === 'yarisma' ? 'ag' : e.kod || 'ag'; var a2 = ayar(); if (a2) { a2.hata = sonHata; ayarYaz(a2); }
       ciz(); if (elle) AT.toast(hataMetni(sonHata)); return false;
     });
 }
+var yarisma = 0;
+function revOf(m) { try { return +JSON.parse(m).rev || 0; } catch (e) { return 0; } }
 function planla(ms) { clearTimeout(zaman); zaman = setTimeout(function () { esitle(false); }, ms); }
 function hataMetni(k) {
   return k === 'sifre' ? 'Şifre öbür cihazdakiyle aynı değil' : k === 'anahtar' ? 'GitHub anahtarı geçersiz ya da süresi dolmuş' : 'İnternet yok; bağlanınca eşitlenir';
@@ -173,7 +209,8 @@ function icerik(durum) {
   var a = ayar();
   if (!DESTEK) return '<p class="mut">Bu tarayıcı eşitlemeyi desteklemiyor.</p>';
   if (!a) return '<p class="mut">Kayıtların PC ve telefonda aynı olsun: GitHub hesabındaki gizli bir dosyada, kendi şifrenle kilitli durur. Ücretsiz.</p>' +
-    '<label class="alan"><span>GitHub anahtarı ya da PC\'den gelen link <a href="https://github.com/settings/tokens/new?scopes=gist&description=Agirlik%20Takip%20esitleme" target="_blank" rel="noopener">anahtar al</a> <small>(süre: No expiration)</small></span><input id="es-token" type="password" autocomplete="off" placeholder="ghp_… ya da bağlantı linki"></label>' +
+    '<p class="mut"><a href="https://github.com/settings/tokens/new?scopes=gist&description=Agirlik%20Takip%20esitleme" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;min-height:44px">GitHub\'da anahtar al</a> <small>(süre olarak “No expiration” seç)</small></p>' +
+    '<label class="alan"><span>GitHub anahtarı ya da PC\'den gelen link</span><input id="es-token" type="password" autocomplete="off" placeholder="ghp_… ya da bağlantı linki"></label>' +
     '<label class="alan"><span>Şifre (iki cihazda aynı)</span><input id="es-sifre" type="password" autocomplete="new-password" placeholder="en az 6 karakter"></label>' +
     '<button class="btn-ac btn-big" data-act="es-bagla">Bağla</button>';
   var hata = a.hata || sonHata;
@@ -202,7 +239,8 @@ function bagla(token, sifre) {
   ayarYaz({ token: token, sifre: sifre });
   localStorage.removeItem(LS_TABAN);   /* yeni bağlantı: iki taraf birleşir, silme yok */
   ciz('Bağlanıyor…');
-  esitle(true).then(function () { var a = ayar(); if (a && a.hata) { ayarYaz(null); ciz(); } else AT.render(); });
+  /* yalnız şifre/anahtar yanlışsa bağlantı geri alınır; internet sorunu geçicidir, bağlantı kalır ve sonra eşitlenir */
+  esitle(true).then(function () { var a = ayar(); if (a && (a.hata === 'sifre' || a.hata === 'anahtar')) { ayarYaz(null); ciz(); } else AT.render(); });
 }
 AT.islem['es-bagla'] = function () { var t = AT.$('#es-token'), s = AT.$('#es-sifre'); bagla(t && t.value, s && s.value); };
 AT.islem['es-simdi'] = function () { esitle(true); };

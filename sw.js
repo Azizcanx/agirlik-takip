@@ -7,7 +7,7 @@
      Sayfa önbellekten açıldıysa aynı yüklemedeki dosyalar da önbellekten gelir (beklemesin, sürümler karışmasın).
    - Kurulum HTTP önbelleğini atlar (cache: 'reload'): yeni sürüm eski dosyalarla kurulmasın.
    Test: Temp/agt/sw-test.js (sahte fetch/caches) ve yavaş/kopuk sunucuyla tarayıcıda. */
-const V = 'agirlik-v31';
+const V = 'agirlik-v32';
 const DOSYALAR = ['./', 'index.html', 'style.css', 'hareketler.js', 'app.js', 'bulk.js', 'notlar.js', 'disa.js', 'excel.js', 'ekstra.js', 'pc.js', 'takviye.js', 'defter.js', 'duzenle.js', 'ozet.js', 'haftalik.js', 'komut.js', 'esitle.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 const BEKLE = 3000, ONBELLEK_MODU = 15000;
 let onbellekten = 0;   /* son sayfa önbellekten açıldıysa zamanı */
@@ -52,7 +52,7 @@ self.addEventListener('fetch', e => {
     const onbellekVer = () => onbellekte(q).then(r => { if (ver(r) && sayfa) onbellekten = Date.now(); return !!r; });
     if (sayfa) sure = setTimeout(onbellekVer, BEKLE);   /* zayıf internet: sayfa BEKLE ms sonra önbellekten */
     ag.then(r => {
-      if (iyi(r) || r.type === 'opaqueredirect') { ver(r); if (sayfa) onbellekten = 0; return; }   /* yönlendirmeyi tarayıcı izlesin */
+      if (iyi(r) || r.type === 'opaqueredirect') { if (ver(r) && sayfa) onbellekten = 0; return; }   /* yönlendirmeyi tarayıcı izlesin */
       onbellekte(q).then(c => { ver(c || r); });                                                    /* 404/5xx: varsa iyi kopya */
     }, () => {
       onbellekVer().then(var_ => { if (!var_) ver(Response.error()); });                             /* ağ yok */
