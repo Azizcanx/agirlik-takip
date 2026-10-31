@@ -720,12 +720,32 @@ function unutulanKontrol() {
 }
 
 /* ---------- dinlenme sayacı ---------- */
+/* dinlenme sayacı çalışırken ekran kararmasın (Wake Lock). Sayaç bitince, geçilince ya da gizlenince bırakılır;
+   sayfa arka plana gidince tarayıcı kendisi bırakır, geri gelince sayaç sürüyorsa yeniden istenir. Destek yoksa sessiz. */
+var uyanik = null, uyanikIste = false, uyanikBekle = false;
+function uyanikTut(ac) {
+  uyanikIste = ac;
+  if (!navigator.wakeLock) return;
+  if (ac && !uyanik && !uyanikBekle && document.visibilityState === 'visible') {
+    uyanikBekle = true;
+    navigator.wakeLock.request('screen').then(function (l) {
+      uyanikBekle = false;
+      if (!uyanikIste) { l.release().catch(function () {}); return; }
+      uyanik = l; l.addEventListener('release', function () { if (uyanik === l) uyanik = null; });
+    }, function () { uyanikBekle = false; });
+  } else if (!ac && uyanik) { var l = uyanik; uyanik = null; l.release().catch(function () {}); }
+}
+function uyanikKontrol() { var r = $('#rest'); uyanikTut(!!r && !r.hidden && restBitis > Date.now()); }
+document.addEventListener('visibilitychange', uyanikKontrol);
+setInterval(uyanikKontrol, 5000);   /* bitir/iptal gibi sayacı gizleyen her yol için */
+
 function restBasla(sn) {
   restBitis = Date.now() + sn * 1000; restSure = sn * 1000; $('#rest').hidden = false; restCiz();
   clearInterval(restTimer); restTimer = setInterval(restCiz, 250);
 }
 function restCiz() {
   var r = $('#rest'), kalan = Math.ceil((restBitis - Date.now()) / 1000);
+  uyanikTut(kalan > 0 && !r.hidden);
   if (kalan <= 0) {
     clearInterval(restTimer); r.innerHTML = '<span class="t"><small>Dinlenme</small>Bitti, sıradaki set</span><button class="btn-ac" data-act="rest-kapat">Tamam</button>';
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -854,7 +874,7 @@ var islem = {
     clearInterval(restTimer); restTimer = setInterval(restCiz, 250); restCiz();
   },
   'din-egz-sil': function () { delete S.dinlenmeEgz; kaydet(); render(); toast('Hareketlere özel süreler silindi'); },
-  'rest-kapat': function () { clearInterval(restTimer); $('#rest').hidden = true; },
+  'rest-kapat': function () { clearInterval(restTimer); $('#rest').hidden = true; uyanikTut(false); },
   disa: function () { indir(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), 'agirlik-yedek-' + iso(new Date()) + '.json'); toast('Yedek indirildi'); },
   ice: function () { $('#dosya').click(); },
   'ice-kesin': function () { S = pendingImport; pendingImport = null; kaydet(); kapat(); temaUygula(); render(); toast('İçe aktarıldı'); },
