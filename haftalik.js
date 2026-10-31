@@ -50,10 +50,11 @@ function ac(bas) {
     '<h3>' + (bas === buHafta ? 'Bu hafta' : bas === gunEkle(buHafta, -7) ? 'Geçen hafta' : 'Haftalık özet') + '</h3>';
   o += '<div class="ozet ozet-buyuk"><div><b>' + v.seans + '</b><span>antrenman</span></div>' +
     '<div><b>' + (ton ? AT.fmt(v.hacim / 1000, 1) : AT.fmt(Math.round(v.hacim), 0)) + '</b><span>' + (ton ? 'ton' : 'kg') + ' toplam</span></div>' +
-    '<div><b>' + (v.kilo == null ? '–' : (v.kilo > 0.04 ? '+' : v.kilo < -0.04 ? '−' : '') + AT.fmt(Math.abs(v.kilo), 1)) + '</b><span>kg kilo farkı</span></div></div>';
-  if (on.hacim > 0 && v.hacim > 0) {
+    '<div><b>' + (v.kilo == null ? '–' : (v.kilo > 0.04 ? '+' : v.kilo < -0.04 ? '−' : '') + AT.fmt(Math.abs(v.kilo), 1) + '<small> kg</small>') + '</b><span>kilo değişimi</span></div></div>';
+  /* önceki hafta en az 2 antrenmansa ve fark makulse (≤%150): tek antrenmanlı haftaya göre '%562' gibi anlamsız sayı çıkmasın */
+  if (on.hacim > 0 && v.hacim > 0 && on.seans >= 2) {
     var y = Math.round((v.hacim - on.hacim) / on.hacim * 100);
-    if (y >= 1) o += '<p class="durum iyi">Önceki haftadan %' + y + ' fazla kaldırdın</p>';
+    if (y >= 1 && y <= 150) o += '<p class="durum iyi">Önceki haftadan %' + y + ' fazla kaldırdın</p>';
   }
   var kv = [];
   kv.push(['Set', AT.fmt(v.set, 0)]);
@@ -61,7 +62,8 @@ function ac(bas) {
   if (v.takviye != null) kv.push(['Takviyeler tam', v.takviye + '/7 gün']);
   o += '<dl class="kv">' + kv.map(function (x) { return '<div><dt>' + x[0] + '</dt><dd>' + x[1] + '</dd></div>'; }).join('') + '</dl>';
   if (v.rekor.length) o += '<h2>' + (v.rekor.length === 1 ? 'Rekor' : v.rekor.length + ' rekor') + '</h2><ul class="ozet-rekor">' +
-    v.rekor.slice(0, 6).map(function (ad) { return '<li><b>' + AT.h(ad) + '</b></li>'; }).join('') + '</ul>';
+    v.rekor.slice(0, 6).map(function (ad) { return '<li><b>' + AT.h(ad) + '</b></li>'; }).join('') +
+    (v.rekor.length > 6 ? '<li class="mut">+' + (v.rekor.length - 6) + ' daha</li>' : '') + '</ul>';
   o += '<button class="btn-ac btn-big" data-act="kapat" style="margin-top:20px">Tamam</button></div>';
   AT.sheet(o);
 }

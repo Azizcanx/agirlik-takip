@@ -21,9 +21,10 @@ function ciz() {
     o += '<section class="panel dz-ex"><div class="ex-head"><span class="grow"><b>' + AT.h(e.ad) + '</b></span>' +
       '<button class="mini btn-ghost" data-act="dz-ex-sil" data-e="' + ei + '">Çıkar</button></div>';
     o += '<div class="setgrid dz' + rg + '"><span class="lbl">Set</span><span class="lbl">kg</span><span class="lbl">Tekrar</span>' + (rp ? '<span class="lbl">Zorluk</span>' : '') + '<span class="lbl">Sil</span></div>';
+    var no = 0;   /* ısınma setleri numara almaz: antrenman ekranındaki gibi I, 1, 2 */
     e.sets.forEach(function (s, si) {
       var a = ' data-te="' + ei + '" data-ts="' + si + '"';
-      o += '<div class="setgrid dz' + rg + '"><span class="n' + (s.tip === 'isinma' ? ' isinma' : '') + '">' + (s.tip === 'isinma' ? 'I' : si + 1) + '</span>' +
+      o += '<div class="setgrid dz' + rg + '"><span class="n' + (s.tip === 'isinma' ? ' isinma' : '') + '">' + (s.tip === 'isinma' ? 'I' : ++no) + '</span>' +
         '<input inputmode="decimal"' + a + ' data-tf="kg" value="' + AT.h(virgul(s.kg)) + '" aria-label="' + AT.h(e.ad) + ' set ' + (si + 1) + ' kg">' +
         '<input inputmode="numeric"' + a + ' data-tf="reps" value="' + AT.h(s.reps) + '" aria-label="' + AT.h(e.ad) + ' set ' + (si + 1) + ' tekrar">' +
         (rp ? '<input inputmode="decimal"' + a + ' data-tf="rpe" value="' + AT.h(s.rpe == null ? '' : s.rpe) + '" placeholder="–" aria-label="' + AT.h(e.ad) + ' set ' + (si + 1) + ' zorluk">' : '') +

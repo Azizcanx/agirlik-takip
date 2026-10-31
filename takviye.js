@@ -71,7 +71,7 @@ function duzenleBolum(t) {
   }).join('') + '</div>';
   if (hazir.length) o += '<h3 class="tk-h3">Hızlı ekle</h3><div class="chips">' + hazir.map(function (x, i) {
     return '<button class="chip" data-act="tk-hazir" data-i="' + HAZIR.indexOf(x) + '">+ ' + AT.h(x[0]) + '</button>'; }).join('') + '</div>';
-  o += '<h3 class="tk-h3">Kendin ekle</h3><div class="alanlar"><label class="alan"><span>Ad</span><input id="tk-ad" placeholder="örn. Ashwagandha" autocomplete="off"></label>' +
+  o += '<h3 class="tk-h3">Kendin ekle</h3><div class="alanlar"><label class="alan"><span>Ad</span><input id="tk-ad" placeholder="örn. Melatonin" autocomplete="off"></label>' +
     '<label class="alan"><span>Doz</span><input id="tk-doz" placeholder="örn. 600 mg" autocomplete="off"></label>' +
     '<label class="alan tam"><span>Ne zaman</span><select id="tk-zaman">' + ZAMAN.map(function (z) { return '<option value="' + z[0] + '"' + (z[0] === 'gun' ? ' selected' : '') + '>' + z[1] + '</option>'; }).join('') + '</select></label></div>' +
     '<button class="btn-big" data-act="tk-ekle">Ekle</button>';
@@ -83,7 +83,8 @@ function gorunum() {
   var n = t.liste.length, al = t.liste.filter(function (x) { return alindiMi(t, x.id, bugun); }).length;
   var o = '<h1>Takviye</h1><p class="sub">' + (n ? 'Bugün ' + al + '/' + n + ' alındı' : AT.tarih(bugun)) + '</p>';
   if (!n) return o + '<h2>Takviyelerini ekle</h2>' + duzenleBolum(t);
-  var a = '<h2>Bugün <small>dokun: alındı</small></h2>' + bugunListe(t, bugun);
+  /* düzenlerken bugünün listesi gizlenir: aynı takviyeler iki kez görünmesin */
+  var a = duzenle ? '<h2>Listeyi düzenle</h2>' : '<h2>Bugün <small>dokun: alındı</small></h2>' + bugunListe(t, bugun);
   a += '<div class="row tk-alt"><button class="btn-ghost mini" data-act="tk-duzenle">' + (duzenle ? 'Düzenlemeyi kapat' : 'Listeyi düzenle') + '</button></div>';
   if (duzenle) a += duzenleBolum(t);
   var b = '<h2>Son ' + GUN30 + ' gün</h2>' + gecmis(t, bugun);

@@ -220,12 +220,20 @@ function kcalYaz(k, r) {
   return 'Günde ~' + AT.fmt(Math.abs(k), 0) + ' kcal ' + (k > 0 ? 'daha fazla ye.' : 'daha az ye.');
 }
 var SINIF = { iyi: 'iyi', yavas: 'uyari', hizli: 'uyari', veri: 'bilgi', erken: 'bilgi' };
+/* durum satırı: iyi/uyarı renkli; 'erken' (ilk 14 gün) düz sonuç satırı (bilgi kutusu yok, Aziz'in kararı); 'veri' hiç yok */
+function durumSatiri(r, metin) {
+  if (r.durum === 'veri') return '';
+  if (r.durum === 'erken') return '<p class="mut kucuk durum-duz">' + AT.h(metin) + '</p>';
+  return '<p class="durum ' + SINIF[r.durum] + '">' + AT.h(metin) + '</p>';
+}
 function sezonAd(b) { return yonOf(b) > 0 ? 'Bulk sezonu' : 'Cut sezonu'; }
 function durumMetin(r, yon) {
   if (r.durum === 'veri') return 'Gidişatı görmek için en az 4 tartı ve 1 hafta gerekli.';
   var hz = 'haftada ' + hizYaz(r.hiz) + ' kg';
-  if (r.durum === 'erken') return 'İlk tahmin: ' + hz + ' (hedef ' + aralikYaz(r.min, r.max) + ' kg). İlk iki hafta tartı oynak; kalori önerisi 2. haftadan sonra.';
-  if (r.durum === 'iyi') return 'Doğru hızdasın: ' + hz + ' (hedef ' + aralikYaz(r.min, r.max) + ' kg).' + (r.ortKcal != null ? ' Ortalama ' + kcalSay(r.ortKcal) + ' ile böyle devam.' : '');
+  if (r.durum === 'erken') return 'İlk tahmin: ' + hz + ' (hedef ' + aralikYaz(r.min, r.max) + ' kg) · kalori önerisi 14. günden sonra';
+  /* aynı ekrandaki "Hedef hız için günde ~X" ile aynı sayı (önceden ortalama yenen ile 10 kcal farklı iki sayı çıkıyordu) */
+  var dev = r.hedefKcal != null ? r.hedefKcal : r.ortKcal;
+  if (r.durum === 'iyi') return 'Doğru hızdasın: ' + hz + ' (hedef ' + aralikYaz(r.min, r.max) + ' kg).' + (dev != null ? ' Günde ~' + kcalSay(dev) + ' ile böyle devam.' : '');
   if (r.durum === 'hizli') return 'Fazla hızlı: ' + hz + (yon > 0 ? ', yağ alıyor olabilirsin. ' : ', kas kaybedebilirsin. ') + kcalYaz(r.kcal, r);
   if (r.hiz * yon < 0) return (yon > 0 ? 'Kilo düşüyor: ' : 'Kilo artıyor: ') + hz + '. ' + kcalYaz(r.kcal, r);
   return 'Yavaş: ' + hz + '. ' + kcalYaz(r.kcal, r);
@@ -234,7 +242,7 @@ function durumMetin(r, yon) {
 function kisaDurum(r, ad) {
   if (r.durum === 'veri') return ad + ': gidişat için birkaç tartı daha gerekli';
   var hz = 'haftada ' + hizYaz(r.hiz) + ' kg';
-  if (r.durum === 'erken') return ad + ' ilk tahmin: ' + hz + ' (2 hafta dolunca netleşir)';
+  if (r.durum === 'erken') return ad + ' ilk tahmin: ' + hz;
   if (r.durum === 'iyi') return ad + ' iyi gidiyor: ' + hz;
   return ad + (r.durum === 'hizli' ? ' fazla hızlı: ' : ' yavaş: ') + hz + ' · ' +
     (r.hedefKcal != null ? 'günde ~' + kcalSay(r.hedefKcal) + ' ye' : 'günde ~' + AT.fmt(Math.abs(r.kcal), 0) + ' kcal ' + (r.kcal > 0 ? 'fazla' : 'az') + ' ye');
@@ -328,7 +336,7 @@ function bolumVar(l, b) {
   yuzde = Math.round(Math.max(0, Math.min(100, yuzde)));
   o += '<div class="ibar" role="progressbar" aria-label="Hedefe ilerleme" aria-valuenow="' + yuzde + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + yuzde + '%"></i></div>' +
     '<div class="ibar-uc"><span>' + AT.h(AT.fmt(r.basKg)) + ' kg · ' + AT.h(AT.tarih(b.bas, 1)) + '</span><span>hedef ' + AT.h(AT.fmt(r.hedefKg)) + ' kg</span></div>';
-  if (r.durum !== 'veri') o += '<p class="durum ' + SINIF[r.durum] + '">' + AT.h(durumMetin(r, yon)) + '</p>';   /* "daha fazla tartı gerekli" ipucu kutusu yok */
+  o += durumSatiri(r, durumMetin(r, yon));
   var son = sonKayit(l), ulasti = r.kalan * yon <= 0;
   o += '<dl class="kv">' +
     '<div><dt>Hedefe kalan</dt><dd>' + (ulasti ? 'Hedefe ulaştın' : AT.h(isaret(r10(r.kalan))) + ' kg') + '</dd></div>' +
@@ -376,7 +384,7 @@ function kcalGir(bugun) {
     '<button data-act="kcal-ekle">' + (k ? 'Ekle' : 'Kaydet') + '</button></div>' +
     '<details class="makro"' + (acik ? ' open' : '') + '><summary>Makro ile ekle</summary><div class="row makrorow">' +
     MAKRO.map(function (x) { return '<input id="mk-' + x[0] + '" inputmode="decimal" autocomplete="off" placeholder="' + x[1] + ' g" aria-label="' + x[1] + ', gram">'; }).join('') +
-    '<button data-act="makro-ekle">Ekle</button></div><p class="mut kucuk makro-kcal" id="mk-kcal">Kalorisi kendiliğinden eklenir (4·4·9).</p></details>' +
+    '<button data-act="makro-ekle">Ekle</button></div><p class="mut kucuk makro-kcal" id="mk-kcal"></p></details>' +
     (k ? '<p class="kcal-bugun">Bugün: <b>' + AT.h(kcalSay(k.kcal || 0)) + '</b>' + (makroVar(k) ? ' <span class="makro-bugun">' + AT.h(makroYaz(k)) + '</span>' : '') + demoTag(k) +
       ' <button class="btn-ghost mini" data-act="kcal-sil">Sıfırla</button></p>' : '');
 }
@@ -384,7 +392,7 @@ function kcalGir(bugun) {
 if (typeof document !== 'undefined') document.addEventListener('input', function (ev) {
   if (!ev.target || !/^mk-[pky]$/.test(ev.target.id || '')) return;
   var m = {}, e = AT.$('#mk-kcal'); MAKRO.forEach(function (x) { var i = AT.$('#mk-' + x[0]); m[x[0]] = i ? AT.num(String(i.value).trim()) : NaN; });
-  var c = makroKcal(m); if (e) e.textContent = c > 0 ? '+' + kcalSay(Math.round(c)) + ' eklenecek' : 'Kalorisi kendiliğinden eklenir (4·4·9).';
+  var c = makroKcal(m); if (e) e.textContent = c > 0 ? '+' + kcalSay(Math.round(c)) + ' eklenecek' : '';
 });
 /* bugünün kaydını değiştir: varsa (örnek değilse) kopyası üzerinde, yoksa yeni; id korunur, eşitleme tarih + alan bazında */
 function gunuGuncelle(bugun, fn) {
@@ -409,7 +417,7 @@ function tarti() {
   var b = AT.S.bulk;
   if (b) {
     var r = oneriUygula(hesapla(l, b, bugun, AT.S.kcal), b, bugun);
-    if (r.durum !== 'veri') o += '<p class="durum ' + SINIF[r.durum] + '">' + AT.h(kisaDurum(r, sezonAd(b).split(' ')[0])) + '</p>';
+    o += durumSatiri(r, kisaDurum(r, sezonAd(b).split(' ')[0]));
   }
   return o + '</div>';
 }

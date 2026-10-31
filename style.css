@@ -4,7 +4,7 @@
    Koyu tema (varsayılan) "gece defteri": derin zemin, kırık beyaz yazı, dolu düğmeler parlamayan koyu mürekkep (--btn). */
 :root{
   --bg:#f7f4ee;--s1:#fffdf9;--s2:#eeeae2;--line:#e4ded2;
-  --tx:#26282c;--mut:#6a6c70;--dim:#9c9b97;
+  --tx:#26282c;--mut:#6a6c70;--dim:#7e7c78;
   --ac:#3d5d8a;--on-ac:#ffffff;--act:rgba(61,93,138,.09);--ac2:rgba(61,93,138,.15);--acl:rgba(61,93,138,.30);
   --iyi:#3f8462;--iyit:rgba(63,132,98,.10);
   --warn:#9a6b1f;--warnt:rgba(176,125,40,.12);
@@ -372,7 +372,7 @@ section.panel.ex-bitti .ex-head b{color:var(--mut)}
 #esitleme .alan small{color:var(--dim);font-size:13px}
 
 /* haftalık özet (haftalik.js) */
-.hafta-dugme{vertical-align:baseline;margin-left:4px;min-height:30px;padding:0 8px}
+.hafta-dugme{vertical-align:baseline;margin-left:4px;min-height:36px;padding:0 8px}
 .hafta .ayb{margin:0 0 4px}
 .hafta .ayb b{font-family:var(--sans);font-size:14px;font-weight:500;color:var(--mut)}
 .hafta .ayb button:disabled{opacity:.3;cursor:default}
@@ -480,7 +480,7 @@ details.makro[open]>summary::after{transform:rotate(-135deg);margin:3px 0 0 2px}
 .hint.gecen b{color:var(--tx);font-weight:600}
 /* mini geçmiş: "Geçen sefer" satırına dokun -> son 3 seans */
 .mini-gecmis{margin:-4px 0 12px}
-.mini-gecmis>summary{list-style:none;cursor:pointer;margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
+.mini-gecmis>summary{list-style:none;cursor:pointer;margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-height:32px;padding-top:6px}
 .mini-gecmis>summary::-webkit-details-marker{display:none}
 .mini-gecmis .neden{font-size:13px;color:var(--ac)}
 .mini-gecmis .neden::after{content:"";display:inline-block;width:5px;height:5px;margin:0 0 2px 6px;border-right:1.4px solid currentColor;border-bottom:1.4px solid currentColor;transform:rotate(45deg);transition:transform .15s}
@@ -574,6 +574,20 @@ button.satir.df-not:hover .df-saat{color:var(--ac)}
   #df-liste{margin-top:0}
 }
 
+/* Excel'e aktar (disa.js + excel.js): büyük düğme, altında kayıt sayıları; CSV küçük satırda */
+.panel>.btn-big+p.xl-durum{margin:8px 0 0}
+.panel>p.csv-etiket{margin:18px 0 0}
+.panel>p.csv-etiket+.row{margin-top:0}
+.panel>.csv-satir+p.mut{margin-top:14px}
+
+/* ---------- görsel QA düzeltmeleri (31 Eki) ---------- */
+#egzyok{margin-top:14px}   /* arama kutusunun gölgesi "Bulunamadı" satırını örtmesin */
+.toast,.toast.yukari{white-space:normal;text-align:center;width:max-content;line-height:1.35}   /* uzun bildirim kesilmesin */
+#rest .t small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* uzun hareket adı sayacı büyütmesin */
+#sheet .row>.hero b{white-space:nowrap}   /* plaka: "111,25 kg" tek satır */
+@media (max-width:380px){ #sheet .row>.hero b{font-size:36px} }
+.makro-kcal:empty{display:none}
+.durum-duz{margin:10px 0 0}
 /* ---------- masaüstü (PC) ----------
    Telefonda: marka, kısayol düğmesi ve <kbd> ipuçları gizli; .duzen alt alta (sıra aynı).
    ≥1024px: solda sabit menü, iki sütun (.duzen), ortada açılan pencere, sağ altta dinlenme sayacı. */

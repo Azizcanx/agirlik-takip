@@ -1,6 +1,7 @@
 /* disa.js: modül (window.AT'ye kayıt olur)
-   Excel dışa aktarma: Türkçe Excel'de çift tıklayınca düzgün açılan CSV
-   (UTF-8 BOM, ayraç ';', satır sonu CRLF, ondalık virgül). Bağımlılık yok. */
+   CSV dışa aktarma: Türkçe Excel'de çift tıklayınca düzgün açılan CSV
+   (UTF-8 BOM, ayraç ';', satır sonu CRLF, ondalık virgül). Bağımlılık yok.
+   Asıl Excel aktarımı excel.js (.xlsx, aynı satır fonksiyonlarını kullanır); CSV eski uygulamalar ve içe aktarma için. */
 (function (AT) {
 'use strict';
 
@@ -388,16 +389,17 @@ AT._csv.metinSec = csvMetinSec; /* test: dosya okunmuş gibi akışı çalışt�
 
 AT.bolum.disa = function () {
   var S = AT.S, setN = antrenmanSatirlari(S.sessions).length, seansN = (S.sessions || []).length, kiloN = kiloSatirlari(S.bw).length;
+  var xl = !!AT.islem['excel-indir'];   /* excel.js yüklüyse tek .xlsx öne çıkar; CSV küçük satıra iner */
   function satir(act, etiket, bilgi) {
     return '<div class="row"><button class="btn-big grow" data-act="' + act + '">' + AT.h(etiket) + '</button><span class="mut">' + AT.h(bilgi) + '</span></div>';
   }
+  function kucuk(act, etiket) { return '<button class="btn-ghost mini" data-act="' + act + '">' + AT.h(etiket) + '</button>'; }
   /* Ayarlar'da "Excel ve diğer uygulamalar" katlanır bölümünün içi (başlığı app.js verir) */
   return '<div class="panel">' +
-    '<p class="mut">' + AT.h('Excel\'e (CSV) indir:') + '</p>' +
-    satir('csv-antrenman', 'Antrenmanlar', seansN + ' antrenman · ' + setN + ' set') +
-    satir('csv-kilo', 'Kilo kayıtları', kiloN + ' kayıt') +
-    satir('csv-kalori', 'Kalori kayıtları', kaloriSatirlari(S.kcal).length + ' gün') +
-    '<p class="mut">' + AT.h('Her set bir satır; ondalıklar virgüllü, Türkçe Excel\'de çift tıklayınca sütunlara ayrılır.') + '</p>' +
+    (xl ? '<button class="btn-ac btn-big" data-act="excel-indir">' + AT.h('Excel\'e aktar (.xlsx)') + '</button>' : '') +
+    '<p class="mut kucuk xl-durum">' + AT.h(seansN + ' antrenman (' + setN + ' set) · ' + kiloN + ' tartı · ' + kaloriSatirlari(S.kcal).length + ' gün kalori') + '</p>' +
+    '<p class="mut kucuk csv-etiket">' + AT.h(xl ? 'CSV olarak (eski uygulamalar için):' : 'Excel\'e (CSV) indir:') + '</p>' +
+    '<div class="row csv-satir">' + kucuk('csv-antrenman', 'Antrenmanlar') + kucuk('csv-kilo', 'Kilo') + kucuk('csv-kalori', 'Kalori') + '</div>' +
     '<p class="mut">' + AT.h('Başka uygulamadan getir:') + '</p>' +
     satir('csv-ice', 'CSV içe aktar', 'Strong, Hevy ya da bu uygulama') +
     '<input type="file" id="csvdosya" accept=".csv,text/csv" hidden>' +

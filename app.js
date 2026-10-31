@@ -20,7 +20,8 @@ function iso(d) { return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2
 function parse(s) { var a = s.split('-'); return new Date(+a[0], +a[1] - 1, +a[2]); }
 function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function num(v) { var n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : NaN; }
-function fmt(n, d) { return (+n).toLocaleString('tr-TR', { maximumFractionDigits: d == null ? 1 : d }); }
+var NF = {};   /* fmt: ondalık sayısı başına tek biçimleyici (toLocaleString her çağrıda yenisini kuruyordu; 5 yılda %8-10 CPU) */
+function fmt(n, d) { d = d == null ? 1 : d; return (NF[d] || (NF[d] = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: d }))).format(+n); }
 function tarih(s, kisa) { var d = parse(s); return d.getDate() + ' ' + AYLAR[d.getMonth()].slice(0, kisa ? 3 : 20) + (kisa ? '' : ' ' + d.getFullYear()); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 /* tahmini 1RM. rpe yok/geçersiz -> Epley. rpe (6–10) varsa RPE tablosu eğrisi:
@@ -48,9 +49,16 @@ function yukle() {
   try { var r = localStorage.getItem(KEY); S = r ? Object.assign(bos(), { temaV: 0 }, JSON.parse(r)) : bos(); } catch (e) { S = bos(); }
   /* tek seferlik: eski varsayılan açık temadan koyuya (Aziz: "açık çok göz alıyor"); sonra seçim kullanıcının */
   if (!S.temaV) { if (S.tema === 'acik') S.tema = 'koyu'; S.temaV = 2; }
+  /* süren antrenmanın son hâli ayrı anahtardaysa (kaydet(true)) onu al; antrenman bittiyse eski kopya yok sayılır */
+  try { var a = JSON.parse(localStorage.getItem(KEY_AKTIF) || 'null'); if (a && S.active && a.id === S.active.id) S.active = a; } catch (e) { }
 }
-function kaydet() {
-  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Kaydedilemedi (depolama dolu?)'); }
+/* kaydet(true): yalnız süren antrenman değişti (set kutusu, ✓, set ekle/tipi, ad, not). Bütün veriyi yeniden yazmak yerine
+   ~2 KB'lık S.active ayrı anahtara yazılır; eşitleme tetiklenmez (antrenman bitince tam kayıt). 5 yıllık veride telefonda
+   ✓ ~130 ms'den ~20 ms'ye iner. Tam kayıt bu anahtarı siler; yukle() aynı antrenmansa onu okur. */
+var KEY_AKTIF = KEY + '-aktif';
+function kaydet(aktif) {
+  if (aktif === true && S.active) { try { localStorage.setItem(KEY_AKTIF, JSON.stringify(S.active)); return; } catch (e) { /* tam kayda düş */ } }
+  try { localStorage.setItem(KEY, JSON.stringify(S)); localStorage.removeItem(KEY_AKTIF); } catch (e) { toast('Kaydedilemedi (depolama dolu?)'); }
   if (AT.degisti) AT.degisti();   /* esitle.js: değişiklikten sonra eşitleme */
 }
 /* window.HAREKETLER (hareketler.js) varsa geniş liste: [{ad, tr, kas, ikincil, ekipman, tip}]; yoksa HAZIR */
@@ -425,7 +433,7 @@ function kasBolum(l) {
   return '<h2>Son 7 günde kaslar <small>· set sayısı, yardımcı kas yarım</small></h2><div class="panel"><div class="kasbar">' + kasl.map(function (k) {
     var n = Math.round(kasSet[k] || 0);
     return '<div' + (n ? '' : ' class="sifir"') + '><span>' + h(k) + '</span><div class="ibar"><i style="width:' + Math.round(n / mxk * 100) + '%"></i></div><b>' + n + '<small>set</small></b></div>';
-  }).join('') + '</div><p class="mut kucuk">Kas başına haftada 10 ve üstü set iyi bir hedef. Soluk olanlar bu hafta hiç çalışılmadı.</p></div>';
+  }).join('') + '</div><p class="mut kucuk">Kas başına haftada 10 ve üstü set iyi bir hedef. Soluk olanlar son 7 günde hiç çalışılmadı.</p></div>';
 }
 
 function vGecmis() {
@@ -444,7 +452,8 @@ function vGecmis() {
   for (var d = 1; d <= say; d++) { var k = y + '-' + p2(m + 1) + '-' + p2(d); o += '<span class="' + (gunler[k] ? 'on' : '') + (k === bi ? ' today' : '') + '">' + d + '</span>'; }
   o += '</div><p class="mut kucuk takvim-not"><i class="nokta"></i>antrenman yaptığın gün</p></div>';
   if (S.sessions.length) o += kasBolum(bitenSeanslar());
-  var b = '<h2>Antrenmanlar <small>· bu ay ' + buAy + '</small></h2>';
+  /* takvimde başka ay açıksa sayı o aya aittir: "· Eylül ayında 12" */
+  var b = '<h2>Antrenmanlar <small>· ' + (y === bu.getFullYear() && m === bu.getMonth() ? 'bu ay ' : AYLAR[m] + ' ayında ') + buAy + '</small></h2>';
   var l = S.sessions.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.start || 0) - (a.start || 0); });
   if (!l.length) return o0 + kol(o, b + '<div class="empty">Kayıtlı antrenman yok.</div>', 'takvim');
   var pr = prHesapla();
@@ -495,15 +504,15 @@ function gucBolum(l) {
   });
   var ilkP = pts[0], sonP = pts[pts.length - 1], fark = sonP && ilkP && pts.length > 1 ? sonP.y - ilkP.y : 0;
   if (pts.length) {
-    o += '<div class="panel"><div class="hero"><b>' + fmt(enE) + ' <small>kg</small></b><span>tahmini max: tek tekrarda kaldırabileceğin kilo · en iyisi ' + h(enET) + '</span></div>';
+    o += '<div class="panel"><div class="hero"><b>' + fmt(enE) + ' <small>kg</small></b><span>tahmini max: tek tekrarda kaldırabileceğin kilo · en iyisi ' + h(enET).replace(' ', '&nbsp;') + '</span></div>';
     if (fark > 0) o += '<p class="durum iyi">İlk kayıttan bu yana +' + fmt(fark) + ' kg güçlendin.</p>';
     o += cizgi(pts, { baslik: secEgz + ' tahmini max', birim: 'kg' }) + '</div>';
   } else {
     o += '<p class="mut kucuk">Bu harekette ' + MAX_TEKRAR + ' tekrar ve altı set yok; tahmini max yalnız ' + MAX_TEKRAR + ' ve altı tekrardan hesaplanır.</p>';
   }
   o += '<div class="panel"><dl class="kv">' +
-    '<div><dt>En ağır kaldırdığın</dt><dd>' + fmt(enAgir) + ' kg<small>' + h(enAgirT) + '</small></dd></div>' +
-    '<div><dt>En iyi set</dt><dd>' + (enSet.kg != null ? fmt(enSet.kg) + ' kg × ' + enSet.r + '<small>' + h(enSet.t) + '</small>' : '–') + '</dd></div>' +
+    '<div><dt>En ağır kaldırdığın</dt><dd>' + fmt(enAgir, 2) + ' kg<small>' + h(enAgirT) + '</small></dd></div>' +
+    '<div><dt>En iyi set</dt><dd>' + (enSet.kg != null ? fmt(enSet.kg, 2) + ' kg × ' + enSet.r + '<small>' + h(enSet.t) + '</small>' : '–') + '</dd></div>' +
     '<div><dt>Bir seansta en çok</dt><dd>' + fmt(enHac, 0) + ' kg<small>' + h(enHacT) + '</small></dd></div></dl></div>';
   // haftalık toplam kaldırılan (bu hareket), son 12 hafta
   var hb = haftaBasi(iso(new Date())), hv = {};
@@ -524,7 +533,7 @@ function vIlerleme() {
   var o = '<h1>İlerleme</h1>';
   var l = bitenSeanslar();
   var kartK = function () { return AT.bolum.kart ? AT.bolum.kart() : ''; };
-  if (!l.length && !S.bw.length) return o + '<div class="empty">Grafikler için önce kilonu gir ya da bir antrenman kaydet.<br>Örneğe bakmak için: Ayarlar › Örnek veriyi yükle.</div>' + bwAlan();
+  if (!l.length && !S.bw.length) return o + '<div class="empty">Antrenman ve tartı kaydettikçe grafikler burada oluşur.<br>Örneğe bakmak için: Ayarlar › Örnek veriyi yükle.</div>' + bwAlan();
   if (!ilerSek) ilerSek = S.bw.length || S.bulk ? 'kilo' : 'guc';
   var hb = haftaBasi(iso(new Date())), buHafta = l.filter(function (s) { return haftaBasi(s.date) === hb; }).length, seri = haftaSerisi();
   o += '<p class="sub">Bu hafta ' + buHafta + ' antrenman' + (seri > 1 ? ' · ' + seri + ' haftadır aksatmadın' : '') + '</p>';
@@ -550,12 +559,14 @@ function tekrarTablosu(ad, l, enE) {
   }
   return o + '</tbody></table>';
 }
+/* rekor değeri: gerçek kaldırılan kilo (En ağır) 2 ondalık (78,75), tahmini max 1 ondalık */
+function kgOnd(t) { return t && t.ad === 'En ağır' ? 2 : 1; }
 function prSatir(x) {
   var d = parse(x.s.date), yil = d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : '';
   return '<div class="satir pr"><div class="pr-d"><b>' + d.getDate() + '</b><span>' + AYLAR[d.getMonth()].slice(0, 3) + yil + '</span></div><div class="grow">' +
     x.t.map(function (t) {
       return '<div class="pr-l"><span class="k">' + h(t.ad) + (t.set ? '<small>' + fmt(num(t.set.kg), 2) + ' × ' + h(t.set.reps) + '</small>' : '') + '</span>' +
-        '<b>' + fmt(t.yeni) + ' kg</b><span class="up">+' + fmt(t.fark) + '</span></div>';
+        '<b>' + fmt(t.yeni, kgOnd(t)) + ' kg</b><span class="up">+' + fmt(t.fark, kgOnd(t)) + '</span></div>';
     }).join('') + '</div></div>';
 }
 
@@ -609,7 +620,7 @@ function vAyarlar() {
     ? '<button class="satir bad" data-act="demo-sil"><span class="grow"><b>Örnek veriyi sil</b><span>Yalnız "örnek" etiketli kayıtlar gider</span></span></button>'
     : '<button class="satir" data-act="demo-yukle"><span class="grow"><b>Örnek veriyi yükle</b><span>Dolu hâlini görmek için 12 haftalık uydurma kayıt, "örnek" etiketli</span></span></button>') + '</div>';
   o += '<details class="katla"><summary>Bu kelimeler ne demek?</summary><dl class="sozluk">' + SOZLUK.map(function (x) { return '<dt>' + h(x[0]) + '</dt><dd>' + h(x[1]) + '</dd>'; }).join('') + '</dl></details>';
-  o += '<h2>Veriyi sil</h2><div class="panel liste"><button class="satir bad" data-act="hepsini-sil"><span class="grow"><b>Tüm verileri sil</b><span>Antrenmanlar, kilo kayıtları, kendi eklediğin hareketler</span></span></button></div>';
+  o += '<h2>Veriyi sil</h2><div class="panel liste"><button class="satir bad" data-act="hepsini-sil"><span class="grow"><b>Tüm verileri sil</b><span>Antrenmanlar, kilo, kalori ve makrolar, takviyeler, defter notları, kilo hedefi ve ayarlar</span></span></button></div>';
   return o0 + kol(a0, o) + '<p class="altnot">Ağırlık Takip · internetsiz çalışır<span class="pc"> · kısayollar <kbd>?</kbd></span></p>';
 }
 
@@ -682,7 +693,7 @@ function seansSheet(id) {
   se.exs.forEach(function (e) {
     var sets = yapilanSetler(e); if (!sets.length) return;
     o += '<div class="satir"><span class="grow"><b>' + h(e.ad) + '</b><span class="num">' + sets.map(function (s) { return fmt(num(s.kg), 2) + '×' + h(s.reps); }).join(' · ') + '</span>' +
-      (pr[e.ad] ? '<span class="rek">Rekor · ' + pr[e.ad].map(function (t) { return h(t.ad) + ' ' + fmt(t.yeni) + ' kg'; }).join(' · ') + '</span>' : '') + '</span>' +
+      (pr[e.ad] ? '<span class="rek">Rekor · ' + pr[e.ad].map(function (t) { return h(t.ad) + ' ' + fmt(t.yeni, kgOnd(t)) + ' kg'; }).join(' · ') + '</span>' : '') + '</span>' +
       '<span class="deger">' + fmt(hacim(e), 0) + ' kg</span></div>';
   });
   o += '</div><div class="yigin" style="margin-top:18px"><button class="btn-big" data-act="kapat">Kapat</button>' +
@@ -778,7 +789,14 @@ var islem = {
     kaydet(); kapat(); window.scrollTo(0, 0); render(); toast(exs.length + ' hareket hazır');
   },
   'gecmis-hepsi': function () { gecmisHepsi = true; render(); },
-  ilersek: function (d) { ilerSek = d.v === 'guc' ? 'guc' : 'kilo'; render(); },
+  /* Kilo | Güç: iki sütun zaten çizili, yalnız sınıf değişir (5 yılda telefonda ~110 ms yeniden çizim yerine anında) */
+  ilersek: function (d) {
+    ilerSek = d.v === 'guc' ? 'guc' : 'kilo';
+    var k = $('#view .duzen.ilerleme');
+    if (!k) return render();
+    k.classList.remove('sek-kilo', 'sek-guc'); k.classList.add('sek-' + ilerSek);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-act=ilersek]'), function (b) { var on = b.dataset.v === ilerSek; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  },
   'egz-ekle': egzSheet,
   'egz-sec-ekle': function (d) { ekle(d.ad); },
   'oz-ekle': function () {
@@ -799,11 +817,11 @@ var islem = {
     var e = S.active.exs[+d.e], son = e.sets[e.sets.length - 1];
     var yeni = { kg: son ? son.kg : '', reps: son ? son.reps : '', done: false };
     if (S.rpe) yeni.rpe = '';   // RPE kopyalanmaz: her setin zorluğu ayrı girilir
-    e.sets.push(yeni); kaydet(); render();
+    e.sets.push(yeni); kaydet(true); render();
   },
   tamam: function (d) {
     var e = S.active.exs[+d.e], s = e.sets[+d.s];
-    if (s.done) { s.done = false; delete s.t; kaydet(); return render(); }
+    if (s.done) { s.done = false; delete s.t; kaydet(true); return render(); }
     var wi = e.sets.slice(0, +d.s).filter(function (x) { return x.tip !== 'isinma'; }).length, p = s.tip === 'isinma' ? null : hedefPv(e.ad, oncekiSetler(e.ad), wi, e, +d.s);
     // ipucundan doldurma: Türkçe ondalık virgül (78,75); binlik ayıracı yok ki num() geri okuyabilsin
     if (s.kg === '' && p) s.kg = String(num(p.kg)).replace('.', ',');
@@ -814,7 +832,7 @@ var islem = {
       if (!(r >= 6 && r <= 10)) return toast('RPE 6–10 arası olmalı (boş bırakabilirsin)');
       s.rpe = fmt(Math.round(r * 2) / 2);
     }
-    s.done = true; s.t = Date.now(); kaydet(); render();   /* s.t: setin bittiği an (unutulan antrenmanın gerçek süresi için) */
+    s.done = true; s.t = Date.now(); kaydet(true); render();   /* s.t: setin bittiği an (unutulan antrenmanın gerçek süresi için) */
     var hepsi = S.active.exs.every(function (x) { return x.sets.every(function (y) { return y.done; }); });
     if (hepsi) {   /* son set: dinlenme yok */ clearInterval(restTimer); $('#rest').hidden = true; return; }
     restEgz = e.ad; restBasla(dinlenmeOf(e.ad));
@@ -822,7 +840,7 @@ var islem = {
   'set-tip': function (d) {
     var s = S.active.exs[+d.e].sets[+d.s], t = TIPLER[(TIPLER.indexOf(s.tip || '') + 1) % TIPLER.length];
     if (t) s.tip = t; else delete s.tip;
-    kaydet(); render();
+    kaydet(true); render();
   },
   rpe: function (d) { S.rpe = d.v === '1'; kaydet(); render(); },
   bitir: function () {
@@ -881,7 +899,7 @@ var islem = {
   'ice-kesin': function () { S = pendingImport; pendingImport = null; kaydet(); kapat(); temaUygula(); render(); toast('İçe aktarıldı'); },
   'demo-yukle': function () { var d = demoUret(); S.sessions = S.sessions.concat(d.sessions); S.bw = S.bw.concat(d.bw); S.kcal = (S.kcal || []).concat(d.kcal.filter(function (k) { return !(S.kcal || []).some(function (x) { return x.date === k.date; }); })); if (d.bulk && !S.bulk) S.bulk = d.bulk; kaydet(); render(); toast('Örnek veri yüklendi'); },
   'demo-sil': function () { S.sessions = S.sessions.filter(function (s) { return !s.demo; }); S.bw = S.bw.filter(function (b) { return !b.demo; }); S.kcal = (S.kcal || []).filter(function (k) { return !k.demo; }); if (S.bulk && S.bulk.demo) S.bulk = null; secEgz = null; kaydet(); render(); toast('Örnek veri silindi'); },
-  'hepsini-sil': function () { onayla('Tüm veriler silinsin mi?', 'Antrenmanlar, vücut ağırlığı ve özel egzersizler kalıcı olarak silinir. Önce yedek almanı öneririm.', 'hepsini-kesin', 'Evet, hepsini sil'); },
+  'hepsini-sil': function () { onayla('Tüm veriler silinsin mi?', 'Antrenmanlar, kilo, kalori ve makrolar, takviyeler, defter notları, kilo hedefi, kendi eklediğin hareketler ve ayarlar kalıcı olarak silinir. Önce yedek almanı öneririm.', 'hepsini-kesin', 'Evet, hepsini sil'); },
   'hepsini-kesin': function () { S = bos(); kaydet(); secEgz = null; kapat(); temaUygula(); $('#rest').hidden = true; render(); toast('Tüm veriler silindi'); }
 };
 var pendingImport = null;
@@ -925,15 +943,15 @@ document.addEventListener('toggle', function (ev) {
 }, true);
 document.addEventListener('input', function (ev) {
   var t = ev.target; if (t.id === 'din') { var n = parseInt(t.value, 10); if (n >= 10 && n <= 900) { S.dinlenme = n; kaydet(); } return; }
-  if (t.id === 'seansnot' && S.active) { S.active.not = t.value; kaydet(); return; }
-  if (t.id === 'seansad' && S.active) { S.active.name = t.value.slice(0, 60); kaydet(); return; }
-  if (t.dataset.f && S.active) { S.active.exs[+t.dataset.e].sets[+t.dataset.s][t.dataset.f] = t.value; kaydet(); }
+  if (t.id === 'seansnot' && S.active) { S.active.not = t.value; kaydet(true); return; }
+  if (t.id === 'seansad' && S.active) { S.active.name = t.value.slice(0, 60); kaydet(true); return; }
+  if (t.dataset.f && S.active) { S.active.exs[+t.dataset.e].sets[+t.dataset.s][t.dataset.f] = t.value; kaydet(true); }
 });
 document.addEventListener('change', function (ev) {
   if (ev.target.id === 'egzsec') { secEgz = ev.target.value; render(); var g = $('#egzsec'); if (g) g.focus(); }
 });
 /* ---------- klavye (PC) ----------
-   1–6 sekme · N antrenman başlat / egzersiz ekle · ? kısayollar · Esc kapat
+   1–6 sekme · N antrenman başlat / hareket ekle · ? kısayollar · Esc kapat
    set satırında Enter: kg → tekrar → (RPE) → seti tamamla, sonraki setin kg'sine geç */
 var SEKME = { '1': 'bugun', '2': 'gecmis', '3': 'ilerleme', '4': 'defter', '5': 'takviye', '6': 'ayarlar' };
 function sekmeAc(t) { tab = t; render(); window.scrollTo(0, 0); }
@@ -947,7 +965,7 @@ function setEnter(t) {
   if (!odakla('input[data-e="' + e + '"][data-s="' + (s + 1) + '"][data-f="kg"]')) odakla('.addset[data-e="' + e + '"]');
 }
 function kisayolSheet() {
-  var l = [['1 – 6', 'Bugün · Geçmiş · İlerleme · Defter · Takviye · Ayarlar'], ['N', 'Antrenmanı başlat / egzersiz ekle'], ['Enter', 'Set satırında: kg → tekrar → seti tamamla'],
+  var l = [['1 – 6', 'Bugün · Geçmiş · İlerleme · Defter · Takviye · Ayarlar'], ['N', 'Antrenmanı başlat / hareket ekle'], ['Enter', 'Set satırında: kg → tekrar → seti tamamla'],
     ['Enter', 'Egzersiz aramada: ilk sonucu ekle'], ['Enter', 'Kilo ya da kalori alanında: kaydet'], ['Ctrl + Enter', 'Defterde: notu kaydet'], ['Ctrl + K', 'Hızlı komut: 82,4 · +650 · bench · özet'], ['Esc', 'Pencereyi kapat'], ['?', 'Bu liste']];
   sheet('<h3>Klavye kısayolları</h3><p class="mut">Bilgisayarda daha hızlı kayıt için.</p><dl class="kv">' + l.map(function (x) { return '<div><dt>' + h(x[1]) + '</dt><dd><kbd>' + h(x[0]) + '</kbd></dd></div>'; }).join('') +
     '</dl><div class="yigin" style="margin-top:18px"><button class="btn-big" data-act="kapat">Kapat</button></div>');

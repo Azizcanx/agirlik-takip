@@ -32,7 +32,7 @@ AT.seansOzet = function (se) {
     o += '<p class="durum iyi">Geçen seferden +' + AT.fmt(Math.round(v.fark), 0) + ' kg fazla (' + AT.h(AT.tarih(v.onceki, 1)) + ')</p>';
   if (v.rekor.length) {
     o += '<h2>' + (v.rekor.length === 1 ? 'Yeni rekor' : v.rekor.length + ' yeni rekor') + '</h2><ul class="ozet-rekor">' + v.rekor.map(function (r) {
-      return '<li><b>' + AT.h(r.ad) + '</b><span>' + r.t.map(function (t) { return AT.h(t.ad) + ' ' + AT.fmt(t.yeni) + ' kg <i>+' + AT.fmt(t.fark) + '</i>'; }).join(' · ') + '</span></li>';
+      return '<li><b>' + AT.h(r.ad) + '</b><span>' + r.t.map(function (t) { return AT.h(t.ad) + ' ' + AT.fmt(t.yeni, t.ad === 'En ağır' ? 2 : 1) + ' kg <i>+' + AT.fmt(t.fark, t.ad === 'En ağır' ? 2 : 1) + '</i>'; }).join(' · ') + '</span></li>';
     }).join('') + '</ul>';
   }
   o += '<button class="btn-ac btn-big" data-act="kapat" style="margin-top:20px">Tamam</button></div>';

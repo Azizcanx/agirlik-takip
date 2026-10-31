@@ -112,7 +112,7 @@ function kartVeri() {
     v.kg0 = S.bulk ? S.bulk.basKg : ort(bw.filter(function (b) { return b.date <= gunEkle(bw[0].date, 6); }).map(function (b) { return b.kg; }));
     v.kg1 = ort(bw.filter(function (b) { return b.date >= gunEkle(son, -6); }).map(function (b) { return b.kg; })); v.kgAd = '7 günlük ortalama';
     var bd = S.bulk && AT.bulkDurum ? AT.bulkDurum() : null;
-    if (bd && isFinite(bd.simdi)) { v.kg1 = bd.simdi; v.kgAd = 'trend kilo'; }
+    if (bd && isFinite(bd.simdi)) { v.kg1 = bd.simdi; v.kgAd = 'ortalama kilo'; }
     v.seri = bw.map(function (b, i) {
       var lim = gunEkle(b.date, -6), a = bw.slice(0, i + 1).filter(function (x) { return x.date >= lim; });
       return ort(a.map(function (x) { return x.kg; }));
@@ -184,7 +184,7 @@ function kartCiz(v) {
   [[String(v.seans), 'antrenman'], [String(v.set), 'set'], [AT.fmt(v.hacim / 1000, 1) + ' t', 'toplam kaldırılan']].forEach(function (k, i) {
     yaz(k[0], P + i * cw, sy, 84, 600, TX, 'left', true); yaz(k[1], P + i * cw, sy + 56, 36, 400, MUT);
   });
-  yaz(AT.tarih(v.bas, 1) + ' – ' + AT.tarih(v.bit), P, H - P - 10, 34, 400, DIM);
+  yaz(AT.tarih(v.bas, 1) + (v.bas.slice(0, 4) !== v.bit.slice(0, 4) ? ' ' + v.bas.slice(0, 4) : '') + ' – ' + AT.tarih(v.bit, 1) + ' ' + v.bit.slice(0, 4), P, H - P - 10, 34, 400, DIM);
   yaz('Ağırlık Takip', W - P, H - P - 10, 34, 600, AC, 'right');
   return cv;
 }

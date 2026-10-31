@@ -139,7 +139,7 @@ function oneriler(h, bugun) {
     if (ws.length < 2 || !(kg > 0)) return;
     var rs = tekrarlar(ws), ilk = rs[0], mn = Math.min.apply(0, rs), ar = aralik(rs), alt = ar[0], tepe = ar[1];
     var rpe = rpeOf(ws[ws.length - 1]), rpeYaz = rpe != null ? 'son set RPE ' + AT.fmt(rpe) : '';
-    var ne = AT.tarih(son.date, true), n = ws.length, ek = artis(son.ex, kg), yeni = kg + ek;
+    var ne = AT.tarih(son.date, true), gs = g === 0 ? 'Bugün' : 'Geçen sefer (' + ne + ')', n = ws.length, ek = artis(son.ex, kg), yeni = kg + ek;
     var bolge = (altVucut(son.ex) ? 'Alt vücut' : 'Üst vücut') + ': +' + AT.fmt(ek, 2) + ' kg';
     var x = { g: g, n: l.length };
     /* a7: bu hafta (Pzt'den beri) bu harekette kg zaten artırıldıysa ikinci kez artırma */
@@ -166,7 +166,7 @@ function oneriler(h, bugun) {
       var ht = Math.min(tepe + EK_TEKRAR, mn + 1);
       x.sinif = 2; x.hedef = { kg: kg, tekrar: ht, n: n };
       x.not = { tip: 'iyi', baslik: a + ': ' + kgYaz(kg) + ' ile ' + n + ' set × ' + ht + ' tekrar',
-        aciklama: 'Geçen sefer (' + ne + ') ' + n + '×' + mn + ' @ ' + kgYaz(kg) + '. +' + AT.fmt(ek, 2) + ' kg bu kiloda %' + Math.round(ek / kg * 100) +
+        aciklama: gs + ' ' + n + '×' + mn + ' @ ' + kgYaz(kg) + '. +' + AT.fmt(ek, 2) + ' kg bu kiloda %' + Math.round(ek / kg * 100) +
           ' sıçrama; önce tekrarı artır, hepsi ' + (tepe + EK_TEKRAR) + ' olunca ' + kgYaz(yeni) + '.' };
     } else if (buHaftaArtti && (mn >= tepe || (rpe != null && rpe <= RPE_KOLAY && mn >= alt))) {
       /* a7: haftada en fazla bir kg artışı */
@@ -178,29 +178,29 @@ function oneriler(h, bugun) {
       if (rpe != null && rpe >= RPE_ZOR) {
         x.sinif = 2; x.hedef = { kg: kg, tekrar: tepe, n: n };
         x.not = { tip: 'bilgi', baslik: a + ': ' + kgYaz(kg) + ' ile ' + n + ' set × ' + tepe + ' tekrar',
-          aciklama: 'Geçen sefer (' + ne + ') ' + n + '×' + mn + ' @ ' + kgYaz(kg) + ' ama ' + rpeYaz + ': aynı kg\'da kal. RPE 9 ve altına inince +' + AT.fmt(ek, 2) + ' kg.' };
+          aciklama: gs + ' ' + n + '×' + mn + ' @ ' + kgYaz(kg) + ' ama ' + rpeYaz + ': aynı kg\'da kal. RPE 9 ve altına inince +' + AT.fmt(ek, 2) + ' kg.' };
       } else {
         x.sinif = 1; x.hedef = { kg: yeni, tekrar: alt, n: n };
-        x.not = { tip: 'iyi', baslik: a + ': bugün ' + kgYaz(yeni) + ' dene',
-          aciklama: 'Geçen sefer (' + ne + ') ' + n + '×' + mn + ' @ ' + kgYaz(kg) + ', tüm setler ' + alt + '–' + tepe + ' aralığının tepesinde' +
+        x.not = { tip: 'iyi', baslik: a + (g === 0 ? ': sonraki seansta ' : ': bugün ') + kgYaz(yeni) + ' dene',
+          aciklama: gs + ' ' + n + '×' + mn + ' @ ' + kgYaz(kg) + ', tüm setler ' + alt + '–' + tepe + ' aralığının tepesinde' +
             (rpeYaz ? ' (' + rpeYaz + ')' : '') + '. ' + bolge + ', tekrarı ' + alt + '\'e indir: hedef ' + n + '×' + alt + '.' };
       }
     } else if (rpe != null && rpe <= RPE_KOLAY && mn >= alt) {
       x.sinif = 1; x.hedef = { kg: yeni, tekrar: mn, n: n };
-      x.not = { tip: 'iyi', baslik: a + ': bugün ' + kgYaz(yeni) + ' dene',
-        aciklama: 'Geçen sefer (' + ne + ') ' + rs.join(', ') + ' tekrar @ ' + kgYaz(kg) + ', ' + rpeYaz + ': fazla kolay. ' + bolge + ', aynı tekrar (' + n + '×' + mn + ').' };
+      x.not = { tip: 'iyi', baslik: a + (g === 0 ? ': sonraki seansta ' : ': bugün ') + kgYaz(yeni) + ' dene',
+        aciklama: gs + ' ' + rs.join(', ') + ' tekrar @ ' + kgYaz(kg) + ', ' + rpeYaz + ': fazla kolay. ' + bolge + ', aynı tekrar (' + n + '×' + mn + ').' };
     } else if (geriKg(ws, kg, alt) > 0) {
       // en iyi set bile aralığın altında: alt sınır tekrarı için kg, tahmini maxtan geri (Epley tersi), adıma aşağı yuvarlı
       var gk = geriKg(ws, kg, alt);
       x.sinif = 2; x.hedef = { kg: gk, tekrar: alt, n: n };
       x.not = { tip: 'bilgi', baslik: a + ': ' + kgYaz(gk) + ' ile ' + n + ' set × ' + alt + ' tekrar',
-        aciklama: 'Geçen sefer (' + ne + ') ' + rs.join(', ') + ' tekrar @ ' + kgYaz(kg) + ': en iyi set bile ' + alt + '–' + tepe +
+        aciklama: gs + ' ' + rs.join(', ') + ' tekrar @ ' + kgYaz(kg) + ': en iyi set bile ' + alt + '–' + tepe +
           ' aralığının altında. Tahmini maxına göre ' + alt + ' tekrar için ' + kgYaz(gk) + ' uygun; oradan yeniden yüksel, hepsi ' + tepe + ' olunca ' + kgYaz(kg) + '\'a dön.' };
     } else {
       var hedef = Math.min(tepe, Math.max(ilk, mn + 1));
       x.sinif = 2; x.hedef = { kg: kg, tekrar: hedef, n: n };
       x.not = { tip: mn === Math.max.apply(0, rs) ? 'iyi' : 'bilgi', baslik: a + ': ' + kgYaz(kg) + ' ile ' + n + ' set × ' + hedef + ' tekrar',
-        aciklama: 'Geçen sefer (' + ne + ') ' + rs.join(', ') + ' tekrar (aralık ' + alt + '–' + tepe + '). ' +
+        aciklama: gs + ' ' + rs.join(', ') + ' tekrar (aralık ' + alt + '–' + tepe + '). ' +
           (rpe != null && rpe >= RPE_ZOR ? 'Son set RPE ' + AT.fmt(rpe) + ': zorlandın, aynı kg\'da kal; ' : mn < ilk ? 'Önce setleri eşitle; ' : 'Her seans bir tekrar ekle; ') +
           'hepsi ' + tepe + ' olunca +' + AT.fmt(ek, 2) + ' kg.' };
     }
@@ -277,7 +277,9 @@ AT.bolum.notlar = function () {
   var l = AT.notlar();
   if (!l.length) return '';
   /* başlık = ne yapmalı (tek satır); açıklama = neden, dokununca açılır */
-  return '<h2>Bugün için öneriler</h2><ul class="notlar">' + l.map(function (n) {
+  /* bugün antrenman bittiyse öneriler bir sonraki seans içindir */
+  var bugun = AT.iso(new Date()), bitti = AT.bitenSeanslar().some(function (x) { return x.date === bugun && !x.demo; });
+  return '<h2>' + (bitti ? 'Sonraki antrenman için' : 'Bugün için öneriler') + '</h2><ul class="notlar">' + l.map(function (n) {
     var tip = { iyi: 1, uyari: 1, bilgi: 1 }[n.tip] ? n.tip : 'bilgi';
     return '<li class="' + tip + '"><details><summary><b>' + AT.h(n.baslik) + '</b><span class="neden">Neden?</span></summary><span>' + AT.h(n.aciklama) + '</span></details></li>';
   }).join('') + '</ul>';
