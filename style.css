@@ -621,6 +621,128 @@ button.satir.df-not:hover .df-saat{color:var(--ac)}
 .panel>p.csv-etiket+.row{margin-top:0}
 .panel>.csv-satir+p.mut{margin-top:14px}
 
+/* ---------- ferahlık: ilerleme, defter, takviye, ayarlar, pencere, bildirim (1 Kas) ----------
+   8 px ızgara: bölüm arası 32–36, kart içi 18, satır 14. Seçiciler sekmeye sınırlı (#view[data-sekme=…], app.js render koyar);
+   pencere (#sheet) ve bildirim (.toast) ortak. Defter yazı alanında kenar çizgisi, takviyede başlık altında günün noktaları,
+   Ayarlar'da ikon rozetli grup başlıkları ve en altta ayrı "Veriyi sil". */
+:root{--marj:rgba(162,70,61,.28);--parilti:rgba(53,87,138,.09)}
+:root[data-theme=koyu]{--marj:rgba(230,146,138,.28);--parilti:rgba(157,182,230,.09)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=acik]){--marj:rgba(230,146,138,.28);--parilti:rgba(157,182,230,.09)}}
+
+/* ortak ritim: bölüm başlığı, kart içi boşluk, katlanır başlık 56 px */
+#view[data-sekme=ilerleme] h2,#view[data-sekme=takviye] h2,#view[data-sekme=ayarlar] h2{margin:36px 0 12px}
+#view[data-sekme=takviye] .kol:first-child>h2:first-child,#view[data-sekme=ayarlar] .kol:first-child>h2:first-child{margin-top:0}
+#view[data-sekme=ilerleme] div.panel:not(.liste),#view[data-sekme=takviye] div.panel:not(.liste),#view[data-sekme=ayarlar] div.panel:not(.liste){padding:18px}
+#view[data-sekme=ilerleme] div.panel.liste,#view[data-sekme=takviye] div.panel.liste,#view[data-sekme=ayarlar] div.panel.liste,#view[data-sekme=defter] div.panel.liste{padding:0 18px}
+#view[data-sekme=ilerleme] details.katla>div.panel,#view[data-sekme=ayarlar] details.katla>div.panel{padding:0 0 4px}   /* katlanırın içindeki bölüm ikinci kez içeri girmesin */
+#view[data-sekme=ilerleme] .panel>.kv:first-child,#view[data-sekme=ayarlar] .panel>.kv:first-child{margin-top:-18px}
+#view[data-sekme=ilerleme] .panel>.kv:last-child,#view[data-sekme=ayarlar] .panel>.kv:last-child{margin-bottom:-18px}
+#view[data-sekme=ilerleme] details.katla,#view[data-sekme=ayarlar] details.katla{padding:0 18px}
+#view[data-sekme=ilerleme] details.katla>summary,#view[data-sekme=ayarlar] details.katla>summary{min-height:56px;gap:8px}
+#view[data-sekme=ilerleme] details.katla>summary small,#view[data-sekme=ayarlar] details.katla>summary small{font-size:13.5px;color:var(--dim)}
+#view[data-sekme=ilerleme] details.katla>:last-child,#view[data-sekme=ayarlar] details.katla>:last-child{margin-bottom:18px}
+#view[data-sekme=ilerleme] .kv>div,#view[data-sekme=ayarlar] .kv>div{padding:14px 0}
+#view[data-sekme=ilerleme] .kv dt{font-size:15px}
+#view[data-sekme=ilerleme] .kv dt small{white-space:nowrap}
+
+/* İlerleme: Kilo | Güç seçici telefonda üstte yapışık (uzun Rekorlar'da geri dönmek kolay) */
+#view[data-sekme=ilerleme] .seg.sekme{margin:0 0 4px;position:sticky;top:calc(8px + env(safe-area-inset-top));z-index:3;box-shadow:0 0 0 8px var(--bg)}
+#view[data-sekme=ilerleme] .seg.sekme button{min-height:44px;font-size:15.5px}
+#view[data-sekme=ilerleme] .duzen.ilerleme>.kol>h2:first-child{margin-top:28px}
+/* büyük rakam: tek ve iri, kartın sol üstünde hafif ışık */
+#view[data-sekme=ilerleme] .panel:has(>.hero){background:radial-gradient(120% 80% at 0 0,var(--parilti),transparent 60%),var(--s1)}
+#view[data-sekme=ilerleme] .hero{margin:2px 0 16px}
+#view[data-sekme=ilerleme] .hero b{font-size:54px;letter-spacing:-.03em;line-height:1}
+#view[data-sekme=ilerleme] .hero b small{font-size:.34em;margin-left:0;letter-spacing:0}
+#view[data-sekme=ilerleme] .hero span{font-size:14.5px;margin-top:10px;line-height:1.45}
+#view[data-sekme=ilerleme] .panel>.durum{margin:0 0 6px}
+#view[data-sekme=ilerleme] .panel>*+.kv{margin:10px 0 18px}
+#view[data-sekme=ilerleme] .chart+.row{margin-top:14px}
+#view[data-sekme=ilerleme] details.katla{margin:16px 0 0}
+#view[data-sekme=ilerleme] details.katla+details.katla{margin-top:12px}
+#view[data-sekme=ilerleme] .panel.liste.ayri{margin-top:32px}
+#view[data-sekme=ilerleme] .panel+.panel{margin-top:12px}
+#view[data-sekme=ilerleme] #egzsec{min-height:56px;padding-left:18px}
+/* Güç: rekor tablosu ve rekor satırları nefes alsın */
+#view[data-sekme=ilerleme] .tekrar-tablo{margin:0 0 20px}
+#view[data-sekme=ilerleme] .tekrar-tablo th{padding:10px 0}
+#view[data-sekme=ilerleme] .tekrar-tablo td{padding:10px 0;border-bottom-color:color-mix(in srgb,var(--line) 70%,transparent)}
+#view[data-sekme=ilerleme] .satir.pr{padding:16px 0}
+@media (max-width:380px){ #view[data-sekme=ilerleme] .pr-l .k small{display:block;margin:1px 0 0} }   /* dar ekranda "78,75 × 8" alt satırda, ad kırılmasın */
+
+/* Defter: kağıt defter gibi solda kenar çizgisi; notlar arası daha geniş */
+#view[data-sekme=defter] .df-alan,#sheet .in .df-alan{padding:13px 14px 13px 36px;
+  background:linear-gradient(90deg,transparent 22px,var(--marj) 22px,var(--marj) 23.5px,transparent 23.5px) padding-box,
+    linear-gradient(transparent 25px,var(--line) 25px) 0 0/100% 26px content-box local,var(--s1)}
+#view[data-sekme=defter] .df-yaz .df-alan{margin:0 0 12px}
+#view[data-sekme=defter] #df-liste{margin-top:36px}
+#view[data-sekme=defter] h2.df-gun{margin:36px 0 10px}
+#view[data-sekme=defter] #df-liste>h2.df-gun:first-child,#view[data-sekme=defter] .df-sonuc+h2.df-gun{margin-top:12px}
+#view[data-sekme=defter] #df-liste>h2.df-gun:first-child{margin-top:0}
+#view[data-sekme=defter] button.satir.df-not{padding:16px 0;gap:16px}
+#view[data-sekme=defter] .df-ara{margin-top:20px}
+
+/* Takviye: günün noktaları, ferah kartlar ve çipler */
+.tk-nokta{display:inline-flex;gap:6px;margin-left:12px;vertical-align:1px}
+.tk-nokta i{width:8px;height:8px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--kenar-g)}
+.tk-nokta i.v{background:var(--ac);box-shadow:none}
+.tk-nokta.tam i{background:var(--iyi)}
+#view[data-sekme=takviye] .tk-liste{gap:10px}
+#view[data-sekme=takviye] button.satir.tk{min-height:68px;padding:14px 16px}
+#view[data-sekme=takviye] .tk-alt{margin:10px 0 0}
+#view[data-sekme=takviye] .satir.tk-gecmis{padding:16px 0}
+#view[data-sekme=takviye] .tk-h3{margin:28px 0 12px}
+#view[data-sekme=takviye] .chips{gap:10px}
+#view[data-sekme=takviye] .chip{min-height:42px;padding:0 16px;font-size:15px}
+#view[data-sekme=takviye] .bos{padding:20px 16px 8px}
+
+/* Ayarlar: grup başlığı ikonu yumuşak rozette, satırlar 64 px, gruplar arası nefes */
+#view[data-sekme=ayarlar] h2.ay-b{gap:12px}
+#view[data-sekme=ayarlar] .ay-i,#view[data-sekme=ayarlar] details.ay-sozluk>summary .ay-i{width:30px;height:30px;padding:6px;border-radius:9px;background:var(--act);color:var(--ac)}
+#view[data-sekme=ayarlar] details.ay-sozluk>summary .ay-i{margin-right:6px}
+#view[data-sekme=ayarlar] button.satir.ay-satir{min-height:66px;padding:14px 0}
+#view[data-sekme=ayarlar] .ay-satir .grow>span{margin-top:3px}
+#view[data-sekme=ayarlar] details.katla{margin:12px 0 0}
+#view[data-sekme=ayarlar] details.ay-sozluk{margin-top:36px}
+#view[data-sekme=ayarlar] .tema-sec{gap:12px}
+#view[data-sekme=ayarlar] .tema-sec button{padding:12px 8px 10px}
+#view[data-sekme=ayarlar] .panel .alan{margin-bottom:18px}
+#view[data-sekme=ayarlar] .panel>:last-child,#view[data-sekme=ayarlar] .panel>.alan:last-child{margin-bottom:0}
+#view[data-sekme=ayarlar] .sozluk dt{margin-top:16px}
+#view[data-sekme=ayarlar] .sozluk dt:first-child{margin-top:0}
+#view[data-sekme=ayarlar] .sozluk dd{line-height:1.55}
+/* örnek veriyi silmek tehlikeli değil: kırmızı yalnız "Tüm verileri sil"de */
+#view[data-sekme=ayarlar] button.satir.bad[data-act=demo-sil]{color:var(--tx)}
+/* tehlikeli işlem: en altta, ince çizgiyle ayrı; sakin (dolgu yok, kırmızı yalnız başlıkta) */
+.ay-tehlike{margin:48px 0 0;padding-top:28px;border-top:1px solid var(--line)}
+#view[data-sekme=ayarlar] .ay-tehlike h2{margin:0 0 12px;color:var(--mut);font-size:15px}
+#view[data-sekme=ayarlar] .ay-tehlike .ay-i{background:var(--s2);color:var(--mut)}
+#view[data-sekme=ayarlar] .ay-tehlike div.panel{background:transparent;box-shadow:none}
+#view[data-sekme=ayarlar] .ay-tehlike button.satir:hover{background:var(--badt)}
+#view[data-sekme=ayarlar] .ay-tehlike button.satir{margin:0 -18px;padding:14px 18px;width:calc(100% + 36px);border-radius:var(--r)}
+
+/* pencere: sağ üstte kapat (×), yanlarda daha geniş boşluk, başlık × ile çakışmaz */
+#sheet .in[role=dialog]{padding-left:20px;padding-right:20px;border-radius:24px 24px 0 0}
+.sh-kapat{position:absolute;top:12px;right:12px;z-index:2;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:50%;background:var(--s2);color:var(--mut);display:grid;place-items:center;box-shadow:none}
+.sh-kapat::before{content:"";position:absolute;inset:-4px}   /* dokunma alanı 44 px */
+.sh-kapat svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.sh-kapat:hover{background:var(--s3);color:var(--tx);border-color:transparent}
+#sheet h3,#sheet .sheet-ust{padding-right:40px}
+#sheet .ozet-son h3,#sheet .ozet-son .ozet-ust{padding-left:40px;padding-right:40px}
+
+/* bildirim: biraz daha iri, cam gibi */
+body>.toast{font-size:15px;padding:13px 20px;border-radius:16px;max-width:min(440px,calc(100vw - 32px));
+  background:color-mix(in srgb,var(--toast-bg) 90%,transparent);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)}
+
+@media (min-width:1024px){
+  #view[data-sekme=ilerleme] .hero b{font-size:58px}
+  #view[data-sekme=ilerleme] .duzen.ilerleme>.kol>h2:first-child,#view[data-sekme=ayarlar] .kol>h2:first-child,#view[data-sekme=takviye] .kol>h2:first-child{margin-top:0}
+  #view[data-sekme=defter] #df-liste{margin-top:0}
+  .ay-tehlike{max-width:calc((100% - 48px)/2)}
+  #sheet .in[role=dialog]{padding:30px 32px 28px;border-radius:20px}
+  .sh-kapat{top:14px;right:14px}
+}
+
 /* ---------- görsel QA düzeltmeleri (31 Eki) ---------- */
 #egzyok{margin-top:14px}   /* arama kutusunun gölgesi "Bulunamadı" satırını örtmesin */
 .toast,.toast.yukari{white-space:normal;text-align:center;width:max-content;line-height:1.35}   /* uzun bildirim kesilmesin */
@@ -654,8 +776,8 @@ h1{font-size:34px;letter-spacing:-.02em;line-height:1.12;margin:0 0 6px}
 #view.giris>*{animation:giris .18s ease-out}
 @keyframes giris{from{opacity:0;transform:translateY(6px)}}
 /* klavye: ilk Tab'da "İçeriğe geç" (menü kodda içerikten önce; görsel sırayla uyuşur) */
-.atla{position:fixed;left:12px;top:12px;z-index:40;padding:12px 16px;border-radius:12px;background:var(--btn);color:var(--on-btn);font-weight:600;text-decoration:none;box-shadow:var(--pop);transform:translateY(-160%)}
-.atla:focus{transform:none;outline:2px solid var(--ac);outline-offset:2px}
+.atla{position:fixed;left:12px;top:12px;z-index:40;padding:12px 16px;border-radius:12px;background:var(--btn);color:var(--on-btn);font-weight:600;text-decoration:none;transform:translateY(-200%)}
+.atla:focus{transform:none;box-shadow:var(--pop);outline:2px solid var(--ac);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){ #view.giris>*{animation:none} #tabs button::before,#tabs svg,#tabs svg .d{transition:none} }
 /* ---------- tasarım: ilerleme ve grafikler ----------
    Grafik: ince keskin ızgara, yumuşak degrade alan, son değer hapı, açıklama şeridi (çizgi · tartı · hedef),
@@ -708,6 +830,55 @@ details.katla>.chart{margin-bottom:16px}
 .tekrar-tablo td:nth-child(2){font-weight:600}
 .tekrar-tablo tbody tr:last-child td{border-bottom:0}
 
+
+/* ---------- tasarım: bugünkü kilo ve kalori ----------
+   bulk.js tarti/kcalOzet: kilo satırında önceki tartıya fark rozeti; kalori toplamı serif rakam + ince hedef çubuğu
+   (değer değişince öncekinden akar), altında P/K/Y şeridi (protein hedefe mini çubuk). Hedef aşılınca çubuk dolu,
+   renk sakin (bulk'ta yeşil, cut'ta mürekkep). Sonraki "bugün ve antrenman" bölümü aynı seçicileri ezmesin diye div.panel ile. */
+.kfark{display:inline-flex;align-items:baseline;gap:3px;margin-left:6px;padding:1px 8px;border-radius:99px;background:var(--s2);color:var(--mut);
+  font-size:13px;font-weight:600;line-height:1.55;font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:3px}
+.kfark small{font-size:12px;font-weight:400}
+div.panel.tarti .kc-ozet{margin:14px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+.kc-ust{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}
+.kc-say{color:var(--mut);font-size:15px;font-variant-numeric:tabular-nums}
+.kc-say b{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--tx);letter-spacing:-.01em;margin-right:2px}
+.kc-not{margin-left:auto;font-size:14px;font-weight:600;color:var(--ac);font-variant-numeric:tabular-nums;white-space:nowrap}
+.kc-ozet.tam .kc-not{color:var(--mut)}
+.kc-ozet.iyi .kc-not{color:var(--iyi)}
+div.panel.tarti .kc-bar{height:6px;margin:9px 0 0;background:var(--s2)}
+.kc-ozet.iyi .kc-bar i{background:var(--iyi)}
+.kc-bar i.akar,.mk-bar i.akar{animation:kc-ak .7s var(--egri) both}
+@keyframes kc-ak{from{width:var(--o)}}
+.mk-serit{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.mk-serit li{min-width:0;padding:0 12px;border-left:1px solid var(--line);display:flex;flex-direction:column}
+.mk-serit li:first-child{padding-left:0;border-left:0}
+.mk-serit span{font-size:12.5px;color:var(--mut);line-height:1.3}
+.mk-serit b{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-serit b small{font-size:12.5px;font-weight:400;color:var(--mut)}
+.mk-bar{height:3px;margin-top:5px;border-radius:99px;background:var(--s2);overflow:hidden}
+.mk-bar i{display:block;height:100%;max-width:100%;border-radius:inherit;background:var(--ac)}
+div.panel.tarti .kcalrow{margin-top:14px}
+.kc-alt{position:relative}
+.kc-alt>.kc-sil{position:absolute;top:4px;right:-12px;color:var(--mut)}
+.kc-alt+.durum,.kc-alt+.durum-duz{margin-top:10px}
+@media (max-width:370px){ .kc-say b{font-size:22px} .mk-serit li{padding:0 8px} .mk-serit b{font-size:15px} }
+@media (prefers-reduced-motion:reduce){ .kc-bar i.akar,.mk-bar i.akar{animation:none} }
+/* Bugün düzeni (app.js vBugun): .b-sira, .b-tarti, .b-not, .b-son. Telefonda bu sırayla alt alta;
+   PC'de solda antrenman (Sıradaki, öneriler, son antrenman), sağda kilo/kalori kartı (yapışkan) */
+details.makro>summary{min-height:44px}
+details.makro{margin-top:2px}
+.duzen.bugun .notlar summary{padding:8px 0;margin:-8px 0}   /* dokunma alanı ≥44 px, görünüm aynı */
+.duzen.bugun .basla-baska{min-height:44px}
+.duzen.bugun>.b-son>.bos-durum:first-child{margin-top:20px}
+@media (min-width:1024px){
+  .duzen.bugun{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto 1fr;column-gap:48px}
+  .duzen.bugun>.b-sira{grid-column:1;grid-row:1}
+  .duzen.bugun>.b-tarti{grid-column:2;grid-row:1 / span 3;position:sticky;top:24px}
+  .duzen.bugun>.b-not{grid-column:1;grid-row:2}
+  .duzen.bugun>.b-son{grid-column:1;grid-row:3}
+  .duzen.bugun>.b-tarti>h2:first-child{margin-top:0}
+  .duzen.bugun>.b-sira>.adimlar:first-child{margin-top:0}
+}
 
 /* ---------- tasarım: bugün ve antrenman ----------
    Hafta şeridi, Sıradaki kartı, kilo/kalori, öneriler, son antrenman; antrenmanda parçalı çubuk, set ✓ animasyonu,
@@ -871,6 +1042,71 @@ svg.tik{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stro
   .hserit{max-width:520px}
 }
 @media (prefers-reduced-motion:reduce){ .setgrid.yeni .done svg.tik path{stroke-dasharray:none} }
+/* ---------- tasarım: antrenman ekranı ----------
+   Biten hareket tek satır özet (✓ ad · setler · rekor yıldızı), dokununca açılır; sıradaki hareketin başında ince mürekkep çizgisi.
+   ✓ anı: düğme 220 ms ölçek + renk, satır soldan hafifçe dolar. Rekor anı: altın yıldız + tek parıltı (app.js aktifRekor).
+   Set/kg/Tekrar başlığı yalnız ilk açık kartta, küçük ve soluk. reduced-motion'da hiçbir animasyon yok. */
+
+/* başlık satırı: küçük, soluk, kısa */
+.setgrid.etiket{margin:-4px 0 0}
+.setgrid.etiket .lbl{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);line-height:1.2}
+.setgrid.etiket+.setgrid{margin-top:6px}
+
+/* ikincil yazılar sakin: Plaka/Çıkar soluk küçük (dokunma alanı .mini::before ile 44 px), "Geçen sefer" soluk, sayılar orta kalın */
+section.ex .ex-dug .mini{color:var(--dim);font-size:13px;font-weight:500}
+section.ex .ex-dug .mini:hover{color:var(--tx)}
+section.ex .mini-gecmis,section.ex .hint.gecen{margin-bottom:6px}
+section.ex .hint.gecen{font-size:13px;color:var(--dim)}
+section.ex .hint.gecen b{font-weight:500;color:var(--mut)}
+section.ex .mini-gecmis .neden{font-size:12.5px;color:var(--dim)}
+/* kartlar arası nefes payı; kutular arası biraz daha boşluk */
+section.ex:not(.kapali){padding:20px 0 14px}
+section.ex .setgrid{column-gap:10px}
+section.ex .setgrid+.setgrid{margin-top:9px}
+section.ex .setgrid.etiket+.setgrid{margin-top:6px}
+
+/* sıradaki hareket: başlığın solunda ince --ac çizgi, ad mürekkep rengi */
+section.ex.sirada .ex-head>.grow{position:relative;padding-left:12px}
+section.ex.sirada .ex-head>.grow::before{content:"";position:absolute;left:0;top:50%;width:3px;height:22px;margin-top:-11px;border-radius:2px;background:var(--ac)}
+section.ex.sirada .ex-head>.grow>b{color:var(--ac)}
+
+/* biten hareket: tek satır — ad · setler, sağda yıldız ve ok */
+section.ex.kapali{padding:8px 0}
+.ex-head>button.ex-katla{flex:1 1 auto;flex-wrap:nowrap;min-width:0}
+.ex-katla .ex-ad{flex:1 1 auto;min-width:0;flex-direction:row;align-items:baseline;gap:7px}
+.ex-katla .ex-ad b{flex:0 1 auto;min-width:0;max-width:62%;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-katla .ex-ozet{flex:1 1 0;min-width:3em}
+.ex-katla .ex-ozet::before{content:"· ";color:var(--dim)}
+.ex-katla .ex-ok{margin-left:4px}
+.ex-rek{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--altint,var(--warnt));color:var(--altin,var(--warn))}
+.ex-rek svg{width:13px;height:13px;fill:currentColor}
+section.ex.ex-yeni .ex-ad{animation:tz-ac .22s var(--ease)}
+section.ex.rekor-yeni .ex-rek{animation:tz-yildiz .45s var(--ease) .08s backwards}
+section.ex.rekor-yeni .ex-head{position:relative}
+section.ex.rekor-yeni .ex-head::after{content:"";position:absolute;inset:-6px -8px;border-radius:12px;pointer-events:none;background:linear-gradient(100deg,transparent 35%,color-mix(in srgb,var(--altin,var(--warn)) 22%,transparent) 50%,transparent 65%) no-repeat;background-size:260% 100%;animation:tz-parilti .9s ease-out .12s both}
+
+/* ✓ anı: kısa ölçek + renk (≤250 ms), satır soldan dolar ve söner */
+.setgrid{position:relative;isolation:isolate}
+.setgrid.yeni .done{animation:tz-tik .22s var(--ease)}
+.setgrid.yeni .done svg.tik path{animation:tz-ciz .2s .03s var(--ease) backwards}
+.setgrid.yeni input{animation:tz-dolu .25s ease-out}
+.setgrid.yeni::before{content:"";position:absolute;inset:-4px -6px;z-index:-1;border-radius:12px;pointer-events:none;background:var(--tikt);background:color-mix(in srgb,var(--tik) 14%,transparent);transform-origin:left center;animation:tz-dol .7s var(--ease) forwards}
+
+/* rekor seti: altın ✓, rakamlar altın, düğme köşesinde yıldız; ilk anda yıldız döner + parıltı geçer */
+.setgrid .done{position:relative}
+.setgrid.rekor .done.on{background:var(--altint,var(--warnt));color:var(--altin,var(--warn))}
+.setgrid.rekor.is-done input{color:var(--altin,var(--warn))}
+.rek-yildiz{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--bg);color:var(--altin,var(--warn))}
+.rek-yildiz svg{width:13px;height:13px;fill:currentColor}
+.setgrid.rekor-yeni::before{background:var(--altint,var(--warnt))}
+.setgrid.rekor-yeni .rek-yildiz{animation:tz-yildiz .45s var(--ease) .08s backwards}
+.setgrid.rekor-yeni::after{content:"";position:absolute;inset:-4px -6px;z-index:2;border-radius:12px;pointer-events:none;background:linear-gradient(100deg,transparent 35%,color-mix(in srgb,var(--altin,var(--warn)) 26%,transparent) 50%,transparent 65%) no-repeat;background-size:260% 100%;animation:tz-parilti .9s ease-out .12s both}
+
+@keyframes tz-dol{0%{transform:scaleX(.04);opacity:1}35%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
+@keyframes tz-dolu{from{background-color:var(--tikt)}}
+@keyframes tz-yildiz{0%{transform:scale(0) rotate(-70deg);opacity:0}60%{transform:scale(1.3) rotate(8deg);opacity:1}100%{transform:none;opacity:1}}
+@keyframes tz-parilti{0%{background-position:100% 0;opacity:1}80%{opacity:1}100%{background-position:0 0;opacity:0}}
+@media (prefers-reduced-motion:reduce){ .setgrid.yeni::before,.setgrid.rekor-yeni::after,section.ex.rekor-yeni .ex-head::after{display:none} }
 /* ---------- tasarım: geçmiş, defter, takviye, ayarlar ----------
    Takvim tonu (az/olağan/çok set), hafta serisi, kas hedef çizgisi, seans satırı gün kutusu + rekor rozeti,
    pencere açılışı, bildirim çıkışı, boş durum çizimleri, defter işaret kalemi, takviye kartları, Ayarlar başlık ikonları + tema önizlemesi. */
@@ -1025,6 +1261,84 @@ details.ay-sozluk>summary .ay-i{color:var(--ac);margin-right:4px}
 .tema-on.koyu i{background:#3a3c42}.tema-on.koyu i:first-child{background:#8fabd4}
 .tema-on.sistem{background:linear-gradient(135deg,#f7f4ee 50%,#151517 50%);box-shadow:inset 0 0 0 1px rgba(127,127,127,.3)}
 .tema-on.sistem i{background:#85868a}.tema-on.sistem i:first-child{background:#6f8ab2}
+
+/* ---------- geçmiş takvimi + dinlenme akışı ----------
+   Takvim hep 6 hafta: komşu ayın günleri soluk ama ısı/rekor görünür; antrenman günü düğme (seansı açar), rekor günü altın nokta.
+   Dinlenme: halka CSS animasyonuyla akar (JS yalnız süre değişince yeniden kurar), son 10 sn uyarı tonuna akar, bitişte bir nabız. */
+.cal{row-gap:6px}
+.cal .g{position:relative;justify-self:center;width:42px;height:42px;display:grid;place-items:center;border-radius:50%;font-size:15px;color:var(--tx);font-variant-numeric:tabular-nums}
+.cal button.g{min-height:0;padding:0;border:0;background:none;font:inherit;font-size:15px;line-height:1;cursor:pointer;transition:box-shadow var(--hiz) var(--egri)}
+.cal button.g::before{content:"";position:absolute;inset:-2px;border-radius:50%}   /* dokunma alanı 46 px */
+.cal button.g:active{transform:scale(.92)}
+@media (hover:hover){ .cal button.g:not(.today):hover{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--acl)} }
+.cal .g.on{color:var(--ac);font-weight:600}
+.cal .g.on.t1{background:var(--cal1)}
+.cal .g.on.t2{background:var(--cal2)}
+.cal .g.on.t3{background:var(--cal3);color:var(--cal3-tx)}
+.cal .g.today{box-shadow:inset 0 0 0 1.5px var(--ac);color:var(--ac);font-weight:600}
+.cal .g.on.today{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ac)}
+.cal .g.on.t3.today{color:var(--cal3-tx)}
+.cal .g.diger{color:var(--dim);opacity:.5}
+.cal .g.diger.on{opacity:.62}
+.cal .g.diger.today{opacity:.85}
+.cal .g.rek::after{content:"";position:absolute;left:50%;bottom:4px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--altin)}
+.cal .g.rek.t3::after{background:#f1d08a}
+.rek-l{display:inline-flex;align-items:center;gap:6px}
+.rek-l i{width:5px;height:5px;border-radius:50%;background:var(--altin)}
+@media (max-width:370px){ .cal .g{width:38px;height:38px;font-size:14px} .cal{row-gap:4px} }
+
+/* Geçmiş ferah: bölümler arası nefes, liste hiyerarşisi ad > tarih > set · toplam, pencerede rahat satırlar */
+.duzen.takvim .hseri{margin-bottom:20px}
+.duzen.takvim .takvim-panel{padding-bottom:16px}
+.duzen.takvim .takvim-panel .ayb{margin-bottom:12px}
+.duzen.takvim .takvim-not{margin-top:14px}
+.duzen.takvim .kol>h2{margin-top:32px}
+.duzen.takvim .kasbar{gap:16px}
+.duzen.takvim .kasbar+p.kucuk{margin-top:16px;line-height:1.5}
+button.satir.seans-satir{gap:14px;padding:15px 0;min-height:76px}
+button.satir.seans-satir .grow>b{font-size:16.5px;line-height:1.3;color:var(--tx)}
+button.satir.seans-satir:hover .grow>b{color:var(--ac)}
+button.satir.seans-satir .grow>.num{font-size:13.5px;color:var(--mut);margin-top:4px}
+.seans-satir .ss-gun{width:44px;height:48px;background:var(--s2)}
+.seans-satir .ss-gun b{font-family:var(--sans);font-size:17px;font-weight:600;color:var(--mut)}
+.seans-satir .ss-gun span{font-size:11px;color:var(--dim);letter-spacing:.03em}
+.duzen.takvim .liste+.btn-big{margin-top:14px}
+/* antrenman penceresi */
+.sheet-ust+h3{margin-bottom:4px}
+.sayilar{margin:16px 0 20px;padding:14px 0}
+.se-x{padding:16px 0}
+.se-b{margin:0 0 10px}
+.se-b b{font-size:16px}
+.se-set{gap:8px}
+.se-set span{padding:5px 10px;border-radius:9px}
+.se-rek{margin-top:10px;line-height:1.4}
+.sheet-dugme{margin-top:24px}
+@media (min-width:1024px){
+  #view .duzen.takvim{grid-template-columns:380px minmax(0,1fr);column-gap:56px}
+  .duzen.takvim .cal .g{width:44px;height:44px}
+  .duzen.takvim>.kol:last-child{max-width:680px}
+  .duzen.takvim>.kol>h2:first-child{margin-top:0}
+}
+
+#rest .halka .dolu{transition:stroke .4s ease}
+#rest .halka .dolu[data-n=a]{animation:rest-akis-a var(--sure) linear forwards}
+#rest .halka .dolu[data-n=b]{animation:rest-akis-b var(--sure) linear forwards}
+@keyframes rest-akis-a{from{stroke-dashoffset:var(--o0)}to{stroke-dashoffset:100}}
+@keyframes rest-akis-b{from{stroke-dashoffset:var(--o0)}to{stroke-dashoffset:100}}
+#rest .t .sn{transition:color .4s ease}
+#rest.son .halka .dolu{stroke:var(--warn);transition:stroke var(--son-sure,10s) linear}
+#rest.son .t .sn{color:var(--warn);transition:color var(--son-sure,10s) linear}
+#rest::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;
+  background:color-mix(in srgb,var(--tik) 18%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--tik) 70%,transparent)}
+#rest[data-k=bitti]::after{animation:rest-nabiz 1.5s var(--ease) 1}
+#rest[data-k=bitti] .halka{animation:rest-nabiz-h 1.5s var(--ease) 1}
+@keyframes rest-nabiz{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
+@keyframes rest-nabiz-h{0%,100%{transform:scale(1)}22%{transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){
+  #rest .halka .dolu,#rest .halka .dolu[data-n],#rest .t .sn,#rest.son .halka .dolu,#rest.son .t .sn{animation:none;transition:none}
+  #rest[data-k=bitti]::after,#rest[data-k=bitti] .halka{animation:none}
+  .cal button.g{transition:none}.cal button.g:active{transform:none}
+}
 
 /* ---------- masaüstü (PC) ----------
    Telefonda: marka, kısayol düğmesi ve <kbd> ipuçları gizli; .duzen alt alta (sıra aynı).

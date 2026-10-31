@@ -81,7 +81,11 @@ function duzenleBolum(t) {
 function gorunum() {
   var S = AT.S, t = veri(S), bugun = AT.iso(new Date());
   var n = t.liste.length, al = t.liste.filter(function (x) { return alindiMi(t, x.id, bugun); }).length;
-  var o = '<h1>Takviye</h1><p class="sub">' + (n ? 'Bugün ' + al + '/' + n + ' alındı' : AT.tarih(bugun)) + '</p>';
+  /* başlık altında günün ilerlemesi: alınan her takviye bir nokta; hepsi alınınca yeşil */
+  var nokta = '';
+  for (var i = 0; i < n; i++) nokta += i < al ? '<i class="v"></i>' : '<i></i>';
+  if (n) nokta = '<span class="tk-nokta' + (al === n ? ' tam' : '') + '" aria-hidden="true">' + nokta + '</span>';
+  var o = '<h1>Takviye</h1><p class="sub">' + (n ? 'Bugün ' + al + '/' + n + ' alındı' : AT.tarih(bugun)) + nokta + '</p>';
   if (!n) return o + (AT.bos ? AT.bos('takviye', 'Her gün aldıklarını ekle, dokunarak işaretle.') : '') + '<h2>Takviyelerini ekle</h2>' + duzenleBolum(t);
   /* düzenlerken bugünün listesi gizlenir: aynı takviyeler iki kez görünmesin */
   var a = duzenle ? '<h2>Listeyi düzenle</h2>' : '<h2>Bugün <small>dokun: alındı</small></h2>' + bugunListe(t, bugun);
