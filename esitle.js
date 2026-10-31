@@ -10,7 +10,7 @@
 
 var LS_AYAR = 'agirlik-esit', LS_TABAN = 'agirlik-esit-taban', ACIKLAMA = 'agirlik-takip-esitleme', DOSYA = 'agirlik-takip.json';
 var API = 'https://api.github.com', TEL_ADRES = 'https://azizcanx.github.io/agirlik-takip/';
-var VERI = ['sessions', 'bw', 'kcal', 'ozel', 'takviye', 'bulk', 'active', 'dinlenme', 'dinlenmeEgz', 'rpe', 'ses'];
+var VERI = ['sessions', 'bw', 'kcal', 'ozel', 'takviye', 'bulk', 'active', 'dinlenme', 'dinlenmeEgz', 'rpe', 'ses', 'kcalOneri'];
 var LISTE = { sessions: 'id', bw: 'id', kcal: 'date', ozel: 'ad' };   /* kalori günde tek: tarihle */
 var DESTEK = !!(window.crypto && crypto.subtle && window.fetch && window.TextEncoder);
 

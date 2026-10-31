@@ -1,4 +1,4 @@
-const V = 'agirlik-v23';
+const V = 'agirlik-v24';
 const DOSYALAR = ['./', 'index.html', 'style.css', 'hareketler.js', 'app.js', 'bulk.js', 'notlar.js', 'disa.js', 'ekstra.js', 'pc.js', 'takviye.js', 'duzenle.js', 'ozet.js', 'haftalik.js', 'komut.js', 'esitle.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(DOSYALAR))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

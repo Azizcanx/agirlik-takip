@@ -146,6 +146,26 @@ function harcama(bw, kcal, bugun) {
 }
 /* hedef hıza göre günlük kalori: harcama + aralığın ortası × 7700 / 7, 50'ye yuvarlı */
 function hedefKcalOf(tdee, min, max) { return Math.round((tdee + (min + max) / 2 * KCAL_KG / 7) / 50) * 50; }
+/* a11: önerilen günlük kalori haftada bir güncellenir: yeni = eski + ½ × (hesaplanan − eski), haftalık değişim en çok ±200,
+   50'ye yuvarlı. o = {hafta, deger, anahtar}; anahtar (hedef ayarları) değişti ya da 3 haftadan eskiyse hesaplanan doğrudan alınır.
+   Saf: yeni o'yu döndürür, kaydetmez. */
+var ONERI_ADIM = 200;
+function haftalikOneri(o, ham, hafta, anahtar) {
+  if (ham == null || !isFinite(ham)) return null;
+  if (o && o.anahtar === anahtar && o.hafta === hafta && isFinite(o.deger)) return o;
+  var taze = o && o.anahtar === anahtar && isFinite(o.deger) && gunFark(hafta, o.hafta) > 0 && gunFark(hafta, o.hafta) <= 21;
+  var d = taze ? o.deger + Math.max(-ONERI_ADIM, Math.min(ONERI_ADIM, 0.5 * (ham - o.deger))) : ham;
+  return { hafta: hafta, deger: Math.round(d / 50) * 50, anahtar: anahtar };
+}
+/* gösterimden önce: r.hedefKcal'i haftalık öneriyle değiştirir, değiştiyse S.kcalOneri'yi saklar */
+function oneriUygula(r, bulk, bugun) {
+  if (!r || r.hedefKcal == null || r.durum === 'erken' || r.durum === 'veri') return r;   /* ilk 2 hafta ve bayat tartıda saklanan öneri değişmez */
+  var anahtar = [bulk.bas, bulk.hedefKg, bulk.min, bulk.max].join('|'), o = AT.S.kcalOneri;
+  var y = haftalikOneri(o, r.hedefKcal, AT.haftaBasi(bugun), anahtar);
+  if (y && (!o || y.hafta !== o.hafta || y.deger !== o.deger || y.anahtar !== o.anahtar)) { AT.S.kcalOneri = y; AT.kaydet(); }
+  if (y) r.hedefKcal = y.deger;
+  return r;
+}
 function hesapla(bw, bulk, bugun, kcal) {
   if (!bulk) return null;
   var l = gecerli(bw), son = l.length ? l[l.length - 1] : null;
@@ -290,7 +310,7 @@ function varisYaz(r) {
   return '~' + (a.az === a.cok ? a.az : a.az + '–' + a.cok) + ' hafta <span class="mut">(' + AT.h(AT.tarih(r.varis, 1)) + ' civarı)</span>';
 }
 function bolumVar(l, b) {
-  var r = hesapla(l, b, AT.iso(new Date()), AT.S.kcal), yon = yonOf(b);
+  var r = oneriUygula(hesapla(l, b, AT.iso(new Date()), AT.S.kcal), b, AT.iso(new Date())), yon = yonOf(b);
   var bugun = AT.iso(new Date()), gun = Math.max(0, gunFark(bugun, b.bas));
   var o = '<h2>' + sezonAd(b) + ' <small>' + (Math.floor(gun / 7) + 1) + '. hafta</small>' + demoTag(b) + '</h2><div class="panel">';
   o += '<div class="hero"><b>' + AT.h(AT.fmt(r.simdi)) + ' <small>kg</small></b><span>ortalama kilo · başlangıçtan ' + AT.h(isaret(r10(r.degisim))) + ' kg</span></div>';
@@ -342,7 +362,7 @@ function tarti() {
   o += kcalGir(bugun);
   var b = AT.S.bulk;
   if (b) {
-    var r = hesapla(l, b, bugun, AT.S.kcal);
+    var r = oneriUygula(hesapla(l, b, bugun, AT.S.kcal), b, bugun);
     if (r.durum !== 'veri') o += '<p class="durum ' + SINIF[r.durum] + '">' + AT.h(kisaDurum(r, sezonAd(b).split(' ')[0])) + '</p>';
   }
   return o + '</div>';
@@ -413,11 +433,11 @@ AT.islem['kcal-sil'] = function () {
 AT.islem['tarti-duzelt'] = function () { duzelt = true; AT.render(); var e = AT.$('#bwkg'); if (e) e.focus(); };
 
 /* ---------- dışa açılan ---------- */
-AT.bulkDurum = function () { return hesapla(AT.S.bw, AT.S.bulk, AT.iso(new Date()), AT.S.kcal); };
+AT.bulkDurum = function () { var b = AT.iso(new Date()); return oneriUygula(hesapla(AT.S.bw, AT.S.bulk, b, AT.S.kcal), AT.S.bulk, b); };
 AT.harcama = function () { return harcama(AT.S.bw, AT.S.kcal, AT.iso(new Date())); };
 AT.bolum.bulk = function () { var l = gecerli(AT.S.bw); return AT.S.bulk ? bolumVar(l, AT.S.bulk) : bolumYok(l); };
 AT.bolum.tarti = tarti;
 AT.demoBw = demoBw;
 /* test/başka modüller için saf hesaplar */
-AT.bulkHesap = { cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
+AT.bulkHesap = { cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, haftalikOneri: haftalikOneri, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
 })(window.AT);

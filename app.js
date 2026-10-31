@@ -295,7 +295,24 @@ function sadeAd(n) { return String(n || '').replace(/\s*\(örnek\)\s*$/i, '').tr
 function siradaki() {
   var l = sablonlar(), lim = new Date(); lim.setDate(lim.getDate() - 21); var limS = iso(lim);
   l = l.filter(function (s) { return s.date >= limS; });
-  return l.length >= 2 ? l[l.length - 1] : null;
+  if (l.length < 2) return null;
+  /* a13 (veriyle test edilmedi, tutucu): en eskisinden başla; ana kası son 48 saatte çalışılmış olanı atla; hepsi tazeyse en eskisi */
+  for (var i = l.length - 1; i >= 0; i--) if (!kasYeni(anaKas(l[i]), 48)) return l[i];
+  return l[l.length - 1];
+}
+/* antrenmanın ana kası: en çok iş setinin kası */
+function anaKas(se) {
+  var m = {}, en = null; se.exs.forEach(function (e) { var k = e.kas || kasOf(e.ad); m[k] = (m[k] || 0) + yapilanSetler(e).length; if (!en || m[k] > m[en]) en = k; });
+  return en;
+}
+/* bu kas son `saat` içinde ana kas olarak çalışıldı mı (seans bitişi, yoksa günün 18:00'i) */
+function kasYeni(kas, saat) {
+  if (!kas) return false;
+  var sinir = Date.now() - saat * 36e5;
+  return S.sessions.some(function (se) {
+    var t = se.end || (parse(se.date).getTime() + 18 * 36e5);
+    return t >= sinir && se.exs.some(function (e) { return (e.kas || kasOf(e.ad)) === kas && yapilanSetler(e).length; });
+  });
 }
 function sablonlar() {
   var gor = {}, out = [];
