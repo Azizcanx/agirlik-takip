@@ -256,9 +256,10 @@ function kiloGir(etiket) {
 }
 function grafik(seri, ref, baslik) {
   if (!seri.length) return '<p class="mut">Tartı ekledikçe grafik burada oluşur.</p>';
-  var o = { baslik: baslik };
-  if (ref) o.ref = ref;
-  return AT.cizgi(seri.map(function (p) { return { x: AT.parse(p.date).getTime(), y: r10(p.kg), t: AT.tarih(p.date, 1) }; }), o);
+  /* çizgi = ortalama kilo; ham tartılar soluk nokta (kısa seride), dokununca o günün tartısı ve hedef çizgisinin değeri */
+  var o = { baslik: baslik, birim: 'kg', seriAd: 'ortalama kilo', ham: true, ek: function (p) { return p.ham > 0 ? 'tartı ' + AT.fmt(p.ham) + ' kg' : ''; } };
+  if (ref) { o.ref = ref; o.refAd = 'hedef hız'; }
+  return AT.cizgi(seri.map(function (p) { return { x: AT.parse(p.date).getTime(), y: r10(p.kg), t: AT.tarih(p.date, 1), ham: p.ham }; }), o);
 }
 function sonKayit(l) { return l.length ? l[l.length - 1] : null; }
 /* "Günlük harcaman" anahtar-değer satırı; hiç kalori kaydı yoksa boş */
@@ -332,7 +333,7 @@ function bolumVar(l, b) {
   var r = oneriUygula(hesapla(l, b, AT.iso(new Date()), AT.S.kcal), b, AT.iso(new Date())), yon = yonOf(b);
   var bugun = AT.iso(new Date()), gun = Math.max(0, gunFark(bugun, b.bas));
   var o = '<h2>' + sezonAd(b) + ' <small>' + (Math.floor(gun / 7) + 1) + '. hafta</small>' + demoTag(b) + '</h2><div class="panel">';
-  o += '<div class="hero"><b>' + AT.h(AT.fmt(r.simdi)) + ' <small>kg</small></b><span>ortalama kilo · başlangıçtan ' + AT.h(isaret(r10(r.degisim))) + ' kg</span></div>';
+  o += '<div class="hero"><b>' + AT.h(AT.fmt(r.simdi)) + ' <small>kg</small></b><span>ortalama kilo · başlangıçtan <i class="fark' + (r10(r.degisim) * yon > 0 ? ' iyi' : '') + '">' + AT.h(isaret(r10(r.degisim))) + ' kg</i></span></div>';
   var tam = r.hedefKg - r.basKg, yuzde = tam ? (r.simdi - r.basKg) / tam * 100 : 100;
   yuzde = Math.round(Math.max(0, Math.min(100, yuzde)));
   o += '<div class="ibar" role="progressbar" aria-label="Hedefe ilerleme" aria-valuenow="' + yuzde + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + yuzde + '%"></i></div>' +

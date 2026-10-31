@@ -219,67 +219,168 @@ function adim(r, n) {
   return 10 * e;
 }
 function ondalik(st) { var d = 0; while (d < 3 && Math.abs(st * Math.pow(10, d) - Math.round(st * Math.pow(10, d))) > 1e-6) d++; return d; }
-/* pts: [{x: ms, y: sayı, t: etiket}]; o: {baslik, birim:'kg', ref:[{x,y},{x,y}] kesik hedef çizgisi, refAd:'Hedef'} */
+/* pts: [{x: ms, y: sayı, t: etiket, ham?: o günün gerçek tartısı}]
+   o: {baslik, birim:'kg', ref:[{x,y},{x,y}] kesik hedef çizgisi, refAd:'Hedef', seriAd: açıklamada çizginin adı,
+       ham: true → ham tartılar soluk nokta (tek path; 200 noktaya kadar), ek: function (p) → dokunma etiketinin 3. satırı}
+   Etkileşim: GV[id] (piksel konumları + noktalar) ve tek document dinleyicisi (grafikOlay); nokta başına dinleyici yok. */
+var GV = {};
+var AY3 = AYLAR.map(function (a) { return a.slice(0, 3); });
+function eksenTarih(x, uzun) { var d = new Date(x); return uzun ? AY3[d.getMonth()] + ' ' + d.getFullYear() : d.getDate() + ' ' + AY3[d.getMonth()]; }
+function grafikId() { var id = 'g' + (++gid); if (gid === 1) GV = {}; return id; }   /* render() gid'i sıfırlar: eski kayıtlar atılır */
 function cizgi(pts, o) {
-  o = o || {}; var W = grafikW(), H = 200, L = 44, R = 12, T = 14, B = 28, id = 'g' + (++gid), bir = o.birim ? ' ' + o.birim : '';
+  o = o || {}; var W = grafikW(), H = 210, R = 14, B = 28, bir = o.birim ? ' ' + o.birim : '';
   pts = (pts || []).filter(function (p) { return p && isFinite(p.x) && isFinite(p.y); });
   if (!pts.length) return '<p class="empty">Henüz veri yok.</p>';
+  var id = grafikId(), n = pts.length;
   var ref = (o.ref || []).filter(function (p) { return p && isFinite(p.x) && isFinite(p.y); });
-  var hep = pts.concat(ref);
-  var ys = hep.map(function (p) { return p.y; }), mn = Math.min.apply(0, ys), mx = Math.max.apply(0, ys);
+  var hamVar = o.ham && n <= 200, T = ref.length > 1 || hamVar ? 34 : 14;
+  var mn = Infinity, mx = -Infinity, x0 = Infinity, x1 = -Infinity;
+  function kap(p, y) { if (y < mn) mn = y; if (y > mx) mx = y; if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; }
+  pts.forEach(function (p) { kap(p, p.y); if (hamVar && p.ham > 0) kap(p, p.ham); });
+  ref.forEach(function (p) { kap(p, p.y); });
   var st = adim(mx - mn > 0 ? mx - mn : Math.max(1, Math.abs(mx) * .05), 4);
   var y0 = Math.floor(mn / st + 1e-9) * st, y1 = Math.ceil(mx / st - 1e-9) * st;
   if (y1 - y0 < st * 2) { y0 -= st; y1 += st; }
   if (mn >= 0 && y0 < 0) { y0 = 0; }
-  var xs = hep.map(function (p) { return p.x; }), x0 = Math.min.apply(0, xs), x1 = Math.max.apply(0, xs);
+  var dc = ondalik(st), et = [];
+  for (var v = y0, k = 0; v <= y1 + st * 1e-6 && k < 12; v += st, k++) et.push([v, fmt(v, dc)]);
+  /* sol boşluk en uzun eksen yazısına göre (12px tabular ~7px/karakter) */
+  var L = Math.max(30, 14 + 7 * Math.max.apply(0, et.map(function (e) { return e[1].length; })));
+  var yil = x1 - x0 > 300 * 864e5;
   function X(x) { return x1 === x0 ? (L + W - R) / 2 : L + (x - x0) / (x1 - x0) * (W - L - R); }
   function Y(y) { return T + (1 - (y - y0) / (y1 - y0)) * (H - T - B); }
-  var dc = ondalik(st);
-  var s = '<svg class="chart" width="' + W + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + h((o.baslik || 'Grafik') + (bir ? ', ' + o.birim : '')) + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity=".12"/><stop offset="1" stop-opacity="0"/></linearGradient></defs>';
-  for (var v = y0, k = 0; v <= y1 + st * 1e-6 && k < 12; v += st, k++) {
-    var y = Y(v).toFixed(1);
-    s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text x="' + (L - 8) + '" y="' + (+y + 4) + '" text-anchor="end">' + fmt(v, dc) + '</text>';
+  /* ekran okuyucu özeti: "Ortalama kilo, son 82,4 kg, 12 haftada +1,8 kg" (nokta <title>'ları role=img içinde okunmaz) */
+  var fk = pts[n - 1].y - pts[0].y, gun = Math.round((pts[n - 1].x - pts[0].x) / 864e5);
+  var ozet = (o.baslik || 'Grafik') + ', son ' + fmt(pts[n - 1].y) + bir + (n > 1 && gun > 0 ? ', ' + (gun >= 14 ? Math.round(gun / 7) + ' haftada ' : gun + ' günde ') + (fk > 0 ? '+' : fk < 0 ? '−' : '±') + fmt(Math.abs(fk)) + bir : '') + '. Ok tuşlarıyla noktalar gezilir.';
+  var s = '<svg class="chart cizgi" data-g="' + id + '" tabindex="0" width="' + W + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + h(ozet) + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity=".22"/><stop offset=".55" stop-opacity=".07"/><stop offset="1" stop-opacity="0"/></linearGradient></defs>';
+  et.forEach(function (e) {
+    var y = Math.round(Y(e[0])) + .5;
+    s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text x="' + (L - 10) + '" y="' + (y + 4) + '" text-anchor="end">' + e[1] + '</text>';
+  });
+  /* piksel konumları bir kez hesaplanır (path, noktalar ve dokunma aynı diziyi kullanır) */
+  var px = new Array(n), py = new Array(n), d = new Array(n);
+  for (var i = 0; i < n; i++) { px[i] = Math.round(X(pts[i].x) * 10) / 10; py[i] = Math.round(Y(pts[i].y) * 10) / 10; d[i] = (i ? 'L' : 'M') + px[i] + ' ' + py[i]; }
+  d = d.join(' ');
+  if (n > 1) s += '<path class="alan" fill="url(#' + id + ')" d="' + d + ' L' + px[n - 1] + ' ' + (H - B) + ' L' + px[0] + ' ' + (H - B) + 'Z"/>';
+  if (hamVar) {
+    var hd = ''; pts.forEach(function (p, i) { if (p.ham > 0) hd += 'M' + px[i] + ' ' + Math.round(Y(p.ham) * 10) / 10 + 'h0'; });
+    if (hd) s += '<path class="ham" d="' + hd + '"/>';
   }
-  var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1); }).join(' ');
-  if (pts.length > 1) s += '<path fill="url(#' + id + ')" d="' + d + ' L' + X(pts[pts.length - 1].x).toFixed(1) + ' ' + (H - B) + ' L' + X(pts[0].x).toFixed(1) + ' ' + (H - B) + 'Z"/>';
+  var lx = L, ly = 13;
+  function lejant(tur, ad) {
+    var w = 7 * ad.length + 34;
+    if (tur === 'ham') s += '<path class="ham" d="M' + (lx + 9) + ' ' + ly + 'h0"/>';
+    else s += '<path class="' + tur + '" d="M' + lx + ' ' + ly + 'h18"/>';
+    s += '<text class="leg" x="' + (lx + (tur === 'ham' ? 16 : 24)) + '" y="' + (ly + 4) + '">' + h(ad) + '</text>'; lx += w - (tur === 'ham' ? 8 : 0);
+  }
   if (ref.length > 1) {
     s += '<path class="ref" d="' + ref.map(function (p, i) { return (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1); }).join(' ') + '"><title>' + h((o.refAd || 'Hedef') + ': ' + fmt(ref[ref.length - 1].y) + bir) + '</title></path>';
-    /* açıklama: kesik çizgi + ad, çizginin boş bıraktığı üst köşede (yükselen hedefte sol, düşende sağ) */
-    if (o.refAd !== false) {
-      var sol = ref[ref.length - 1].y >= ref[0].y, lx = sol ? L + 6 : W - R - 6, ly = T + 15, lw = 18, ad = o.refAd || 'Hedef';
-      s += '<path class="ref" d="M' + (sol ? lx : lx - lw) + ' ' + ly + ' h' + lw + '"/><text class="reft" x="' + (sol ? lx + lw + 6 : lx - lw - 6) + '" y="' + (ly + 4) + '" text-anchor="' + (sol ? 'start' : 'end') + '">' + h(ad) + '</text>';
-    }
   }
-  s += '<path class="ln" d="' + d + '"/>';
-  var son = pts.length - 1;
-  pts.forEach(function (p, i) {
-    var cx = X(p.x).toFixed(1), cy = Y(p.y).toFixed(1), tt = '<title>' + h(p.t) + ': ' + fmt(p.y) + h(bir) + '</title>';
-    if (i === son) s += '<circle class="dot son" cx="' + cx + '" cy="' + cy + '" r="4.5">' + tt + '</circle>';
-    else if (pts.length <= 20) s += '<circle class="dot" cx="' + cx + '" cy="' + cy + '" r="3">' + tt + '</circle>';
-    else s += '<circle class="hit" cx="' + cx + '" cy="' + cy + '" r="7">' + tt + '</circle>';
-  });
-  var ix = etiketIdx(pts.length, Math.floor((W - L) / 90) + 1);
-  ix.forEach(function (j) { var tx = X(pts[j].x); s += '<text x="' + tx.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (tx < L + 30 ? 'start' : tx > W - R - 30 ? 'end' : 'middle') + '">' + h(pts[j].t) + '</text>'; });
-  return s + '</svg>';
+  if (T > 14) {   /* açıklama satırı: çizginin üstünde kendi şeridinde, hiçbir şeyle çakışmaz */
+    lejant('ln', o.seriAd || 'değer');
+    if (hamVar) lejant('ham', 'tartı');
+    if (ref.length > 1 && o.refAd !== false) lejant('ref', o.refAd || 'Hedef');
+  }
+  s += '<path class="ln" pathLength="1" d="' + d + '"/>';
+  var son = n - 1;
+  for (i = 0; i < n; i++) {
+    var tt = '<title>' + h(pts[i].t) + ': ' + fmt(pts[i].y) + h(bir) + '</title>';
+    if (i === son) s += '<circle class="hale" cx="' + px[i] + '" cy="' + py[i] + '" r="9"/><circle class="dot son" cx="' + px[i] + '" cy="' + py[i] + '" r="4.5">' + tt + '</circle>';
+    else if (n <= 20) s += '<circle class="dot" cx="' + px[i] + '" cy="' + py[i] + '" r="3">' + tt + '</circle>';
+    else s += '<circle class="hit" cx="' + px[i] + '" cy="' + py[i] + '" r="7">' + tt + '</circle>';
+  }
+  /* son değer etiketi: çizginin geldiği yönün tersinde (yükselen çizgide üstte) */
+  var sv = fmt(pts[son].y) + bir, sw = 7 * sv.length + 16, onc = py[Math.max(0, son - Math.max(1, Math.round(n / 12)))];
+  var ust = n < 2 || onc >= py[son]; if (ust && py[son] - 30 < 2) ust = false; if (!ust && py[son] + 30 > H - B) ust = true;
+  var sx = Math.max(L, Math.min(W - 2 - sw, px[son] - sw / 2)), sy = ust ? py[son] - 30 : py[son] + 10;
+  s += '<g class="sonet"><rect x="' + sx.toFixed(1) + '" y="' + sy.toFixed(1) + '" width="' + sw + '" height="20" rx="10"/><text x="' + (sx + sw / 2).toFixed(1) + '" y="' + (sy + 14).toFixed(1) + '" text-anchor="middle">' + h(sv) + '</text></g>';
+  var ix = etiketIdx(n, Math.floor((W - L) / (yil ? 96 : 84)) + 1);
+  ix.forEach(function (j) { var tx = px[j]; s += '<text x="' + tx + '" y="' + (H - 6) + '" text-anchor="' + (tx < L + 30 ? 'start' : tx > W - R - 30 ? 'end' : 'middle') + '">' + h(yil ? eksenTarih(pts[j].x, true) : pts[j].t) + '</text>'; });
+  GV[id] = { tur: 'c', W: W, T: T, A: H - B, px: px, py: py, pts: pts, bir: bir, ref: ref.length > 1 ? ref.map(function (p) { return [X(p.x), p.y]; }) : null, refAd: o.refAd || 'hedef', ek: o.ek };
+  return s + imlec() + '</svg>';
 }
-/* items: [{l: etiket, v: sayı}]; o: {baslik, birim (varsayılan 'kg')} */
+/* dokunma/fare etiketi: kılavuz çizgi, nokta, yuvarlak kutu (2–3 satır). Başta görünmez; grafikOlay doldurur */
+function imlec() { return '<g class="im" aria-hidden="true"><line class="im-c"/><circle class="im-n" r="5"/><rect class="im-k" rx="8"/><text class="im-t"><tspan class="im-d"/><tspan class="im-v"/><tspan class="im-e"/></text></g>'; }
+/* items: [{l: etiket, v: sayı}]; o: {baslik, birim (varsayılan 'kg'), donem (etiket eki, varsayılan ' haftası')} */
 function cubuk(items, o) {
-  o = o || {}; var bir = o.birim == null ? 'kg' : o.birim;
-  var W = grafikW(), H = 170, L = 46, R = 4, B = 26, T = 12, mxv = Math.max.apply(0, items.map(function (i) { return i.v || 0; })) || 0;
-  var st = adim(mxv > 0 ? mxv : 1, 3), ust = Math.max(st, Math.ceil(mxv / st - 1e-9) * st), dc = ondalik(st);
-  var bw = (W - L - R) / Math.max(1, items.length), ix = etiketIdx(items.length, Math.floor((W - L) / 80) + 1);
-  var s = '<svg class="chart" width="' + W + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + h(o.baslik || 'Haftalık hacim') + '">';
-  for (var v = 0, k = 0; v <= ust + st * 1e-6 && k < 10; v += st, k++) {
-    var y = (T + (1 - v / ust) * (H - T - B)).toFixed(1);
-    s += '<line class="grid' + (v === 0 ? ' z' : '') + '" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text x="' + (L - 8) + '" y="' + (+y + 4) + '" text-anchor="end">' + fmt(v, dc) + '</text>';
-  }
-  items.forEach(function (it, i) {
-    var hh = (H - T - B) * (it.v || 0) / ust, x = L + i * bw + bw * .2;
-    if (hh > 0) s += '<rect class="bar' + (i === items.length - 1 ? ' son' : '') + '" x="' + x.toFixed(1) + '" y="' + (H - B - hh).toFixed(1) + '" width="' + (bw * .6).toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="3"><title>' + h(it.l) + ': ' + fmt(it.v, 0) + (bir ? ' ' + h(bir) : '') + '</title></rect>';
-    if (ix.indexOf(i) >= 0) s += '<text x="' + (x + bw * .3).toFixed(1) + '" y="' + (H - 7) + '" text-anchor="' + (i === 0 ? 'start' : i === items.length - 1 ? 'end' : 'middle') + '"' + (i === 0 ? ' dx="' + (-bw * .3).toFixed(1) + '"' : i === items.length - 1 ? ' dx="' + (bw * .3).toFixed(1) + '"' : '') + '>' + h(it.l) + '</text>';
+  o = o || {}; var bir = o.birim == null ? 'kg' : o.birim, id = grafikId();
+  var W = grafikW(), H = 180, R = 4, B = 26, T = 22, mxv = Math.max.apply(0, items.map(function (i) { return i.v || 0; })) || 0;
+  var st = adim(mxv > 0 ? mxv : 1, 3), ust = Math.max(st, Math.ceil(mxv / st - 1e-9) * st), dc = ondalik(st), et = [];
+  for (var v = 0, k = 0; v <= ust + st * 1e-6 && k < 10; v += st, k++) et.push([v, fmt(v, dc)]);
+  var L = Math.max(30, 14 + 7 * Math.max.apply(0, et.map(function (e) { return e[1].length; })));
+  var bw = (W - L - R) / Math.max(1, items.length), ix = etiketIdx(items.length, Math.floor((W - L) / 80) + 1), son = items.length - 1;
+  var sonI = items.length ? items[items.length - 1] : null, be = bir ? ' ' + bir : '';
+  var ozet = (o.baslik || 'Haftalık hacim') + (sonI ? ', ' + items.length + ' hafta, son ' + fmt(sonI.v || 0, 0) + be + ', en çok ' + fmt(mxv, 0) + be : '') + '. Ok tuşlarıyla haftalar gezilir.';
+  var s = '<svg class="chart cubuk" data-g="' + id + '" tabindex="0" width="' + W + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + h(ozet) + '">';
+  et.forEach(function (e) {
+    var y = Math.round(T + (1 - e[0] / ust) * (H - T - B)) + .5;
+    s += '<line class="grid' + (e[0] === 0 ? ' z' : '') + '" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text x="' + (L - 10) + '" y="' + (y + 4) + '" text-anchor="end">' + e[1] + '</text>';
   });
-  return s + '</svg>';
+  var ys = [];
+  items.forEach(function (it, i) {
+    var hh = (H - T - B) * (it.v || 0) / ust, x = L + i * bw + bw * .2; ys.push(H - B - hh);
+    if (hh > 0) s += '<rect class="bar' + (i === son ? ' son' : '') + '" data-i="' + i + '" x="' + x.toFixed(1) + '" y="' + (H - B - hh).toFixed(1) + '" width="' + (bw * .6).toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="' + Math.min(4, bw * .15).toFixed(1) + '"><title>' + h(it.l) + ': ' + fmt(it.v, 0) + (bir ? ' ' + h(bir) : '') + '</title></rect>';
+    if (ix.indexOf(i) >= 0) s += '<text x="' + (x + bw * .3).toFixed(1) + '" y="' + (H - 7) + '" text-anchor="' + (i === 0 ? 'start' : i === son ? 'end' : 'middle') + '"' + (i === 0 ? ' dx="' + (-bw * .3).toFixed(1) + '"' : i === son ? ' dx="' + (bw * .3).toFixed(1) + '"' : '') + '>' + h(it.l) + '</text>';
+  });
+  /* son değer etiketi: son çubuğun üstünde */
+  if (items.length && items[son].v > 0) s += '<text class="sonv" x="' + (L + son * bw + bw * .8).toFixed(1) + '" y="' + (ys[son] - 7).toFixed(1) + '" text-anchor="end">' + fmt(items[son].v, 0) + '</text>';
+  GV[id] = { tur: 'b', W: W, T: T, A: H - B, L: L, bw: bw, ys: ys, items: items, bir: bir ? ' ' + bir : '', donem: o.donem == null ? ' haftası' : o.donem };
+  return s + imlec() + '</svg>';
 }
+/* tek dinleyici (document, yetki devri): fare üstündeyken / parmak dokununca en yakın nokta. Dokunmada etiket
+   başka yere dokunulana kadar kalır; yatay kaydırma (touch-action: pan-y) etiketi gezdirir. */
+var imAcik = null;
+function imGizle() { if (imAcik) { imAcik.classList.remove('im-on'); var b = imAcik.querySelector('.bar.on'); if (b) b.classList.remove('on'); imAcik._i = -1; imAcik = null; } }
+function imGoster(svg, cx, ki) {
+  var g = GV[svg.getAttribute('data-g')]; if (!g) return;
+  var r = svg.getBoundingClientRect(); if (!r.width) return;
+  var x = ki == null ? (cx - r.left) * g.W / r.width : 0, i, n, j, px, py, d, v, e = '';
+  if (g.tur === 'b') {
+    n = g.items.length; i = Math.max(0, Math.min(n - 1, ki != null ? ki : Math.floor((x - g.L) / g.bw)));
+    px = g.L + (i + .5) * g.bw; py = g.ys[i]; d = g.items[i].l + g.donem; v = fmt(g.items[i].v || 0, 0) + g.bir;
+  } else {
+    var a = g.px; n = a.length; var lo = 0, hi = n - 1;
+    while (hi - lo > 1) { j = (lo + hi) >> 1; if (a[j] < x) lo = j; else hi = j; }   /* x'ler sıralı: ikili arama */
+    i = ki != null ? Math.max(0, Math.min(n - 1, ki)) : Math.abs(a[lo] - x) <= Math.abs(a[hi] - x) ? lo : hi;
+    var p = g.pts[i]; px = a[i]; py = g.py[i];
+    d = p.t + (new Date(p.x).getFullYear() !== new Date().getFullYear() ? ' ' + new Date(p.x).getFullYear() : ''); v = fmt(p.y) + g.bir;
+    if (g.ek) e = g.ek(p) || '';
+    if (g.ref) { var f = g.ref, k2 = f.length - 1; if (px >= f[0][0] - .5 && px <= f[k2][0] + .5) { for (j = 1; j < k2 && f[j][0] < px; j++); var q = f[j - 1], w = f[j], hy = w[0] === q[0] ? w[1] : q[1] + (w[1] - q[1]) * (px - q[0]) / (w[0] - q[0]); e += (e ? ' · ' : '') + g.refAd + ' ' + fmt(hy) + g.bir; } }
+  }
+  if (imAcik && imAcik !== svg) imGizle();
+  imAcik = svg; svg.classList.add('im-on');
+  if (svg._i === i) return; svg._i = i;
+  var $c = svg.querySelector('.im-c'), $n = svg.querySelector('.im-n'), $k = svg.querySelector('.im-k'), $t = svg.querySelector('.im-t');
+  if (g.tur === 'b') { var ob = svg.querySelector('.bar.on'); if (ob) ob.classList.remove('on'); var nb = svg.querySelector('.bar[data-i="' + i + '"]'); if (nb) nb.classList.add('on'); }
+  $c.setAttribute('x1', px); $c.setAttribute('x2', px); $c.setAttribute('y1', g.T - 4); $c.setAttribute('y2', g.A);
+  $n.setAttribute('cx', px); $n.setAttribute('cy', py); $n.style.display = g.tur === 'b' ? 'none' : '';
+  var sat = [d, v, e], ts = $t.children, sy = 0;
+  for (j = 0; j < 3; j++) { ts[j].textContent = sat[j]; ts[j].setAttribute('x', 0); ts[j].setAttribute('dy', j ? 17 : 0); ts[j].style.display = sat[j] ? '' : 'none'; }
+  var bw = 0; for (j = 0; j < 3; j++) if (sat[j]) bw = Math.max(bw, ts[j].getComputedTextLength());
+  var kw = Math.ceil(bw) + 20, kh = (e ? 3 : 2) * 17 + 10, kx = Math.max(2, Math.min(g.W - 2 - kw, px - kw / 2));
+  var ky = py - kh - 12; if (ky < 2) ky = Math.min(g.A - kh, py + 14); if (ky < 2) ky = 2;
+  if (g.tur === 'b' && ky + kh > py - 4) ky = Math.max(2, py - kh - 6);
+  $k.setAttribute('x', kx); $k.setAttribute('y', ky); $k.setAttribute('width', kw); $k.setAttribute('height', kh);
+  for (j = 0; j < 3; j++) ts[j].setAttribute('x', kx + 10);
+  $t.setAttribute("y", ky + 18);
+}
+function grafikOlay(ev) {
+  var t = ev.target, svg = t && t.closest ? t.closest('svg.chart[data-g]') : null;
+  if (ev.type === 'focusout') { if (svg && imAcik === svg) imGizle(); return; }
+  if (ev.type === 'keydown') {   /* klavye: odaklı grafikte ← → noktalar, Home/End uçlar */
+    var g = svg && GV[svg.getAttribute('data-g')], k = { ArrowLeft: -1, ArrowRight: 1, Home: -1e9, End: 1e9 }[ev.key];
+    if (!g || !k || ev.target !== svg) return;
+    ev.preventDefault();
+    var son = (g.tur === 'b' ? g.items.length : g.px.length) - 1, su = svg._i >= 0 && imAcik === svg ? svg._i : son + (k > 0 ? 0 : 1);
+    imGoster(svg, 0, Math.max(0, Math.min(son, su + k))); return;
+  }
+  if (ev.type === 'pointerout') { if (ev.pointerType !== 'touch' && svg && imAcik === svg && !(ev.relatedTarget && svg.contains(ev.relatedTarget))) imGizle(); return; }
+  if (!svg) { if (ev.type === 'pointerdown') imGizle(); return; }
+  if (ev.type === 'pointermove' && ev.pointerType === 'touch' && imAcik !== svg) return;   /* parmak kaydırırken (dikey) etiket açılmasın */
+  imGoster(svg, ev.clientX);
+}
+['pointerdown', 'pointermove', 'pointerout', 'focusout'].forEach(function (tur) { document.addEventListener(tur, grafikOlay, { passive: true }); });
+document.addEventListener('keydown', grafikOlay);
 
 /* ---------- görünümler ---------- */
 function gecenSure(ts) { var m = Math.floor((Date.now() - ts) / 60000); return m < 60 ? m + ' dk' : Math.floor(m / 60) + ' sa ' + (m % 60) + ' dk'; }
@@ -485,6 +586,12 @@ function egzNoktalar(ad) {
 
 /* İlerleme iki konu: Kilo | Güç. Telefonda üstteki seçici biri gösterir; masaüstünde ikisi yan yana (seçici gizli). */
 var ilerSek = null, gecmisHepsi = false;
+/* dokunma etiketinin 3. satırı: o seansın tahmini maxı veren seti ("80 kg × 8"); yalnız dokununca hesaplanır */
+function enIyiSet(p) {
+  var b = null, m = 0; if (!p.e) return '';
+  yapilanSetler(p.e).forEach(function (s) { var v = tahminiMax(num(s.kg), num(s.reps), s.rpe); if (v > m) { m = v; b = s; } });
+  return b ? 'en iyi set ' + fmt(num(b.kg), 2) + ' kg × ' + b.reps : '';
+}
 function gucBolum(l) {
   var adlar = []; l.forEach(function (s) { s.exs.forEach(function (e) { if (yapilanSetler(e).length && adlar.indexOf(e.ad) < 0) adlar.push(e.ad); }); });
   var o = '<h2>Güç</h2>';
@@ -506,7 +613,7 @@ function gucBolum(l) {
   if (pts.length) {
     o += '<div class="panel"><div class="hero"><b>' + fmt(enE) + ' <small>kg</small></b><span>tahmini max: tek tekrarda kaldırabileceğin kilo · en iyisi ' + h(enET).replace(' ', '&nbsp;') + '</span></div>';
     if (fark > 0) o += '<p class="durum iyi">İlk kayıttan bu yana +' + fmt(fark) + ' kg güçlendin.</p>';
-    o += cizgi(pts, { baslik: secEgz + ' tahmini max', birim: 'kg' }) + '</div>';
+    o += cizgi(pts, { baslik: secEgz + ' tahmini max', birim: 'kg', ek: enIyiSet }) + '</div>';
   } else {
     o += '<p class="mut kucuk">Bu harekette ' + MAX_TEKRAR + ' tekrar ve altı set yok; tahmini max yalnız ' + MAX_TEKRAR + ' ve altı tekrardan hesaplanır.</p>';
   }
@@ -537,8 +644,8 @@ function vIlerleme() {
   if (!ilerSek) ilerSek = S.bw.length || S.bulk ? 'kilo' : 'guc';
   var hb = haftaBasi(iso(new Date())), buHafta = l.filter(function (s) { return haftaBasi(s.date) === hb; }).length, seri = haftaSerisi();
   o += '<p class="sub">Bu hafta ' + buHafta + ' antrenman' + (seri > 1 ? ' · ' + seri + ' haftadır aksatmadın' : '') + '</p>';
-  o += '<div class="seg sekme" role="tablist" aria-label="Konu">' + [['kilo', 'Kilo'], ['guc', 'Güç']].map(function (t) {
-    return '<button role="tab" data-act="ilersek" data-v="' + t[0] + '" aria-selected="' + (ilerSek === t[0]) + '" aria-pressed="' + (ilerSek === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+  o += '<div class="seg sekme" role="group" aria-label="Konu">' + [['kilo', 'Kilo'], ['guc', 'Güç']].map(function (t) {
+    return '<button data-act="ilersek" data-v="' + t[0] + '" aria-pressed="' + (ilerSek === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
   return o + kol(bwAlan() + kartK(), gucBolum(l), 'ilerleme sek-' + ilerSek);
 }
 function bwAlan() { return AT.bolum.bulk ? AT.bolum.bulk() : bwBolum(); }
@@ -644,6 +751,7 @@ function render() {
       '<div class="yigin"><button class="btn-ac btn-big" data-act="disa">Yedeği indir</button>' + (tab !== 'bugun' ? '<button class="btn-big" data-tab="bugun">Bugün\'e dön</button>' : '') + '</div>' +
       '<p class="altnot">' + h(String(e && e.message || e)) + '</p>';
   }
+  v.classList.toggle('giris', v.dataset.sekme !== tab); v.dataset.sekme = tab;   /* yalnız sekme değişince giriş animasyonu (style.css) */
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   var f = $('#dosya'); if (f) f.addEventListener('change', iceAl);
   if (tab === 'bugun') setVurgu();
@@ -795,7 +903,7 @@ var islem = {
     var k = $('#view .duzen.ilerleme');
     if (!k) return render();
     k.classList.remove('sek-kilo', 'sek-guc'); k.classList.add('sek-' + ilerSek);
-    Array.prototype.forEach.call(document.querySelectorAll('[data-act=ilersek]'), function (b) { var on = b.dataset.v === ilerSek; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-act=ilersek]'), function (b) { b.setAttribute('aria-pressed', b.dataset.v === ilerSek); });
   },
   'egz-ekle': egzSheet,
   'egz-sec-ekle': function (d) { ekle(d.ad); },
@@ -963,7 +1071,12 @@ document.addEventListener('change', function (ev) {
    1–6 sekme · N antrenman başlat / hareket ekle · ? kısayollar · Esc kapat
    set satırında Enter: kg → tekrar → (RPE) → seti tamamla, sonraki setin kg'sine geç */
 var SEKME = { '1': 'bugun', '2': 'gecmis', '3': 'ilerleme', '4': 'defter', '5': 'takviye', '6': 'ayarlar' };
-function sekmeAc(t) { tab = t; render(); window.scrollTo(0, 0); }
+function sekmeAc(t) {
+  tab = t; render(); window.scrollTo(0, 0);
+  /* erişilebilirlik: ekran okuyucu yeni sayfayı duysun; başlık sekmeyi söylesin */
+  var b = $('#tabs [data-tab="' + tab + '"]'); document.title = (b ? b.textContent.trim() + ' · ' : '') + 'Ağırlık Takip';
+  $('#view').focus({ preventScroll: true });
+}
 function yaziyor(t) { return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable); }
 function odakla(sel) { var e = $(sel); if (e) { e.focus(); if (e.select) e.select(); } return e; }
 function setEnter(t) {
