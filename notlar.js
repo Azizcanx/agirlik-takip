@@ -256,22 +256,28 @@ function hesapla(seanslar, S, bugun, bd) {
   return out.slice(0, MAX);
 }
 
+/* önbellek: gün + veri sürümü (AT.surum, her tam kayıtta artar); sonuç yalnız okunur. AT.surum yoksa (test) her seferinde hesap */
+var notOnb = { k: null, v: null };
+function onbAnahtar(bugun) { return AT.surum ? bugun + ':' + AT.iso(new Date()) + ':' + AT.surum() : null; }
 AT.notlar = function (bugun) {
   var S = AT.S || {};
   bugun = bugun || AT.iso(new Date());
-  var bd = null;
+  var k = onbAnahtar(bugun);
+  if (k !== null && notOnb.k === k) return notOnb.v;
+  var bd = null, v;
   try { bd = AT.bulkDurum ? AT.bulkDurum() : null; } catch (e) { bd = null; }
-  try { return hesapla(AT.bitenSeanslar(), S, bugun, bd || null); } catch (e) { return []; }
+  try { v = hesapla(AT.bitenSeanslar(), S, bugun, bd || null); } catch (e) { v = []; }
+  notOnb = { k: onbAnahtar(bugun), v: v };   /* bulkDurum haftalık öneriyi kaydedip sürümü artırmış olabilir: anahtar hesaptan sonra */
+  return v;
 };
 AT.notlarHesapla = hesapla;   // test için saf giriş
 /* bugünkü hedef (öneriyle aynı kural): ad -> {kg, tekrar, n} ya da null (son seans 14 günden eski / yeterli set yok).
    app.js antrenman ekranında soluk sayıları (placeholder) bununla doldurur. Seans listesi değişmedikçe önbellekte. */
 var hedefOnb = { k: null, m: null };
 AT.hedefSet = function (ad) {
-  /* önbellek anahtarı: gün + seans sayısı + son 3 seansın içeriği (geçmiş antrenman düzenlenince de tazelenir) */
-  var uz = 0; try { uz = (localStorage.getItem('agirlik-takip-v1') || '').length; } catch (e) {}
-  var l = AT.bitenSeanslar(), bugun = AT.iso(new Date()), k = bugun + ':' + l.length + ':' + uz + ':' + JSON.stringify(l.slice(-3).map(function (x) { return [x.id, x.date, x.exs]; }));
-  if (hedefOnb.k !== k) { try { hedefOnb.m = oneriler(gecmis(l), bugun); } catch (e) { hedefOnb.m = {}; } hedefOnb.k = k; }
+  /* önbellek anahtarı: gün + veri sürümü (geçmiş antrenman eklenince/düzenlenince tam kayıt sürümü artırır; antrenmanda ✓ artırmaz) */
+  var bugun = AT.iso(new Date()), k = onbAnahtar(bugun);
+  if (k === null || hedefOnb.k !== k) { try { hedefOnb.m = oneriler(gecmis(AT.bitenSeanslar()), bugun); } catch (e) { hedefOnb.m = {}; } hedefOnb.k = k; }
   var x = hedefOnb.m[ad]; return x && x.hedef ? x.hedef : null;
 };
 

@@ -45,10 +45,10 @@ var duzenle = false;
 function bugunListe(t, bugun) {
   var sira = ZAMAN.map(function (z) { return z[0]; });
   var l = t.liste.slice().sort(function (a, b) { return sira.indexOf(a.zaman) - sira.indexOf(b.zaman); });
-  return '<div class="panel liste">' + l.map(function (x) {
+  return '<div class="tk-liste">' + l.map(function (x) {
     var ok = alindiMi(t, x.id, bugun);
     return '<button class="satir tk' + (ok ? ' on' : '') + '" data-act="tk-al" data-id="' + AT.h(x.id) + '" aria-pressed="' + ok + '">' +
-      '<span class="tk-kutu" aria-hidden="true">' + (ok ? '✓' : '') + '</span>' +
+      '<span class="tk-kutu" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg></span>' +
       '<span class="grow"><b>' + AT.h(x.ad) + '</b><span>' + AT.h([x.doz, zamanAd(x.zaman)].filter(Boolean).join(' · ')) + '</span></span></button>';
   }).join('') + '</div>';
 }
@@ -57,8 +57,8 @@ function gecmis(t, bugun) {
     var o = ozet(t, x.id, bugun);
     return '<div class="satir tk-gecmis"><span class="grow"><b>' + AT.h(x.ad) + '</b>' +
       '<span class="tk-serit" role="img" aria-label="' + AT.h(x.ad + ': son ' + GUN30 + ' günde ' + o.say + ' gün') + '">' +
-      o.serit.map(function (g) { return '<i' + (g.v ? ' class="v"' : '') + ' title="' + AT.h(AT.tarih(g.gun, 1)) + '"></i>'; }).join('') + '</span></span>' +
-      '<span class="tk-say"><b>' + o.say + '/' + GUN30 + '</b><span>' + (o.seri ? o.seri + ' gün seri' : 'seri yok') + '</span></span></div>';
+      o.serit.map(function (g, i) { var c = (g.v ? 'v' : '') + (i === GUN30 - 1 ? ' bu' : ''); return '<i' + (c ? ' class="' + c.trim() + '"' : '') + ' title="' + AT.h(AT.tarih(g.gun, 1)) + '"></i>'; }).join('') + '</span></span>' +
+      '<span class="tk-say' + (o.seri >= 7 ? ' iyi' : '') + '"><b>' + o.say + '/' + GUN30 + '</b><span>' + (o.seri ? o.seri + ' gün seri' : 'seri yok') + '</span></span></div>';
   }).join('') + '</div>';
 }
 function duzenleBolum(t) {
@@ -82,7 +82,7 @@ function gorunum() {
   var S = AT.S, t = veri(S), bugun = AT.iso(new Date());
   var n = t.liste.length, al = t.liste.filter(function (x) { return alindiMi(t, x.id, bugun); }).length;
   var o = '<h1>Takviye</h1><p class="sub">' + (n ? 'Bugün ' + al + '/' + n + ' alındı' : AT.tarih(bugun)) + '</p>';
-  if (!n) return o + '<h2>Takviyelerini ekle</h2>' + duzenleBolum(t);
+  if (!n) return o + (AT.bos ? AT.bos('takviye', 'Her gün aldıklarını ekle, dokunarak işaretle.') : '') + '<h2>Takviyelerini ekle</h2>' + duzenleBolum(t);
   /* düzenlerken bugünün listesi gizlenir: aynı takviyeler iki kez görünmesin */
   var a = duzenle ? '<h2>Listeyi düzenle</h2>' : '<h2>Bugün <small>dokun: alındı</small></h2>' + bugunListe(t, bugun);
   a += '<div class="row tk-alt"><button class="btn-ghost mini" data-act="tk-duzenle">' + (duzenle ? 'Düzenlemeyi kapat' : 'Listeyi düzenle') + '</button></div>';
@@ -102,6 +102,7 @@ function ekle(ad, doz, zaman) {
 AT.islem['tk-al'] = function (d) {
   var t = veri(AT.S), x = t.liste.filter(function (k) { return k.id === d.id; })[0]; if (!x) return;
   var alindi = degistir(t, d.id, AT.iso(new Date())); AT.kaydet(); AT.render();
+  var b = alindi && AT.$('[data-act="tk-al"][data-id="' + String(d.id).replace(/"/g, '') + '"]'); if (b && b.classList) b.classList.add('az');   /* yalnız yeni işaretlenen kutu canlanır */
   if (alindi && t.liste.every(function (k) { return alindiMi(t, k.id, AT.iso(new Date())); })) AT.toast('Bugünkü takviyeler tamam');
 };
 AT.islem['tk-duzenle'] = function () { duzenle = !duzenle; AT.render(); };

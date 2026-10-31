@@ -83,13 +83,13 @@ function notSatir(n, ts) {
 /* notlar sütunu (arama yazarken yalnız bu kısım yenilenir). İlk ILK not tam günlerle; arama hepsine bakar */
 function listeHtml() {
   var l = notlar(AT.S), bugun = AT.iso(new Date());
-  if (!l.length) return '<div class="empty">Henüz not yok.</div>';
+  if (!l.length) return AT.bos ? AT.bos('defter', 'Henüz not yok; yazdıkların günlere göre burada birikir.') : '<div class="empty">Henüz not yok.</div>';
   var ts = l.length > ARA_ESIK ? terimler(aramaQ) : [], bul = ts.length ? l.filter(function (n) { return eslesir(n, ts); }) : l;
   var gr = grupla(bul), say = 0, n = 0;
   for (; n < gr.length && (hepsi || ts.length || say < ILK); n++) say += gr[n].notlar.length;
   var o = ts.length ? '<p class="df-sonuc">' + (bul.length ? bul.length + ' not bulundu' : 'Bulunamadı') + '</p>' : '';
   o += gr.slice(0, n).map(function (g) {
-    return '<h2 class="df-gun">' + AT.h(gunAdi(g.gun, bugun)) + '</h2><div class="panel liste">' + g.notlar.map(function (x) { return notSatir(x, ts); }).join('') + '</div>';
+    return '<h2 class="df-gun"><span class="df-say">' + g.notlar.length + ' not</span>' + AT.h(gunAdi(g.gun, bugun)) + '</h2><div class="panel liste">' + g.notlar.map(function (x) { return notSatir(x, ts); }).join('') + '</div>';
   }).join('');
   if (bul.length > say) o += '<button class="btn-big btn-ghost ac" data-act="df-hepsi">Daha eski notlar (' + (bul.length - say) + ')</button>';
   return o;

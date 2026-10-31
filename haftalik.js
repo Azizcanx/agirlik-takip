@@ -51,6 +51,11 @@ function ac(bas) {
   o += '<div class="ozet ozet-buyuk"><div><b>' + v.seans + '</b><span>antrenman</span></div>' +
     '<div><b>' + (ton ? AT.fmt(v.hacim / 1000, 1) : AT.fmt(Math.round(v.hacim), 0)) + '</b><span>' + (ton ? 'ton' : 'kg') + ' toplam</span></div>' +
     '<div><b>' + (v.kilo == null ? '–' : (v.kilo > 0.04 ? '+' : v.kilo < -0.04 ? '−' : '') + AT.fmt(Math.abs(v.kilo), 1) + '<small> kg</small>') + '</b><span>kilo değişimi</span></div></div>';
+  /* haftanın 7 günü: antrenman yapılan gün dolu nokta, bugün halkalı */
+  var gunSet = {}, bugunS = AT.iso(new Date());
+  AT.bitenSeanslar().forEach(function (s) { gunSet[s.date] = 1; });
+  o += '<div class="hafta-gun" aria-hidden="true">' + ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'].map(function (g, i) {
+    var k = gunEkle(bas, i); return '<span class="' + (gunSet[k] ? 'on' : '') + (k === bugunS ? ' bu' : '') + (k > bugunS ? ' ileri' : '') + '"><i></i>' + g + '</span>'; }).join('') + '</div>';
   /* önceki hafta en az 2 antrenmansa ve fark makulse (≤%150): tek antrenmanlı haftaya göre '%562' gibi anlamsız sayı çıkmasın */
   if (on.hacim > 0 && v.hacim > 0 && on.seans >= 2) {
     var y = Math.round((v.hacim - on.hacim) / on.hacim * 100);
@@ -61,7 +66,7 @@ function ac(bas) {
   if (v.kcal) kv.push(['Ortalama kalori', AT.fmt(Math.round(v.kcal.ort / 10) * 10, 0) + ' kcal<small>' + v.kcal.gun + ' gün</small>']);
   if (v.takviye != null) kv.push(['Takviyeler tam', v.takviye + '/7 gün']);
   o += '<dl class="kv">' + kv.map(function (x) { return '<div><dt>' + x[0] + '</dt><dd>' + x[1] + '</dd></div>'; }).join('') + '</dl>';
-  if (v.rekor.length) o += '<h2>' + (v.rekor.length === 1 ? 'Rekor' : v.rekor.length + ' rekor') + '</h2><ul class="ozet-rekor">' +
+  if (v.rekor.length) o += '<h4>' + (v.rekor.length === 1 ? 'Rekor' : v.rekor.length + ' rekor') + '</h4><ul class="ozet-rekor">' +
     v.rekor.slice(0, 6).map(function (ad) { return '<li><b>' + AT.h(ad) + '</b></li>'; }).join('') +
     (v.rekor.length > 6 ? '<li class="mut">+' + (v.rekor.length - 6) + ' daha</li>' : '') + '</ul>';
   o += '<button class="btn-ac btn-big" data-act="kapat" style="margin-top:20px">Tamam</button></div>';

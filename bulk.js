@@ -12,9 +12,12 @@ function gunEkle(s, n) { var d = AT.parse(s); d.setDate(d.getDate() + n); return
 function r10(n) { return Math.round(n * 10) / 10; }
 function r05(n) { return Math.round(Math.round(n / 0.05) * 0.05 * 100) / 100; }
 
+var gecOnb = null;   /* bu sürümde gecerli(AT.S.bw) çıktısı: harcama önbelleği girdinin durumdan geldiğini tanısın */
 function gecerli(l) {
-  return (l || []).filter(function (b) { return b && typeof b.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.date) && isFinite(b.kg) && b.kg > 0; })
+  var out = (l || []).filter(function (b) { return b && typeof b.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.date) && isFinite(b.kg) && b.kg > 0; })
     .slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  if (AT.surum && AT.S && l === AT.S.bw) gecOnb = { k: AT.surum(), l: out };
+  return out;
 }
 /* Trend (üstel hareketli ortalama; The Hacker's Diet / TrendWeight yöntemi):
    aynı günün kayıtları ortalanır; iki tartı arasındaki boş günler doğrusal doldurulur (ilk..son tartı, ileriye uzatılmaz);
@@ -134,7 +137,22 @@ function yarimGunAt(k) {
   var med = m % 2 ? s[(m - 1) / 2] : (s[m / 2 - 1] + s[m / 2]) / 2;
   return k.filter(function (x) { return +x.kcal >= med * 0.5; });
 }
+/* aynı ekranda harcama 3 kez istenir (hesapla, kaloriGecmisi, harcamaSatir); girdiler uygulama durumuysa (kcal === AT.S.kcal,
+   bw === AT.S.bw ya da bu sürümdeki gecerli(AT.S.bw)) sonuç gün + veri sürümüyle saklanır, bir kez hesaplanır. Sonuç yalnız okunur.
+   Başka girdiyle (testler, AT.surum yok) her seferinde hesaplanır. */
+var hrOnb = { k: null, v: null };
+function durumdan(bw, kcal) {
+  var S = AT.S; if (!AT.surum || !S || kcal !== S.kcal) return false;
+  return bw === S.bw || (!!gecOnb && gecOnb.l === bw && gecOnb.k === AT.surum());
+}
 function harcama(bw, kcal, bugun) {
+  var k = durumdan(bw, kcal) ? bugun + ':' + AT.surum() : null;
+  if (k !== null && hrOnb.k === k) return hrOnb.v;
+  var v = harcamaHesap(bw, kcal, bugun);
+  if (k !== null) hrOnb = { k: k, v: v };
+  return v;
+}
+function harcamaHesap(bw, kcal, bugun) {
   var bas = gunEkle(bugun, -(TDEE_GUN - 1));
   var k = yarimGunAt(kcalGecerli(kcal).filter(function (x) { return x.date >= bas && x.date <= bugun; }));
   var l = gecerli(bw).filter(function (x) { return x.date >= bas && x.date <= bugun; });
@@ -409,9 +427,9 @@ function tarti() {
   var l = gecerli(AT.S.bw), bugun = AT.iso(new Date()), ac = duzelt; duzelt = false;
   var bk = l.filter(function (b) { return b.date === bugun; });
   var t = bk.filter(function (b) { return !b.demo; }).pop() || bk.pop();
-  var o = '<h2>Bugünkü kilo ve kalori</h2><div class="panel">';
+  var o = '<h2>Bugünkü kilo ve kalori</h2><div class="panel tarti">';
   if (t && !ac) {
-    o += '<div class="row"><span class="grow">Bugün: <b>' + AT.h(AT.fmt(t.kg)) + ' kg</b> ✓' + demoTag(t) + '</span><button class="btn-ghost mini" data-act="tarti-duzelt">Düzelt</button></div>';
+    o += '<div class="row kilo-bugun"><span class="grow">Bugün: <b>' + AT.h(AT.fmt(t.kg)) + ' kg</b> ✓' + demoTag(t) + '</span><button class="btn-ghost mini" data-act="tarti-duzelt">Düzelt</button></div>';
   } else {
     o += kiloGir(t ? 'Düzelt' : 'Kaydet');
   }

@@ -56,14 +56,21 @@ function antrenmanSatirlari(sessions) {
 }
 
 /* 7 günlük ortalama: o tarih dahil geriye 7 takvim günü (t-6 .. t) içindeki kayıtların ortalaması. */
+function kiloGecerli(b) { return b && b.date && AT.num(b.kg) > 0; }
+/* Liste tarihe göre sıralı olduğundan pencere bitişik bir aralıktır: başı ikili aramayla, sonu (aynı günün son kaydı) ilerleyen
+   işaretçiyle bulunur; toplam eskisi gibi baştan sıra ile alınır (aynı kayan nokta sonucu). Eskiden her satır tüm listeyi tarıyordu (n²). */
 function kiloSatirlari(bw) {
-  var l = (bw || []).filter(function (b) { return b && b.date && AT.num(b.kg) > 0; })
+  var l = (bw || []).filter(kiloGecerli)
     .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
-  return l.map(function (b) {
-    var son = AT.parse(b.date); son.setDate(son.getDate() - 6);
-    var alt = AT.iso(son), t = 0, n = 0;
-    l.forEach(function (x) { if (x.date >= alt && x.date <= b.date) { t += AT.num(x.kg); n++; } });
-    return [b.date, { n: AT.num(b.kg), d: 2 }, { n: t / n, d: 2 }, b.demo ? 'evet' : ''];
+  var kg = l.map(function (b) { return AT.num(b.kg); }), son = -1;
+  return l.map(function (b, i) {
+    var d = AT.parse(b.date); d.setDate(d.getDate() - 6);
+    var alt = AT.iso(d), t = 0, n = 0, lo = 0, hi = i;
+    if (son < i) son = i;
+    while (son + 1 < l.length && l[son + 1].date <= b.date) son++;
+    while (lo < hi) { var m = (lo + hi) >> 1; if (l[m].date >= alt) hi = m; else lo = m + 1; }   /* ilk date >= alt (en çok i) */
+    for (var j = lo; j <= son; j++) if (l[j].date >= alt) { t += kg[j]; n++; }
+    return [b.date, { n: kg[i], d: 2 }, { n: t / n, d: 2 }, b.demo ? 'evet' : ''];
   });
 }
 
@@ -392,7 +399,9 @@ if (typeof document !== 'undefined') document.addEventListener('change', functio
 AT._csv.metinSec = csvMetinSec; /* test: dosya okunmuş gibi akışı çalıştırır */
 
 AT.bolum.disa = function () {
-  var S = AT.S, setN = antrenmanSatirlari(S.sessions).length, seansN = (S.sessions || []).length, kiloN = kiloSatirlari(S.bw).length;
+  /* yalnız sayılar: CSV satırı üretmeden say (antrenmanSatirlari / kiloSatirlari ile aynı süzgeç) */
+  var S = AT.S, setN = 0, seansN = (S.sessions || []).length, kiloN = (S.bw || []).filter(kiloGecerli).length;
+  (S.sessions || []).forEach(function (se) { (se.exs || []).forEach(function (ex) { setN += AT.yapilanSetler(ex).length; }); });
   var xl = !!AT.islem['excel-indir'];   /* excel.js yüklüyse tek .xlsx öne çıkar; CSV küçük satıra iner */
   function satir(act, etiket, bilgi) {
     return '<div class="row"><button class="btn-big grow" data-act="' + act + '">' + AT.h(etiket) + '</button><span class="mut">' + AT.h(bilgi) + '</span></div>';

@@ -56,8 +56,12 @@ function yukle() {
    ~2 KB'lık S.active ayrı anahtara yazılır; eşitleme tetiklenmez (antrenman bitince tam kayıt). 5 yıllık veride telefonda
    ✓ ~130 ms'den ~20 ms'ye iner. Tam kayıt bu anahtarı siler; yukle() aynı antrenmansa onu okur. */
 var KEY_AKTIF = KEY + '-aktif';
+/* surum: her tam kayıtta artar (S'yi değiştiren her yol — yeniDurum, içe aktarma, tümünü sil, Geri al — tam kaydet() çağırır).
+   prHesapla, AT.notlar, AT.hedefSet ve harcama sonuçları bu sayıyla önbellekte; kaydet(true) yalnız S.active'i değiştirir, sayı artmaz */
+var surum = 0;
 function kaydet(aktif) {
   if (aktif === true && S.active) { try { localStorage.setItem(KEY_AKTIF, JSON.stringify(S.active)); return; } catch (e) { /* tam kayda düş */ } }
+  surum++;
   try { localStorage.setItem(KEY, JSON.stringify(S)); localStorage.removeItem(KEY_AKTIF); } catch (e) { toast('Kaydedilemedi (depolama dolu?)'); }
   if (AT.degisti) AT.degisti();   /* esitle.js: değişiklikten sonra eşitleme */
 }
@@ -135,7 +139,9 @@ function miniGecmis(ad) {
 }
 
 /* PR: her egzersiz için kronolojik koşan en iyi; ilk seans referans (rozet yok) */
+var prOnb = { k: -1, m: null };   /* sonuç yalnız okunur; surum değişmedikçe önbellekten */
 function prHesapla() {
+  if (prOnb.k === surum) return prOnb.m;
   var en = {}, map = {};
   bitenSeanslar().forEach(function (se) {
     se.exs.forEach(function (e) {
@@ -151,6 +157,7 @@ function prHesapla() {
       en[e.ad] = { e1: Math.max(b ? b.e1 : 0, m1), kg: Math.max(b ? b.kg : 0, mk) };
     });
   });
+  prOnb = { k: surum, m: map };
   return map;
 }
 
@@ -454,37 +461,95 @@ function sonGunSatir(son) {
   var g = Math.round((parse(iso(new Date())) - parse(son.date)) / 864e5);
   return g > 5 ? '<p class="son-gun">Son antrenman ' + g + ' gün önce</p>' : '';
 }
+/* Bugün başlığının altında bu hafta (Pt–Pz): antrenmanlı gün dolu, bugün halkalı, gelecek soluk (Geçmiş takvimiyle aynı dil) */
+var GUN_TAM = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+function haftaSerit() {
+  var bugun = iso(new Date()), bas = parse(haftaBasi(bugun)), basS = iso(bas), son = new Date(bas); son.setDate(son.getDate() + 6);
+  var sonS = iso(son), gun = {}, n = 0, o = '';
+  S.sessions.forEach(function (s) { if (s.date >= basS && s.date <= sonS) { (gun[s.date] = gun[s.date] || []).push(sadeAd(s.name) || 'Antrenman'); n++; } });
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(bas); d.setDate(d.getDate() + i); var k = iso(d), g = gun[k];
+    var c = (g ? 'on' : '') + (k === bugun ? ' bugun' : k > bugun ? ' sonra' : '');
+    o += '<li' + (c ? ' class="' + c.trim() + '"' : '') + ' title="' + h(GUN_TAM[i] + ' ' + tarih(k, 1) + (g ? ' · ' + g.join(', ') : '')) + '"><span>' + GUN[i] + '</span><i>' + d.getDate() + '</i></li>';
+  }
+  return '<div class="hserit" role="group" aria-label="Bu hafta ' + n + ' antrenman"><ol aria-hidden="true">' + o + '</ol>' +
+    '<p class="hs-say" aria-hidden="true"><b>' + n + '</b><span>antrenman<br>bu hafta</span></p></div>';
+}
+var IKON_BASLA = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
+var IKON_TIK = '<svg class="tik" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path pathLength="1" d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+/* Bugün'deki son antrenman: ne zaman, kaç set, toplam (Geçmiş satırından biraz zengin) */
+function gunOnce(d) { var g = Math.round((parse(iso(new Date())) - parse(d)) / 864e5); return g <= 0 ? 'Bugün' : g === 1 ? 'Dün' : g + ' gün önce'; }
+function sonKart(s, pr) {
+  var np = pr && pr[s.id] ? Object.keys(pr[s.id]).length : 0, demo = s.demo && !/örnek/i.test(s.name || '');
+  return '<button class="satir son-ant" data-act="seans" data-id="' + h(s.id) + '"><span class="grow"><b>' + h(s.name || 'Antrenman') + '</b>' +
+    '<span class="num">' + gunOnce(s.date) + ' · ' + tarih(s.date, 1) + ' · ' + seansSetSayisi(s) + ' set · toplam ' + fmt(seansHacim(s), 0) + ' kg</span>' +
+    '<span class="son-egz">' + h(s.exs.map(function (e) { return e.ad; }).join(' · ')) + '</span>' +
+    (s.not ? '<span class="notkisa">' + h(String(s.not).replace(/\s+/g, ' ')) + '</span>' : '') + '</span>' +
+    (np ? '<span class="rek">' + np + ' rekor</span>' : '') + (demo ? '<span class="tag demo">örnek</span>' : '') + '</button>';
+}
+var BOS_CIZIM = '<svg class="bos-cizim" width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><path d="M10 22v12M46 22v12M15 17v22M41 17v22M15 28h26"/><path d="M8 46h40" stroke-dasharray="2 5"/></svg>';
+/* antrenman ekranı: biten hareket kartının açık/kapalı hâli (kullanıcı dokunduysa); anahtar antrenman + sıra + ad */
+var katlaDurum = {}, sonTik = null;
+function katlaAnahtar(a, ei, e) { return a.id + '|' + ei + '|' + e.ad; }
+/* şu an çalışılan hareket: son bitirilen setin hareketi; hiç yoksa setleri bitmemiş ilk hareket */
+function simdikiEgz(a) {
+  var en = 0, ei = -1;
+  a.exs.forEach(function (e, i) { e.sets.forEach(function (x) { if (x.done && (x.t || 0) >= en) { en = x.t || 0; ei = i; } }); });
+  if (ei < 0) a.exs.some(function (e, i) { if (e.sets.some(function (x) { return !x.done; })) { ei = i; return true; } return false; });
+  return ei;
+}
 function vBugun() {
   var a = S.active, o = '';
   if (!a) {
     var son = bitenSeanslar().filter(function (x) { return !x.demo; }).pop() || bitenSeanslar().pop(), hic = !S.sessions.length && !S.bw.length;
-    o += '<h1>Bugün</h1><p class="sub">' + tarih(iso(new Date())) + '</p>';
+    o += '<h1>Bugün</h1><p class="sub">' + tarih(iso(new Date())) + '</p>' + haftaSerit();
     var sr = siradaki();
     var a1 = (hic ? ilkAdimlar() : '') + (sr
-      ? '<button class="btn-ac btn-big btn-sira" data-act="basla-tekrar" data-id="' + h(sr.id) + '"><span>Sıradaki: ' + h(sadeAd(sr.name)) + '<kbd>N</kbd></span><small>' + h(hareketOnizle(sr)) + '</small></button><button class="btn-ghost mini basla-baska" data-act="basla">Başka antrenman seç</button>'
-      : '<button class="btn-ac btn-big" data-act="basla">Antrenmana başla<kbd>N</kbd></button>') + sonGunSatir(son) + (AT.bolum.tarti ? AT.bolum.tarti() : '');
+      ? '<button class="btn-ac btn-big btn-sira" data-act="basla-tekrar" data-id="' + h(sr.id) + '"><span class="sira-yazi"><small class="sira-ust">Sıradaki</small><span class="sira-ad">' + h(sadeAd(sr.name)) + '<kbd>N</kbd></span><small>' + h(hareketOnizle(sr)) + '</small></span><span class="sira-ok">' + IKON_BASLA + '</span></button><button class="btn-ghost mini basla-baska" data-act="basla">Başka antrenman seç</button>'
+      : '<button class="btn-ac btn-big btn-basla" data-act="basla"><span class="sira-ok">' + IKON_BASLA + '</span>Antrenmana başla<kbd>N</kbd></button>') + sonGunSatir(son) + (AT.bolum.tarti ? AT.bolum.tarti() : '');
     var b1 = AT.bolum.notlar ? AT.bolum.notlar() : '';
     if (son) {
-      b1 += '<h2>Son antrenman</h2><div class="panel liste">' + seansSatir(son, prHesapla()) + '</div>';
+      b1 += '<h2>Son antrenman</h2><div class="panel liste">' + sonKart(son, prHesapla()) + '</div>';
     } else if (hic) {
-      b1 += '<p class="mut ipucu">Önce nasıl göründüğüne bakmak istersen: Ayarlar › Örnek veriyi yükle.</p>';
+      b1 += '<div class="bos-durum">' + BOS_CIZIM + '<p>Önce nasıl göründüğüne bakmak istersen örnek veriyle dene; Ayarlar\'dan tek dokunuşla silinir.</p><button class="btn-ghost mini" data-act="demo-yukle">Örnek veriyi yükle</button></div>';
     } else {
-      b1 += '<div class="empty">Henüz antrenman yok.</div>';
+      b1 += '<div class="bos-durum">' + BOS_CIZIM + '<p>Henüz antrenman yok.</p></div>';
     }
     return o + kol(a1, b1);
   }
-  var tamam = seansSetSayisi(a), topSet = a.exs.reduce(function (t, e) { return t + e.sets.filter(function (s) { return s.tip !== 'isinma'; }).length; }, 0);   /* ısınma sayılmaz */
+  var tamam = seansSetSayisi(a), topSet = 0, simdi = simdikiEgz(a), yeni = sonTik && Date.now() - sonTik.t < 900 ? sonTik : null;
+  var segs = a.exs.map(function (e) { var n = e.sets.filter(function (s) { return s.tip !== 'isinma'; }).length, d = yapilanSetler(e).length; topSet += n; return { n: n, d: Math.min(d, n) }; });   /* ısınma sayılmaz */
   o += '<input id="seansad" class="baslik-input" value="' + h(a.name) + '" aria-label="Antrenmanın adı (değiştirebilirsin)" autocomplete="off">';
   o += '<p class="sub">Başladı ' + new Date(a.start).toTimeString().slice(0, 5) + ' · <span id="gecen">' + gecenSure(a.start) + '</span></p>';
-  if (topSet) o += '<div class="ilerle"><div class="ibar"><i style="width:' + Math.round(tamam / topSet * 100) + '%"></i></div><span><b>' + tamam + '</b> / ' + topSet + ' set bitti</span></div>';
+  /* hareket başına parçalı çubuk: parça genişliği set sayısı, dolu kısmı biten set; hareketi biten parça yeşil */
+  if (topSet) o += '<div class="ilerle"><div class="iseg" role="progressbar" aria-label="Biten set" aria-valuemin="0" aria-valuemax="' + topSet + '" aria-valuenow="' + tamam + '">' +
+    segs.map(function (x) { return x.n ? '<i style="flex-grow:' + x.n + '"' + (x.d >= x.n ? ' class="tam"' : '') + '><u style="width:' + Math.round(x.d / x.n * 100) + '%"></u></i>' : ''; }).join('') +
+    '</div><span><b>' + tamam + '</b> / ' + topSet + ' set</span></div>';
   var o0 = o; o = '';
-  if (!a.exs.length) o += '<div class="empty">Henüz hareket yok.<br>Aşağıdan “+ Hareket ekle” ile başla.</div>';
+  if (!a.exs.length) o += '<div class="bos-durum">' + BOS_CIZIM + '<p>Henüz hareket yok. Aşağıdan “+ Hareket ekle” ile başla.</p></div>';
+  /* sıradaki set: şu anki hareketin ilk bitmemiş seti; o hareket bittiyse sonraki hareketlerden ilki */
+  var hedefE = -1, hedefS = -1;
+  for (var k = 0; k < a.exs.length && hedefE < 0; k++) {
+    var ki = (Math.max(simdi, 0) + k) % a.exs.length, ks = -1;
+    a.exs[ki].sets.some(function (x, i) { if (!x.done) { ks = i; return true; } return false; });
+    if (ks >= 0) { hedefE = ki; hedefS = ks; }
+  }
   a.exs.forEach(function (e, ei) {
     var prev = oncekiSetler(e.ad);
     var exBitti = e.sets.length && e.sets.every(function (x) { return x.done; });
-    o += '<section class="panel' + (exBitti ? ' ex-bitti' : '') + '"><div class="ex-head"><span class="grow"><b>' + h(e.ad) + '</b>' + (exBitti ? '<span class="ex-tik" aria-label="bitti">✓</span>' : '') + '<span class="tag">' + h(e.kas) + '</span></span>' +
-      (AT.bolum.plakaDugme ? AT.bolum.plakaDugme(ei) : '') +
-      '<button class="mini btn-ghost" data-act="egz-sil" data-e="' + ei + '" aria-label="Hareketi çıkar">Çıkar</button></div>';
+    var kd = katlaDurum[katlaAnahtar(a, ei, e)], kapali = exBitti && (kd != null ? !kd : ei !== simdi);
+    var oz = '';
+    if (exBitti) {
+      var ys = yapilanSetler(e), is = tumSetler(e).length - ys.length;
+      oz = ys.length ? ys.length + ' set · ' + gecenYaz(ys) : '';
+      if (is) oz += (oz ? ' · ' : '') + is + ' ısınma';
+    }
+    o += '<section class="panel ex' + (exBitti ? ' ex-bitti' : '') + (kapali ? ' kapali' : '') + (exBitti && yeni && yeni.e === ei ? ' ex-yeni' : '') + '" data-e="' + ei + '"><div class="ex-head">' +
+      (exBitti
+        ? '<button class="ex-katla grow" data-act="egz-katla" data-e="' + ei + '" aria-expanded="' + !kapali + '"><span class="ex-tik" aria-label="bitti">' + IKON_TIK + '</span><span class="ex-ad"><b>' + h(e.ad) + '</b><small class="ex-ozet">' + oz + '</small></span><span class="ex-ok" aria-hidden="true"></span></button>'
+        : '<span class="grow"><b>' + h(e.ad) + '</b><span class="tag">' + h(e.kas) + '</span></span>') +
+      '<span class="ex-dug">' + (AT.bolum.plakaDugme ? AT.bolum.plakaDugme(ei) : '') +
+      '<button class="mini btn-ghost" data-act="egz-sil" data-e="' + ei + '" aria-label="Hareketi çıkar">Çıkar</button></span></div><div class="ex-govde">';
     o += miniGecmis(e.ad);
     var rg = S.rpe ? ' rpe' : '';
     o += '<div class="setgrid' + rg + '"><span class="lbl">Set</span><span class="lbl">kg</span><span class="lbl">Tekrar</span>' + (S.rpe ? '<span class="lbl">Zorluk</span>' : '') + '<span class="lbl">Bitti</span></div>';
@@ -492,34 +557,52 @@ function vBugun() {
     e.sets.forEach(function (s, si) {
       var isin = s.tip === 'isinma', wi = isin ? -1 : isNo++, pv = isin ? null : hedefPv(e.ad, prev, wi, e, si);
       var etk = isin ? 'I' : String(wi + 1), ad = isin ? 'ısınma seti' : 'normal set';
-      o += '<div class="setgrid' + (s.done ? ' is-done' : '') + rg + '"><button class="n' + (s.tip ? ' ' + s.tip : '') + '" data-act="set-tip" data-e="' + ei + '" data-s="' + si + '" aria-label="Set ' + (si + 1) + ': ' + ad + ' (dokun: tipini değiştir)" title="' + ad + '">' + etk + '</button>' +
-        '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="kg" value="' + h(s.kg) + '" placeholder="' + (pv ? fmt(num(pv.kg), 2) : 'kg') + '" aria-label="' + h(e.ad) + ' set ' + (si + 1) + ' kg">' +
-        '<input inputmode="numeric" data-e="' + ei + '" data-s="' + si + '" data-f="reps" value="' + h(s.reps) + '" placeholder="' + (pv ? h(pv.reps) : 'tekrar') + '" aria-label="' + h(e.ad) + ' set ' + (si + 1) + ' tekrar">' +
+      var sc = (s.done ? ' is-done' : '') + (isin ? ' isin' : '') + (ei === hedefE && si === hedefS ? ' siradaki' : '') + (yeni && yeni.e === ei && yeni.s === si && s.done ? ' yeni' : '');
+      o += '<div class="setgrid' + sc + rg + '"><button class="n' + (s.tip ? ' ' + s.tip : '') + '" data-act="set-tip" data-e="' + ei + '" data-s="' + si + '" aria-label="Set ' + (si + 1) + ': ' + ad + ' (dokun: tipini değiştir)" title="' + ad + '">' + etk + '</button>' +
+        '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="kg" value="' + h(s.kg) + '" placeholder="' + (pv ? fmt(num(pv.kg), 2) : 'kg') + '" aria-label="' + h(e.ad) + ' set ' + etk + ' kg' + (pv ? ', hedef ' + fmt(num(pv.kg), 2) : '') + '">' +
+        '<input inputmode="numeric" data-e="' + ei + '" data-s="' + si + '" data-f="reps" value="' + h(s.reps) + '" placeholder="' + (pv ? h(pv.reps) : 'tekrar') + '" aria-label="' + h(e.ad) + ' set ' + etk + ' tekrar' + (pv ? ', hedef ' + h(pv.reps) : '') + '">' +
         (S.rpe ? '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="rpe" value="' + h(s.rpe) + '" placeholder="–" aria-label="' + h(e.ad) + ' set ' + (si + 1) + ' zorluk (RPE 6–10, boş bırakılabilir)">' : '') +
-        '<button class="done' + (s.done ? ' on' : '') + '" data-act="tamam" data-e="' + ei + '" data-s="' + si + '" aria-label="Seti bitti olarak işaretle" aria-pressed="' + !!s.done + '">&#10003;</button></div>';
+        '<button class="done' + (s.done ? ' on' : '') + '" data-act="tamam" data-e="' + ei + '" data-s="' + si + '" aria-label="' + h(e.ad) + ' set ' + etk + (isin ? ' (ısınma)' : '') + ' bitti" aria-pressed="' + !!s.done + '">' + IKON_TIK + '</button></div>';
     });
     o += '<button class="addset" data-act="set-ekle" data-e="' + ei + '">+ Set ekle</button>';
-    o += '</section>';
+    o += '</div></section>';
   });
-  o += '<button class="btn-big" data-act="egz-ekle" style="margin:4px 0 22px">+ Hareket ekle<kbd>N</kbd></button>';
-  var b2 = '<details class="katla seansnot"' + (a.not ? ' open' : '') + '><summary>Seans notu' + (a.not ? '' : ' ekle') + '</summary><textarea id="seansnot" rows="3" placeholder="Uyku, ağrı, nasıl hissettin…" aria-label="Seans notu">' + h(a.not || '') + '</textarea></details>';
-  b2 += '<button class="btn-ac btn-big" data-act="bitir">Antrenmanı bitir ve kaydet</button>';
-  b2 += '<button class="btn-ghost btn-bad btn-big" style="margin-top:8px;min-height:46px;font-size:15px" data-act="iptal">Kaydetmeden çık</button>';
+  o += '<button class="btn-big ekle-egz" data-act="egz-ekle">+ Hareket ekle<kbd>N</kbd></button>';
+  var hac = a.exs.reduce(function (t, e) { return t + hacim(e); }, 0), bitenEgz = segs.filter(function (x) { return x.n && x.d >= x.n; }).length;
+  var b2 = '<div class="bitir-ozet"><div><b data-gecen>' + gecenSure(a.start) + '</b><span>süre</span></div><div><b>' + bitenEgz + '<small>/' + a.exs.length + '</small></b><span>hareket</span></div><div><b>' + fmt(hac, 0) + '</b><span>kg toplam</span></div></div>';
+  b2 += '<details class="katla seansnot"' + (a.not ? ' open' : '') + '><summary>Seans notu' + (a.not ? '' : ' ekle') + '</summary><textarea id="seansnot" rows="3" placeholder="Uyku, ağrı, nasıl hissettin…" aria-label="Seans notu">' + h(a.not || '') + '</textarea></details>';
+  b2 += '<button class="btn-ac btn-big btn-bitir" data-act="bitir">Antrenmanı bitir ve kaydet</button>';
+  b2 += '<button class="btn-ghost btn-bad btn-big btn-cik" data-act="iptal">Kaydetmeden çık</button>';
   b2 += '<p class="kisaipucu">Enter: kg → tekrar → seti tamamla · <kbd>?</kbd> kısayollar</p>';
-  return o0 + kol(o, b2, 'yan');
+  return o0 + kol(o, b2, 'yan antrenman');
 }
 
-/* Geçmiş / Bugün ortak seans satırı */
+/* boş durum: tek renk çizgi çizim (currentColor) + tek kısa cümle. AT.bos = bosDurum(tur, metin, ek) */
+var BOS_SVG = {
+  gecmis: '<rect x="14" y="20" width="52" height="46" rx="7"/><path d="M14 32h52M28 14v10M52 14v10"/><path class="y" d="M24 42h4M38 42h4M52 42h4M24 54h4M38 54h4"/><circle cx="54" cy="54" r="7"/><path d="M51 54l2.2 2.2 4-4.4"/>',
+  defter: '<path d="M14 20c9-4 18-4 26 2v44c-8-6-17-6-26-2z"/><path d="M66 20c-9-4-18-4-26 2v44c8-6 17-6 26-2z"/><path class="y" d="M20 32c4-1.5 9-1.5 14 .5M20 42c4-1.5 9-1.5 14 .5M46 32.5c5-2 10-2 14-.5M46 42.5c5-2 10-2 14-.5"/>',
+  takviye: '<rect x="24" y="12" width="32" height="10" rx="3"/><path d="M27 22h26v40a6 6 0 0 1-6 6H33a6 6 0 0 1-6-6z"/><path class="y" d="M27 32h26M27 58h26"/><rect x="33" y="40" width="14" height="8" rx="4" transform="rotate(-35 40 44)"/>',
+  ilerleme: '<path d="M14 14v52h54"/><path d="M22 54l12-12 9 7 17-20"/><path d="M52 29h8v8"/><path class="y" d="M14 41h4M14 27h4"/>'
+};
+function bosDurum(tur, metin, ek) {
+  return '<div class="bos"><svg viewBox="0 0 80 80" width="80" height="80" aria-hidden="true">' + (BOS_SVG[tur] || '') + '</svg><p>' + h(metin) + '</p>' + (ek || '') + '</div>';
+}
+
+/* Geçmiş / Bugün ortak seans satırı: solda gün kutusu, ortada ad + set · hareket · toplam, sağda rekor rozeti */
 function seansSatir(s, pr) {
   var np = pr && pr[s.id] ? Object.keys(pr[s.id]).length : 0;
   /* örnek seansın adı zaten "(örnek)" içeriyorsa etiketi tekrarlama */
-  var demo = s.demo && !/örnek/i.test(s.name || '');
-  return '<button class="satir" data-act="seans" data-id="' + h(s.id) + '"><span class="grow"><b>' + h(s.name || 'Antrenman') + '</b><span class="num">' + tarih(s.date, 1) + (s.date.slice(0, 4) !== String(new Date().getFullYear()) ? ' ' + s.date.slice(0, 4) : '') + ' · ' + seansSetSayisi(s) + ' set · ' + s.exs.length + ' hareket</span>' +
+  var demo = s.demo && !/örnek/i.test(s.name || ''), d = parse(s.date), yil = s.date.slice(0, 4) !== String(new Date().getFullYear());
+  var hc = seansHacim(s);
+  return '<button class="satir seans-satir" data-act="seans" data-id="' + h(s.id) + '" aria-label="' + h((s.name || 'Antrenman') + ', ' + tarih(s.date, 1) + (yil ? ' ' + s.date.slice(0, 4) : '')) + '">' +
+    '<span class="ss-gun" aria-hidden="true"><b>' + d.getDate() + '</b><span>' + AYLAR[d.getMonth()].slice(0, 3) + (yil ? ' ’' + s.date.slice(2, 4) : '') + '</span></span>' +
+    '<span class="grow"><b>' + h(s.name || 'Antrenman') + '</b><span class="num">' + seansSetSayisi(s) + ' set · ' + s.exs.length + ' hareket' + (hc > 0 ? ' <span class="nw">· ' + (hc >= 10000 ? fmt(hc / 1000, 1) + ' ton' : fmt(hc, 0) + ' kg') + '</span>' : '') + '</span>' +
     (s.not ? '<span class="notkisa">' + h(String(s.not).replace(/\s+/g, ' ')) + '</span>' : '') + '</span>' +
-    (np ? '<span class="rek">' + np + ' rekor</span>' : '') + (demo ? '<span class="tag demo">örnek</span>' : '') + '</button>';
+    (np ? '<span class="rek rozet"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.8 3.7 4 .6-2.9 2.8.7 4L8 11l-3.6 1.9.7-4L2.2 6.1l4-.6z"/></svg>' + np + '<span class="rk-k"> rekor</span></span>' : '') + (demo ? '<span class="tag demo">örnek</span>' : '') + '</button>';
 }
 
-/* son 7 günde kas grubu başına set; yatay çubuk */
+/* son 7 günde kas grubu başına set; yatay çubuk. Ölçek en az 12 set; ince çizgi = haftada 10 set hedefi, ulaşan yeşil */
+var KAS_HEDEF = 10;
 function kasBolum(l) {
   var lim = new Date(); lim.setDate(lim.getDate() - 6); var limS = iso(lim), kasSet = {};
   KAS.forEach(function (k) { kasSet[k] = 0; });
@@ -530,33 +613,54 @@ function kasBolum(l) {
     ikincilOf(e.ad).forEach(function (y) { if (y !== k) kasSet[y] = (kasSet[y] || 0) + n * 0.5; });
   }); });
   var kasl = KAS.concat(Object.keys(kasSet).filter(function (k) { return KAS.indexOf(k) < 0 && kasSet[k]; }));
-  var mxk = Math.max.apply(0, kasl.map(function (k) { return kasSet[k] || 0; })) || 1;
-  return '<h2>Son 7 günde kaslar <small>· set sayısı, yardımcı kas yarım</small></h2><div class="panel"><div class="kasbar">' + kasl.map(function (k) {
+  var mxk = Math.max(KAS_HEDEF * 1.2, Math.max.apply(0, kasl.map(function (k) { return kasSet[k] || 0; })));
+  return '<h2>Son 7 günde kaslar <small>· set, yardımcı kas yarım</small></h2><div class="panel"><div class="kasbar" style="--hedef:' + (KAS_HEDEF / mxk * 100).toFixed(1) + '%">' + kasl.map(function (k) {
     var n = Math.round(kasSet[k] || 0);
-    return '<div' + (n ? '' : ' class="sifir"') + '><span>' + h(k) + '</span><div class="ibar"><i style="width:' + Math.round(n / mxk * 100) + '%"></i></div><b>' + n + '<small>set</small></b></div>';
-  }).join('') + '</div><p class="mut kucuk">Kas başına haftada 10 ve üstü set iyi bir hedef. Soluk olanlar son 7 günde hiç çalışılmadı.</p></div>';
+    return '<div' + (n ? n >= KAS_HEDEF ? ' class="tamam"' : '' : ' class="sifir"') + '><span>' + h(k) + '</span><div class="ibar"><i style="width:' + Math.round(n / mxk * 100) + '%"></i></div><b>' + n + '<small>set</small></b></div>';
+  }).join('') + '</div><p class="mut kucuk kas-not"><i class="hedef-cizgi" aria-hidden="true"></i>haftada ' + KAS_HEDEF + ' set iyi bir hedef · soluklar 7 günde hiç çalışılmadı</p></div>';
+}
+
+/* son 12 hafta: her hafta bir sütun (antrenman sayısı), solda üst üste hafta sayısı */
+function haftaSeridi() {
+  var w = {}; S.sessions.forEach(function (s) { var k = haftaBasi(s.date); w[k] = (w[k] || 0) + 1; });
+  var d = parse(haftaBasi(iso(new Date()))); d.setDate(d.getDate() - 77);
+  var cs = '', seri = haftaSerisi();
+  for (var i = 0; i < 12; i++) {
+    var k = iso(d), n = w[k] || 0;
+    cs += '<i class="h' + Math.min(n, 4) + (i === 11 ? ' bu' : '') + '" title="' + tarih(k, 1) + ' haftası: ' + n + ' antrenman"></i>';
+    d.setDate(d.getDate() + 7);
+  }
+  return '<div class="hseri"><div class="hseri-n"><b>' + seri + '</b><span>' + (seri ? 'hafta üst üste<br>antrenman' : 'hafta seri<br>bu hafta başla') + '</span></div>' +
+    '<div class="hseri-c" role="img" aria-label="Son 12 hafta, haftalık antrenman sayısı">' + cs + '</div></div>';
 }
 
 function vGecmis() {
   var bu = new Date(); if (!gecmisAy) gecmisAy = new Date(bu.getFullYear(), bu.getMonth(), 1);
   var y = gecmisAy.getFullYear(), m = gecmisAy.getMonth();
-  var gunler = {}; S.sessions.forEach(function (s) { gunler[s.date] = true; });
+  /* gün başına set; takvim tonu kişinin olağan gününe göre (medyan): az · olağan · çok */
+  var gunler = {}; S.sessions.forEach(function (s) { gunler[s.date] = (gunler[s.date] || 0) + Math.max(1, seansSetSayisi(s)); });
+  var dg = Object.keys(gunler).map(function (k) { return gunler[k]; }).sort(function (a, b) { return a - b; }), med = dg.length ? dg[Math.floor(dg.length / 2)] : 0;
+  function ton(n) { return n <= med * 0.75 ? 1 : n >= med * 1.3 ? 3 : 2; }
   var o = '<h1>Geçmiş</h1>';
-  var seri = haftaSerisi(), buAy = S.sessions.filter(function (s) { return s.date.slice(0, 7) === y + '-' + p2(m + 1); }).length;
-  o += '<p class="sub">' + (seri > 1 ? seri + ' haftadır her hafta antrenman yaptın · ' : '') + 'toplam ' + S.sessions.length + ' antrenman' +
+  var buAy = S.sessions.filter(function (s) { return s.date.slice(0, 7) === y + '-' + p2(m + 1); }).length;
+  o += '<p class="sub">toplam ' + S.sessions.length + ' antrenman' +
     (AT.bolum.haftalikDugme && S.sessions.length ? ' ' + AT.bolum.haftalikDugme() : '') + '</p>';   /* haftalik.js */
   var o0 = o; o = '';
-  o += '<div class="panel"><div class="ayb"><button data-act="ay" data-d="-1" aria-label="Önceki ay">&lsaquo;</button><b>' + AYLAR[m] + ' ' + y + '</b><button data-act="ay" data-d="1" aria-label="Sonraki ay">&rsaquo;</button></div>';
+  if (S.sessions.length) o += haftaSeridi();
+  o += '<div class="panel takvim-panel"><div class="ayb"><button data-act="ay" data-d="-1" aria-label="Önceki ay">&lsaquo;</button><b>' + AYLAR[m] + ' ' + y + '</b><button data-act="ay" data-d="1" aria-label="Sonraki ay">&rsaquo;</button></div>';
   o += '<div class="cal">' + GUN.map(function (g) { return '<span class="h">' + g + '</span>'; }).join('');
   var ilk = (new Date(y, m, 1).getDay() + 6) % 7, say = new Date(y, m + 1, 0).getDate(), bi = iso(bu);
   for (var i = 0; i < ilk; i++) o += '<span class="pad"></span>';
-  for (var d = 1; d <= say; d++) { var k = y + '-' + p2(m + 1) + '-' + p2(d); o += '<span class="' + (gunler[k] ? 'on' : '') + (k === bi ? ' today' : '') + '">' + d + '</span>'; }
-  o += '</div><p class="mut kucuk takvim-not"><i class="nokta"></i>antrenman yaptığın gün</p></div>';
+  for (var d = 1; d <= say; d++) {
+    var k = y + '-' + p2(m + 1) + '-' + p2(d), n = gunler[k];
+    o += '<span class="' + (n ? 'on t' + ton(n) : '') + (k === bi ? ' today" aria-current="date' : '') + '"' + (n ? ' title="' + n + ' set" aria-label="' + d + ' ' + AYLAR[m] + ', antrenman var, ' + n + ' set"' : '') + '>' + d + '</span>';
+  }
+  o += '</div><p class="mut kucuk takvim-not"><span class="ton-l" aria-hidden="true">az<i class="t1"></i><i class="t2"></i><i class="t3"></i>çok set</span><span class="bugun-l"><i></i>bugün</span></p></div>';
   if (S.sessions.length) o += kasBolum(bitenSeanslar());
   /* takvimde başka ay açıksa sayı o aya aittir: "· Eylül ayında 12" */
   var b = '<h2>Antrenmanlar <small>· ' + (y === bu.getFullYear() && m === bu.getMonth() ? 'bu ay ' : AYLAR[m] + ' ayında ') + buAy + '</small></h2>';
   var l = S.sessions.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.start || 0) - (a.start || 0); });
-  if (!l.length) return o0 + kol(o, b + '<div class="empty">Kayıtlı antrenman yok.</div>', 'takvim');
+  if (!l.length) return o0 + kol(o, b + bosDurum('gecmis', 'Bitirdiğin antrenmanlar burada birikir.'), 'takvim');
   var pr = prHesapla();
   var n = gecmisHepsi ? 200 : 10;
   b += '<div class="panel liste">' + l.slice(0, n).map(function (s) { return seansSatir(s, pr); }).join('') + '</div>';
@@ -640,7 +744,7 @@ function vIlerleme() {
   var o = '<h1>İlerleme</h1>';
   var l = bitenSeanslar();
   var kartK = function () { return AT.bolum.kart ? AT.bolum.kart() : ''; };
-  if (!l.length && !S.bw.length) return o + '<div class="empty">Antrenman ve tartı kaydettikçe grafikler burada oluşur.<br>Örneğe bakmak için: Ayarlar › Örnek veriyi yükle.</div>' + bwAlan();
+  if (!l.length && !S.bw.length) return o + bosDurum('ilerleme', 'Tartı ve antrenman ekledikçe grafiklerin burada çizilir.', '<button class="btn-ghost mini" data-act="demo-yukle">Örnek veriyle gör</button>') + bwAlan();
   if (!ilerSek) ilerSek = S.bw.length || S.bulk ? 'kilo' : 'guc';
   var hb = haftaBasi(iso(new Date())), buHafta = l.filter(function (s) { return haftaBasi(s.date) === hb; }).length, seri = haftaSerisi();
   o += '<p class="sub">Bu hafta ' + buHafta + ' antrenman' + (seri > 1 ? ' · ' + seri + ' haftadır aksatmadın' : '') + '</p>';
@@ -702,32 +806,45 @@ var SOZLUK = [
   ['Zorluk (RPE)', '10 = bir tekrar daha yapamazdım, 9 = bir tekrar daha yapabilirdim, 8 = iki tekrar daha. Ayarlardan açılır, boş bırakılabilir.'],
   ['Makro', 'Protein, karbonhidrat ve yağ (gram). 1 g protein ve karbonhidrat 4 kcal, 1 g yağ 9 kcal eder; makroyla eklediğin öğünün kalorisi kendiliğinden hesaplanır.']
 ];
+/* Ayarlar küçük çizgi ikonları (currentColor) */
+var AY_IKON = {
+  yedek: '<path d="M7 17.5h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 17.5z"/>',
+  gorunum: '<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v15a7.5 7.5 0 0 0 0-15z" fill="currentColor" stroke="none"/>',
+  antrenman: '<rect x="5" y="7" width="3" height="10" rx="1"/><rect x="16" y="7" width="3" height="10" rx="1"/><path d="M8 12h8M2.5 10v4M21.5 10v4"/>',
+  ornek: '<path d="M12 3.5l1.8 4.6 4.7 1.9-4.7 1.9L12 16.5l-1.8-4.6L5.5 10l4.7-1.9z"/><path d="M18 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
+  sozluk: '<path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H19v13H6.5A1.5 1.5 0 0 0 5 18.5zM5 18.5A1.5 1.5 0 0 0 6.5 20H19"/><path d="M9 8.5h6"/>',
+  sil: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5"/>'
+};
+function ayIkon(k) { return '<svg class="ay-i" viewBox="0 0 24 24" aria-hidden="true">' + AY_IKON[k] + '</svg>'; }
+function ayBaslik(k, m) { return '<h2 class="ay-b">' + ayIkon(k) + h(m) + '</h2>'; }
+function aySatir(act, b, alt, cls) { return '<button class="satir ay-satir' + (cls ? ' ' + cls : '') + '" data-act="' + act + '"><span class="grow"><b>' + h(b) + '</b><span>' + h(alt) + '</span></span></button>'; }
 function vAyarlar() {
   var demoVar = S.sessions.some(function (s) { return s.demo; }) || S.bw.some(function (b) { return b.demo; }) || (S.kcal || []).some(function (k) { return k.demo; }) || (S.defter || []).some(function (n) { return n && n.demo; });
   var o0 = '<h1>Ayarlar</h1><p class="sub">' + (AT.esitBagli && AT.esitBagli() ? 'Kayıtların bu cihazda ve şifreli olarak GitHub\'daki gizli dosyanda durur.' : 'Kayıtların yalnız bu cihazda durur; internete gönderilmez.') + '</p>';
   /* yedek, otomatik yedek, eşitleme ve Excel tek grupta; ayrıntılar katlanır (durumları özet satırında) */
-  var a0 = '<h2>Yedek ve eşitleme</h2><div class="panel liste">' +
-    '<button class="satir" data-act="disa"><span class="grow"><b>Yedeği indir</b><span>Tüm kayıtlar tek dosyada; arada bir al</span></span></button>' +
-    '<button class="satir" data-act="ice"><span class="grow"><b>Yedeği geri yükle</b><span>Şu anki verinin yerine geçer</span></span></button></div>' +
+  var a0 = ayBaslik('yedek', 'Yedek ve eşitleme') + '<div class="panel liste ay-grup">' +
+    aySatir('disa', 'Yedeği indir', 'Tüm kayıtlar tek dosyada; arada bir al') +
+    aySatir('ice', 'Yedeği geri yükle', 'Şu anki verinin yerine geçer') + '</div>' +
     '<input type="file" id="dosya" accept="application/json,.json" hidden>';
   if (AT.bolum.otoyedek) a0 += AT.bolum.otoyedek();
   if (AT.bolum.esitle) a0 += AT.bolum.esitle();   /* esitle.js: PC ↔ telefon */
-  if (AT.bolum.disa) a0 += '<details class="katla"><summary>Excel ve diğer uygulamalar <small>Strong, Hevy</small></summary>' + AT.bolum.disa() + '</details>';
-  var o = '<h2>Görünüm</h2><div class="seg" role="group" aria-label="Tema">' + [['sistem', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu']].map(function (t) {
-    return '<button data-act="tema" data-v="' + t[0] + '" aria-pressed="' + ((S.tema || 'sistem') === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+  if (AT.bolum.disa) a0 += '<details class="katla ay-excel"><summary>Excel ve diğer uygulamalar <small>Strong, Hevy</small></summary>' + AT.bolum.disa() + '</details>';
+  /* tema: üç küçük sayfa önizlemesi (Sistem yarı yarıya) */
+  var o = ayBaslik('gorunum', 'Görünüm') + '<div class="tema-sec" role="group" aria-label="Tema">' + [['sistem', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu']].map(function (t) {
+    return '<button data-act="tema" data-v="' + t[0] + '" aria-pressed="' + ((S.tema || 'sistem') === t[0]) + '"><span class="tema-on ' + t[0] + '" aria-hidden="true"><i></i><i></i><i></i></span>' + t[1] + '</button>'; }).join('') + '</div>';
   var dEgz = Object.keys(S.dinlenmeEgz || {});
-  o += '<h2>Antrenman</h2><div class="panel"><label class="alan"><span>Setler arası dinlenme (saniye)</span><input id="din" inputmode="numeric" value="' + S.dinlenme + '"></label>' +
+  o += ayBaslik('antrenman', 'Antrenman') + '<div class="panel"><label class="alan"><span>Setler arası dinlenme (saniye)</span><input id="din" inputmode="numeric" value="' + S.dinlenme + '"></label>' +
     (dEgz.length ? '<p class="din-egz">' + dEgz.map(function (k) { var v = S.dinlenmeEgz[k]; return h(k) + ' <b>' + Math.floor(v / 60) + ':' + p2(v % 60) + '</b>'; }).join(' · ') +
       ' <button class="btn-ghost mini" data-act="din-egz-sil">Sıfırla</button></p>' : '') +
     '<div class="alan"><span>Zorluk alanı (RPE): her sete 6–10 arası zorluk yazmak için</span><div class="seg" role="group" aria-label="Zorluk alanı">' + [[0, 'Kapalı'], [1, 'Açık']].map(function (t) {
       return '<button data-act="rpe" data-v="' + t[0] + '" aria-pressed="' + (!!S.rpe === !!t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
     '<p class="mut kucuk alt-not">Bilmiyorsan kapalı bırak; öneriler yine çalışır.</p></div>' +
     (AT.bolum.ses ? AT.bolum.ses() : '') + '</div>';
-  o += '<h2>Örnek veri</h2><div class="panel liste">' + (demoVar
-    ? '<button class="satir bad" data-act="demo-sil"><span class="grow"><b>Örnek veriyi sil</b><span>Yalnız "örnek" etiketli kayıtlar gider</span></span></button>'
-    : '<button class="satir" data-act="demo-yukle"><span class="grow"><b>Örnek veriyi yükle</b><span>Dolu hâlini görmek için 12 haftalık uydurma kayıt, "örnek" etiketli</span></span></button>') + '</div>';
-  o += '<details class="katla"><summary>Bu kelimeler ne demek?</summary><dl class="sozluk">' + SOZLUK.map(function (x) { return '<dt>' + h(x[0]) + '</dt><dd>' + h(x[1]) + '</dd>'; }).join('') + '</dl></details>';
-  o += '<h2>Veriyi sil</h2><div class="panel liste"><button class="satir bad" data-act="hepsini-sil"><span class="grow"><b>Tüm verileri sil</b><span>Antrenmanlar, kilo, kalori ve makrolar, takviyeler, defter notları, kilo hedefi ve ayarlar</span></span></button></div>';
+  o += ayBaslik('ornek', 'Örnek veri') + '<div class="panel liste ay-grup">' + (demoVar
+    ? aySatir('demo-sil', 'Örnek veriyi sil', 'Yalnız "örnek" etiketli kayıtlar gider', 'bad')
+    : aySatir('demo-yukle', 'Örnek veriyi yükle', 'Dolu hâlini görmek için 12 haftalık uydurma kayıt, "örnek" etiketli')) + '</div>';
+  o += '<details class="katla ay-sozluk"><summary>' + ayIkon('sozluk') + 'Bu kelimeler ne demek?</summary><dl class="sozluk">' + SOZLUK.map(function (x) { return '<dt>' + h(x[0]) + '</dt><dd>' + h(x[1]) + '</dd>'; }).join('') + '</dl></details>';
+  o += ayBaslik('sil', 'Veriyi sil') + '<div class="panel liste ay-grup">' + aySatir('hepsini-sil', 'Tüm verileri sil', 'Antrenmanlar, kilo, kalori ve makrolar, takviyeler, defter notları, kilo hedefi ve ayarlar', 'bad') + '</div>';
   return o0 + kol(a0, o) + '<p class="altnot">Ağırlık Takip · internetsiz çalışır<span class="pc"> · kısayollar <kbd>?</kbd></span></p>';
 }
 
@@ -758,13 +875,29 @@ function render() {
 }
 
 /* ---------- sheet / toast ---------- */
-function sheet(html) { var s = $('#sheet'); s.innerHTML = '<div class="in">' + html + '</div>'; s.hidden = false; }
-function kapat() { $('#sheet').hidden = true; $('#sheet').innerHTML = ''; }
+/* pencere: diyalog rolü, arkası inert, odak içeri; kapanınca odak açan öğeye (yoksa #view) */
+var donus = null;
+function sheet(html) {
+  var s = $('#sheet'), app = $('#app'); if (s.hidden) donus = document.activeElement;
+  s.innerHTML = '<div class="in" role="dialog" aria-modal="true" tabindex="-1">' + html + '</div>'; s.hidden = false;
+  if (app) app.inert = true;
+  var b = s.querySelector('h3'); if (b) { b.id = 'sh-b'; s.firstChild.setAttribute('aria-labelledby', 'sh-b'); }
+  if (!s.contains(document.activeElement)) (s.querySelector('[autofocus]') || s.firstChild).focus({ preventScroll: true });
+}
+function kapat() {
+  var s = $('#sheet'), app = $('#app'); s.hidden = true; s.innerHTML = ''; if (app) app.inert = false;
+  if (donus && donus.isConnected) donus.focus({ preventScroll: true }); else { var v = $('#view'); if (v) v.focus({ preventScroll: true }); }
+  donus = null;
+}
+/* ekran okuyucuya bildirim (#duyuru, aria-live) */
+function duyur(m) { var d = $('#duyuru'); if (d) { d.textContent = ''; setTimeout(function () { d.textContent = m; }, 50); } }
 function toast(m, sure) {
   Array.prototype.forEach.call(document.querySelectorAll('.toast'), function (x) { x.remove(); });
   geriFn = null;
   var t = document.createElement('div'); t.className = 'toast' + ($('#rest').hidden ? '' : ' yukari'); t.setAttribute('role', 'status'); t.textContent = m;
-  document.body.appendChild(t); setTimeout(function () { t.remove(); if (t.geri && geriFn === t.geri) geriFn = null; }, sure || 2200);
+  document.body.appendChild(t); duyur(m);
+  setTimeout(function () { t.classList.add('git'); }, Math.max(0, (sure || 2200) - 180));   /* son 180 ms: yumuşak çıkış */
+  setTimeout(function () { t.remove(); if (t.geri && geriFn === t.geri) geriFn = null; }, sure || 2200);
   return t;
 }
 /* silme sonrası 6 sn "Geri al": fn eski hâli geri koyar (kaydet + render burada) */
@@ -794,19 +927,24 @@ function egzListele(q) {
 
 function seansSheet(id) {
   var se = S.sessions.filter(function (s) { return s.id === id; })[0]; if (!se) return;
-  var pr = prHesapla()[id] || {};
-  var o = '<h3>' + h(se.name || 'Antrenman') + (se.demo && !/örnek/i.test(se.name || '') ? ' <span class="tag demo">örnek</span>' : '') + '</h3><p class="mut">' + tarih(se.date) + ' · ' + seansSetSayisi(se) + ' set · toplam ' + fmt(seansHacim(se), 0) + ' kg kaldırdın</p>';
+  var pr = prHesapla()[id] || {}, hc = seansHacim(se), ton = hc >= 10000;
+  var dk = se.end && se.start ? Math.max(1, Math.round((se.end - se.start) / 60000)) : null;
+  var o = '<p class="sheet-ust">' + tarih(se.date) + '</p><h3>' + h(se.name || 'Antrenman') + (se.demo && !/örnek/i.test(se.name || '') ? ' <span class="tag demo">örnek</span>' : '') + '</h3>';
+  o += '<div class="sayilar">' + (dk ? '<div><b>' + dk + '</b><span>dakika</span></div>' : '') +
+    '<div><b>' + seansSetSayisi(se) + '</b><span>set</span></div>' +
+    '<div><b>' + (ton ? fmt(hc / 1000, 1) : fmt(hc, 0)) + '</b><span>' + (ton ? 'ton' : 'kg') + ' toplam</span></div></div>';
   if (se.not) o += '<p class="seans-not">' + h(se.not) + '</p>';
-  o += '<div class="panel liste">';
+  o += '<div class="seans-egz">';
   se.exs.forEach(function (e) {
     var sets = yapilanSetler(e); if (!sets.length) return;
-    o += '<div class="satir"><span class="grow"><b>' + h(e.ad) + '</b><span class="num">' + sets.map(function (s) { return fmt(num(s.kg), 2) + '×' + h(s.reps); }).join(' · ') + '</span>' +
-      (pr[e.ad] ? '<span class="rek">Rekor · ' + pr[e.ad].map(function (t) { return h(t.ad) + ' ' + fmt(t.yeni, kgOnd(t)) + ' kg'; }).join(' · ') + '</span>' : '') + '</span>' +
-      '<span class="deger">' + fmt(hacim(e), 0) + ' kg</span></div>';
+    o += '<div class="se-x"><div class="se-b"><b>' + h(e.ad) + '</b><span class="deger">' + fmt(hacim(e), 0) + ' kg</span></div>' +
+      '<div class="se-set num">' + sets.map(function (s) { return '<span>' + fmt(num(s.kg), 2) + '<small>×</small>' + h(s.reps) + '</span>'; }).join('') + '</div>' +
+      (pr[e.ad] ? '<p class="se-rek"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.8 3.7 4 .6-2.9 2.8.7 4L8 11l-3.6 1.9.7-4L2.2 6.1l4-.6z"/></svg>Rekor · ' + pr[e.ad].map(function (t) { return h(t.ad) + ' ' + fmt(t.yeni, kgOnd(t)) + ' kg'; }).join(' · ') + '</p>' : '') + '</div>';
   });
-  o += '</div><div class="yigin" style="margin-top:18px"><button class="btn-big" data-act="kapat">Kapat</button>' +
+  o += '</div><div class="sheet-dugme">' +
     (islem['seans-duzenle'] ? '<button class="btn-big" data-act="seans-duzenle" data-id="' + h(id) + '">Düzenle</button>' : '') +   /* duzenle.js */
-    '<button class="btn-big btn-ghost btn-bad" data-act="seans-sil" data-id="' + h(id) + '">Antrenmanı sil</button></div>';
+    '<button class="btn-big btn-ac" data-act="kapat">Kapat</button></div>' +
+    '<button class="btn-big btn-ghost btn-bad sheet-sil" data-act="seans-sil" data-id="' + h(id) + '">Antrenmanı sil</button>';
   sheet(o);
 }
 
@@ -859,6 +997,13 @@ function uyanikKontrol() { var r = $('#rest'); uyanikTut(!!r && !r.hidden && res
 document.addEventListener('visibilitychange', uyanikKontrol);
 setInterval(uyanikKontrol, 5000);   /* bitir/iptal gibi sayacı gizleyen her yol için */
 
+/* ✓ sonrası yeniden çiz; biten hareket kartı katlanınca dokunulan set parmağın altından kaymasın (kaydırmayı düzelt) */
+function yerindeCiz(d) {
+  var sec = '[data-act=tamam][data-e="' + d.e + '"][data-s="' + d.s + '"]', b = $(sec), y0 = b ? b.getBoundingClientRect().top : null;
+  render();
+  var b2 = y0 == null ? null : $(sec);
+  if (b2) { var dy = b2.getBoundingClientRect().top - y0; if (Math.abs(dy) > 1) window.scrollBy(0, dy); }
+}
 function restBasla(sn) {
   restBitis = Date.now() + sn * 1000; restSure = sn * 1000; $('#rest').hidden = false; restCiz();
   clearInterval(restTimer); restTimer = setInterval(restCiz, 250);
@@ -866,15 +1011,25 @@ function restBasla(sn) {
 function restCiz() {
   var r = $('#rest'), kalan = Math.ceil((restBitis - Date.now()) / 1000);
   uyanikTut(kalan > 0 && !r.hidden);
+  /* ince halka: kalan süre oranı (pathLength 100; CSS geçişiyle 250 ms'de bir yumuşak azalır) */
+  var halka = function (bitti) { return '<span class="halka' + (bitti ? ' bitti' : '') + '" aria-hidden="true"><svg viewBox="0 0 44 44"><circle class="iz" cx="22" cy="22" r="19"/><circle class="dolu" cx="22" cy="22" r="19" pathLength="100"/></svg>' + (bitti ? IKON_TIK : '') + '</span>'; };
   if (kalan <= 0) {
-    clearInterval(restTimer); r.innerHTML = '<span class="t"><small>Dinlenme</small>Bitti, sıradaki set</span><button class="btn-ac" data-act="rest-kapat">Tamam</button>';
+    clearInterval(restTimer); r.dataset.k = 'bitti';
+    r.innerHTML = halka(true) + '<span class="t"><small>Dinlenme bitti</small><span class="sn">Sıradaki set</span></span><button class="btn-ac" data-act="rest-kapat">Tamam</button>';
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     if (AT.restBitti) AT.restBitti();   /* pc.js: ses */
+    if (AT.duyur) AT.duyur('Dinlenme bitti');
     setTimeout(function () { if (Date.now() >= restBitis) r.hidden = true; }, 6000); return;
   }
-  var kalanMs = restBitis - Date.now(), oran = Math.max(0, Math.min(1, kalanMs / Math.max(restSure, kalanMs, 1)));
-  r.innerHTML = '<span class="t"><small>Dinlenme' + (restEgz ? ' · ' + h(restEgz) : '') + '</small>' + Math.floor(kalan / 60) + ':' + p2(kalan % 60) + '</span><button data-act="rest-ekle" data-d="-15" aria-label="15 saniye azalt">−15</button><button data-act="rest-ekle" data-d="15" aria-label="15 saniye ekle">+15</button><button data-act="rest-kapat">Geç</button>' +
-    '<div class="ibar" aria-hidden="true"><i style="width:' + (oran * 100).toFixed(1) + '%"></i></div>';
+  var kalanMs = restBitis - Date.now(), oran = Math.max(0, Math.min(1, kalanMs / Math.max(restSure, kalanMs, 1))), ad = restEgz || '';
+  /* 250 ms'de bir yalnız sayı ve halka güncellenir; yapı hareket değişince ya da bitişten sonra kurulur */
+  if (r.dataset.k !== 'say' || r.dataset.egz !== ad) {
+    r.dataset.k = 'say'; r.dataset.egz = ad;
+    r.innerHTML = halka(false) + '<span class="t"><small>Dinlenme' + (ad ? ' · ' + h(ad) : '') + '</small><span class="sn"></span></span><button data-act="rest-ekle" data-d="-15" aria-label="15 saniye azalt">−15</button><button data-act="rest-ekle" data-d="15" aria-label="15 saniye ekle">+15</button><button data-act="rest-kapat">Geç</button>';
+  }
+  var sn = r.querySelector('.sn'), c = r.querySelector('.dolu'), yz = Math.floor(kalan / 60) + ':' + p2(kalan % 60);
+  if (sn.textContent !== yz) sn.textContent = yz;
+  c.style.strokeDashoffset = (100 - oran * 100).toFixed(2);
 }
 
 /* ---------- işlemler ---------- */
@@ -930,7 +1085,7 @@ var islem = {
   tamam: function (d) {
     var e = S.active && S.active.exs[+d.e], s = e && e.sets[+d.s];
     if (!s) return render();   /* ekran eski: yeniden çiz */
-    if (s.done) { s.done = false; delete s.t; kaydet(true); return render(); }
+    if (s.done) { s.done = false; delete s.t; kaydet(true); return yerindeCiz(d); }
     var wi = e.sets.slice(0, +d.s).filter(function (x) { return x.tip !== 'isinma'; }).length, p = s.tip === 'isinma' ? null : hedefPv(e.ad, oncekiSetler(e.ad), wi, e, +d.s);
     // ipucundan doldurma: Türkçe ondalık virgül (78,75); binlik ayıracı yok ki num() geri okuyabilsin
     if (s.kg === '' && p) s.kg = String(num(p.kg)).replace('.', ',');
@@ -944,10 +1099,20 @@ var islem = {
       if (!(r >= 6 && r <= 10)) return toast('RPE 6–10 arası olmalı (boş bırakabilirsin)');
       s.rpe = fmt(Math.round(r * 2) / 2);
     }
-    s.done = true; s.t = Date.now(); kaydet(true); render();   /* s.t: setin bittiği an (unutulan antrenmanın gerçek süresi için) */
+    s.done = true; s.t = Date.now(); kaydet(true);   /* s.t: setin bittiği an (unutulan antrenmanın gerçek süresi için) */
+    sonTik = { e: +d.e, s: +d.s, t: s.t }; yerindeCiz(d);   /* .yeni: ✓ animasyonu (CSS) */
+    /* kısa dokunsal geri bildirim; destek ya da kullanıcı dokunuşu yoksa sessiz (tarayıcı uyarısı da çıkmasın) */
+    try { var ua = navigator.userActivation; if (navigator.vibrate && (!ua || ua.hasBeenActive)) navigator.vibrate(10); } catch (er) { }
     var hepsi = S.active.exs.every(function (x) { return x.sets.every(function (y) { return y.done; }); });
     if (hepsi) {   /* son set: dinlenme yok */ clearInterval(restTimer); $('#rest').hidden = true; return; }
     restEgz = e.ad; restBasla(dinlenmeOf(e.ad));
+  },
+  /* biten hareket kartını aç/kapat: yeniden çizmeden sınıf değişir, durum render sonrası korunur */
+  'egz-katla': function (d) {
+    var a = S.active, e = a && a.exs[+d.e], sec = $('section.ex[data-e="' + d.e + '"]'); if (!e || !sec) return render();
+    var ac = sec.classList.contains('kapali');
+    katlaDurum[katlaAnahtar(a, +d.e, e)] = ac; sec.classList.toggle('kapali', !ac);
+    var b = sec.querySelector('.ex-katla'); if (b) b.setAttribute('aria-expanded', ac);
   },
   'set-tip': function (d) {
     var s = S.active.exs[+d.e].sets[+d.s], t = TIPLER[(TIPLER.indexOf(s.tip || '') + 1) % TIPLER.length];
@@ -1120,9 +1285,10 @@ var AT = window.AT = {
   islem: islem, bolum: {}, KAS: KAS, AYLAR: AYLAR, p2: p2, iso: iso, parse: parse, h: h, num: num, fmt: fmt, tarih: tarih, uid: uid,
   e1rm: e1rm, tahminiMax: tahminiMax, MAX_TEKRAR: MAX_TEKRAR, haftaBasi: haftaBasi, $: $, kaydet: kaydet, render: render, toast: toast, sheet: sheet, kapat: kapat, onayla: onayla,
   bitenSeanslar: bitenSeanslar, yapilanSetler: yapilanSetler, tumSetler: tumSetler, hacim: hacim, seansHacim: seansHacim, kasOf: kasOf, prHesapla: prHesapla,
-  cizgi: cizgi, cubuk: cubuk, indir: indir, geriAl: geriAl, kol: kol, masaustu: masaustu
+  cizgi: cizgi, cubuk: cubuk, indir: indir, bos: bosDurum, duyur: duyur, geriAl: geriAl, kol: kol, masaustu: masaustu
 };
 Object.defineProperty(AT, 'S', { get: function () { return S; } });
+AT.surum = function () { return surum; };   /* önbellek anahtarı (notlar.js, bulk.js) */
 /* esitle.js: öbür cihazdan birleşen durumu uygula (tema gibi cihaza özel alanlar x içinde zaten bu cihazınki) */
 /* süren antrenmanın yapısı (hareket adları ve set sayıları): eşitleme bunu değiştirirse ekrandaki data-e/data-s indeksleri eskir */
 function aktifImza(x) { var a = x && x.active; return a ? a.id + '|' + a.exs.map(function (e) { return e.ad + ':' + e.sets.length; }).join(',') : ''; }
@@ -1141,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', function () {
 var sonW = 0;
 window.addEventListener('resize', function () { clearTimeout(tickT); tickT = setTimeout(function () { var w = grafikW(); if (w !== sonW) { sonW = w; if (tab === 'ilerleme' && !yaziyor(document.activeElement)) render(); } }, 150); });
 if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', temaUygula);
-setInterval(function () { var g = $('#gecen'); if (g && S.active) g.textContent = gecenSure(S.active.start); }, 30000);
+setInterval(function () { if (S.active) Array.prototype.forEach.call(document.querySelectorAll('#gecen,[data-gecen]'), function (g) { g.textContent = gecenSure(S.active.start); }); }, 30000);
 setInterval(function () { if (tab === 'bugun' && S.active) setVurgu(); }, 10000);
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
 })();

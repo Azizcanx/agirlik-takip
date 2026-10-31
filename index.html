@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#151517">
-<script>try{var t=JSON.parse(localStorage.getItem('agirlik-takip-v1')||'{}').tema||'koyu';if(!JSON.parse(localStorage.getItem('agirlik-takip-v1')||'{}').temaV&&t==='acik')t='koyu';if(t!=='sistem')document.documentElement.dataset.theme=t}catch(e){}</script>
+<script>try{var j=JSON.parse(localStorage.getItem('agirlik-takip-v1')||'{}'),t=j.tema||'koyu';j=j.temaV;if(!j&&t==='acik')t='koyu';if(t!=='sistem')document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -29,6 +29,7 @@
   <div id="rest" hidden></div>
 </div>
 <div id="sheet" hidden></div>
+<div id="duyuru" class="sr" aria-live="polite"></div>
 <script src="hareketler.js"></script>
 <script src="app.js"></script>
 <script src="bulk.js"></script>
