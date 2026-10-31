@@ -183,7 +183,8 @@ function hesapla(bw, bulk, bugun, kcal) {
     varisAralik: durum === 'erken' || durum === 'veri' ? null : varisAralik(kalan, hiz, ay ? ay.se : 0),
     hedefKg: +bulk.hedefKg, basKg: +bulk.basKg,
     tdee: hr.tdee != null ? hr.tdee : null, ortKcal: hr.ortKcal != null ? hr.ortKcal : null,
-    hedefKcal: hr.tdee != null ? hedefKcalOf(hr.tdee, min, max) : null
+    /* ilk 14 gün ('erken') ve bayat tartıda ('veri') kalori önerisi yok: ekranda "14. günden sonra" yazarken sayı gösterilmesin */
+    hedefKcal: hr.tdee != null && durum !== 'erken' && durum !== 'veri' ? hedefKcalOf(hr.tdee, min, max) : null
   };
 }
 

@@ -143,8 +143,12 @@ function oneriler(h, bugun) {
     var bolge = (altVucut(son.ex) ? 'Alt vücut' : 'Üst vücut') + ': +' + AT.fmt(ek, 2) + ' kg';
     var x = { g: g, n: l.length };
     /* a7: bu hafta (Pzt'den beri) bu harekette kg zaten artırıldıysa ikinci kez artırma */
-    var onceki = l.length >= 2 ? calisma(l[l.length - 2].sets) : null, okg = onceki && onceki.length ? AT.num(onceki[0].kg) : 0;
-    var buHaftaArtti = son.date >= haftaBasi(bugun) && okg > 0 && kg > okg;
+    /* haftanın en yüksek çalışma kg'ı, haftadan önceki son seansınkiyle kıyaslanır (Pzt 60→62,5, Çrş 62,5 → Cuma'ya yine 62,5;
+       önceden yalnız son iki seans kıyaslandığı için Cuma'ya 65 çıkıyordu = haftada iki artış) */
+    var hb = haftaBasi(bugun), oncesi = l.filter(function (z) { return z.date < hb; }).pop();
+    var ow = oncesi ? calisma(oncesi.sets) : [], okg = ow.length ? AT.num(ow[0].kg) : 0;
+    var bkg = l.filter(function (z) { return z.date >= hb; }).reduce(function (t, z) { var w = calisma(z.sets); return Math.max(t, w.length ? AT.num(w[0].kg) : 0); }, 0);
+    var buHaftaArtti = okg > 0 && bkg > okg;
     var buyuk = ek / kg > BUYUK_ADIM;
 
     // deload: son 3 seans aynı kg'da ve tekrar ilerlemiyor

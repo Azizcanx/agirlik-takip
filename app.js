@@ -820,13 +820,17 @@ var islem = {
     e.sets.push(yeni); kaydet(true); render();
   },
   tamam: function (d) {
-    var e = S.active.exs[+d.e], s = e.sets[+d.s];
+    var e = S.active && S.active.exs[+d.e], s = e && e.sets[+d.s];
+    if (!s) return render();   /* ekran eski: yeniden çiz */
     if (s.done) { s.done = false; delete s.t; kaydet(true); return render(); }
     var wi = e.sets.slice(0, +d.s).filter(function (x) { return x.tip !== 'isinma'; }).length, p = s.tip === 'isinma' ? null : hedefPv(e.ad, oncekiSetler(e.ad), wi, e, +d.s);
     // ipucundan doldurma: Türkçe ondalık virgül (78,75); binlik ayıracı yok ki num() geri okuyabilsin
     if (s.kg === '' && p) s.kg = String(num(p.kg)).replace('.', ',');
     if (s.reps === '' && p) s.reps = String(num(p.reps));
     if (!(num(s.reps) > 0) || !(num(s.kg) >= 0)) return toast('kg ve tekrar gir');
+    /* düzenleme penceresiyle aynı sınırlar: 8,5 tekrar ya da 1500 kg sahte rekor yazmasın */
+    if (num(s.reps) % 1 || num(s.reps) > 200) return toast('Tekrar 1–200 arası tam sayı olmalı');
+    if (num(s.kg) > 1000) return toast('kg 0–1000 arası olmalı');
     if (S.rpe && s.rpe != null && String(s.rpe).trim() !== '') {   // RPE isteğe bağlı; girildiyse 6–10, 0,5 adım
       var r = num(s.rpe);
       if (!(r >= 6 && r <= 10)) return toast('RPE 6–10 arası olmalı (boş bırakabilirsin)');
@@ -898,7 +902,8 @@ var islem = {
   ice: function () { $('#dosya').click(); },
   'ice-kesin': function () { S = pendingImport; pendingImport = null; kaydet(); kapat(); temaUygula(); render(); toast('İçe aktarıldı'); },
   'demo-yukle': function () { var d = demoUret(); S.sessions = S.sessions.concat(d.sessions); S.bw = S.bw.concat(d.bw); S.kcal = (S.kcal || []).concat(d.kcal.filter(function (k) { return !(S.kcal || []).some(function (x) { return x.date === k.date; }); })); if (d.bulk && !S.bulk) S.bulk = d.bulk; kaydet(); render(); toast('Örnek veri yüklendi'); },
-  'demo-sil': function () { S.sessions = S.sessions.filter(function (s) { return !s.demo; }); S.bw = S.bw.filter(function (b) { return !b.demo; }); S.kcal = (S.kcal || []).filter(function (k) { return !k.demo; }); if (S.bulk && S.bulk.demo) S.bulk = null; secEgz = null; kaydet(); render(); toast('Örnek veri silindi'); },
+  'demo-sil': function () { S.kcalOneri = null;   /* örnek veriden türeyen haftalık kalori önerisi gerçek hedefte kalmasın */
+    S.sessions = S.sessions.filter(function (s) { return !s.demo; }); S.bw = S.bw.filter(function (b) { return !b.demo; }); S.kcal = (S.kcal || []).filter(function (k) { return !k.demo; }); if (S.bulk && S.bulk.demo) S.bulk = null; secEgz = null; kaydet(); render(); toast('Örnek veri silindi'); },
   'hepsini-sil': function () { onayla('Tüm veriler silinsin mi?', 'Antrenmanlar, kilo, kalori ve makrolar, takviyeler, defter notları, kilo hedefi, kendi eklediğin hareketler ve ayarlar kalıcı olarak silinir. Önce yedek almanı öneririm.', 'hepsini-kesin', 'Evet, hepsini sil'); },
   'hepsini-kesin': function () { S = bos(); kaydet(); secEgz = null; kapat(); temaUygula(); $('#rest').hidden = true; render(); toast('Tüm veriler silindi'); }
 };
@@ -945,7 +950,11 @@ document.addEventListener('input', function (ev) {
   var t = ev.target; if (t.id === 'din') { var n = parseInt(t.value, 10); if (n >= 10 && n <= 900) { S.dinlenme = n; kaydet(); } return; }
   if (t.id === 'seansnot' && S.active) { S.active.not = t.value; kaydet(true); return; }
   if (t.id === 'seansad' && S.active) { S.active.name = t.value.slice(0, 60); kaydet(true); return; }
-  if (t.dataset.f && S.active) { S.active.exs[+t.dataset.e].sets[+t.dataset.s][t.dataset.f] = t.value; kaydet(true); }
+  if (t.dataset.f && S.active) {
+    var ex = S.active.exs[+t.dataset.e], st = ex && ex.sets[+t.dataset.s];
+    if (!st) return render();   /* ekran eski (eşitleme değiştirdi): yazma, yeniden çiz */
+    st[t.dataset.f] = t.value; kaydet(true);
+  }
 });
 document.addEventListener('change', function (ev) {
   if (ev.target.id === 'egzsec') { secEgz = ev.target.value; render(); var g = $('#egzsec'); if (g) g.focus(); }
@@ -960,8 +969,9 @@ function odakla(sel) { var e = $(sel); if (e) { e.focus(); if (e.select) e.selec
 function setEnter(t) {
   var e = +t.dataset.e, s = +t.dataset.s, ins = t.closest('.setgrid').querySelectorAll('input'), i = Array.prototype.indexOf.call(ins, t);
   if (i < ins.length - 1) return odakla('input[data-e="' + e + '"][data-s="' + s + '"][data-f="' + ins[i + 1].dataset.f + '"]');
-  if (!S.active.exs[e].sets[s].done) islem.tamam({ e: String(e), s: String(s) });
-  if (!S.active || !S.active.exs[e].sets[s].done) return odakla('input[data-e="' + e + '"][data-s="' + s + '"][data-f="' + t.dataset.f + '"]');
+  var ex = S.active && S.active.exs[e]; if (!ex || !ex.sets[s]) return render();
+  if (!ex.sets[s].done) islem.tamam({ e: String(e), s: String(s) });
+  if (!S.active || !S.active.exs[e] || !S.active.exs[e].sets[s] || !S.active.exs[e].sets[s].done) return odakla('input[data-e="' + e + '"][data-s="' + s + '"][data-f="' + t.dataset.f + '"]');
   if (!odakla('input[data-e="' + e + '"][data-s="' + (s + 1) + '"][data-f="kg"]')) odakla('.addset[data-e="' + e + '"]');
 }
 function kisayolSheet() {
@@ -1001,7 +1011,14 @@ var AT = window.AT = {
 };
 Object.defineProperty(AT, 'S', { get: function () { return S; } });
 /* esitle.js: öbür cihazdan birleşen durumu uygula (tema gibi cihaza özel alanlar x içinde zaten bu cihazınki) */
-AT.yeniDurum = function (x) { S = Object.assign(bos(), x); kaydet(); temaUygula(); if (!yaziyor(document.activeElement)) render(); };   /* yazarken ekranı yenileme */
+/* süren antrenmanın yapısı (hareket adları ve set sayıları): eşitleme bunu değiştirirse ekrandaki data-e/data-s indeksleri eskir */
+function aktifImza(x) { var a = x && x.active; return a ? a.id + '|' + a.exs.map(function (e) { return e.ad + ':' + e.sets.length; }).join(',') : ''; }
+AT.yeniDurum = function (x) {
+  var once = aktifImza(S);
+  S = Object.assign(bos(), x); kaydet(); temaUygula();
+  /* yazarken ekranı yenileme (odak kaybolmasın); ama antrenmanın yapısı değiştiyse yine çiz, yoksa değer yanlış harekete yazılır */
+  if (!yaziyor(document.activeElement) || aktifImza(S) !== once) render();
+};
 
 document.addEventListener('DOMContentLoaded', function () {
   yukle(); temaUygula(); render(); unutulanKontrol();

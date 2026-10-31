@@ -215,7 +215,8 @@ function adEsle(ad) {
   }
   return ad;
 }
-function seansAnahtar(date, ad) { return date + '|' + String(ad || '').trim().toLocaleLowerCase('tr'); }
+/* antrenman anahtarı: tarih + ad; dosyada başlangıç saati varsa (Strong/Hevy) o da: aynı gün aynı adlı iki antrenman birleşmesin */
+function seansAnahtar(date, ad, ms) { return date + '|' + String(ad || '').trim().toLocaleLowerCase('tr') + (ms != null ? '|' + ms : ''); }
 
 /* Saf ayrıştırıcı: CSV metni + mevcut durum -> eklenecekler ve özet. S değiştirilmez.
    Dönüş: { hata } ya da { tip, ad, sessions, ozel, bw, setN, atlanan, satirAtlanan, lb } */
@@ -259,7 +260,9 @@ function iceCoz(text, S) {
   }
 
   var mevcut = {}, gruplar = {}, sira = [], lb = false;
-  (S.sessions || []).forEach(function (se) { mevcut[seansAnahtar(se.date, se.name)] = 1; });
+  /* kayıtlı antrenman: saati biliniyorsa tarih+ad+saat, bilinmiyorsa (elle ya da kendi CSV'mizden) tarih+ad ile eşleşir */
+  var zamansiz = {};
+  (S.sessions || []).forEach(function (se) { mevcut[seansAnahtar(se.date, se.name)] = 1; if (se.start != null) mevcut[seansAnahtar(se.date, se.name, se.start)] = 1; else zamansiz[seansAnahtar(se.date, se.name)] = 1; });
   veri.forEach(function (r) {
     var t = tarihCoz(al(r, c.tarih)), egz = b.tip === 'bizim' ? metin(al(r, c.egz)) : adEsle(metin(al(r, c.egz)));
     if (!t || !egz) { satirAtlanan++; return; }
@@ -271,7 +274,7 @@ function iceCoz(text, S) {
     kg = String(kgHam).trim() === '' ? 0 : sayiCoz(kgHam); /* boş ağırlık = vücut ağırlığı (0 kg) */
     if (!(reps > 0) || !(kg >= 0)) { satirAtlanan++; return; } /* kardiyo, süre, dinlenme satırları */
     if (lbSet) { kg = kg * LB; lb = true; }
-    var ad = metin(al(r, c.ad)) || 'Antrenman', k = seansAnahtar(t.date, ad), g = gruplar[k];
+    var ad = metin(al(r, c.ad)) || 'Antrenman', k = seansAnahtar(t.date, ad, t.ms), g = gruplar[k];
     if (!g) {
       g = gruplar[k] = { se: { id: AT.uid(), date: t.date, name: ad, exs: [] }, ex: {} };
       if (t.ms != null) g.se.start = t.ms;
@@ -294,7 +297,8 @@ function iceCoz(text, S) {
   var sessions = [], atlanan = 0, setN = 0, ozel = [], ozelVar = {};
   (S.ozel || []).forEach(function (o) { ozelVar[String(o.ad).toLocaleLowerCase('tr')] = 1; });
   sira.forEach(function (k) {
-    if (mevcut[k]) { atlanan++; return; }
+    var g0 = gruplar[k].se;
+    if (mevcut[k] || zamansiz[seansAnahtar(g0.date, g0.name)]) { atlanan++; return; }
     var se = gruplar[k].se; sessions.push(se);
     se.exs.forEach(function (ex) {
       setN += ex.sets.length;
