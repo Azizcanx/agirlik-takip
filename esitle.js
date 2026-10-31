@@ -19,8 +19,9 @@ function J(x) { return JSON.stringify(x === undefined ? null : x); }
 function veriAl(S) { var o = {}; VERI.forEach(function (k) { if (S[k] !== undefined) o[k] = S[k]; }); return o; }
 /* tekil değer: bu cihaz tabana göre değiştiyse o, değilse öbürü */
 function sec(b, l, r) { return J(l) !== J(b) ? l : r; }
-/* kimlikli liste: anahtar fn ile */
-function liste(b, l, r, ak) {
+/* kimlikli liste: anahtar fn ile. alanBazli: iki taraf da aynı kaydı değiştirdiyse alan alan birleştir
+   (kalori günlüğü: telefonda kcal, PC'de p/k/y girilse ikisi de kalır); değilse değişen tarafın kaydı */
+function liste(b, l, r, ak, alanBazli) {
   var key = function (x) { return x && x[ak] != null ? String(x[ak]) : null; };
   var mb = {}, ml = {}, mr = {}, sira = [];
   (b || []).forEach(function (x) { var k = key(x); if (k) mb[k] = x; });
@@ -29,7 +30,7 @@ function liste(b, l, r, ak) {
   var out = [];
   sira.forEach(function (k) {
     var vb = mb[k], vl = ml[k], vr = mr[k];
-    if (vl && vr) out.push(J(vl) !== J(vb) ? vl : vr);
+    if (vl && vr) out.push(alanBazli && J(vl) !== J(vb) && J(vr) !== J(vb) ? harita(vb, vl, vr) : J(vl) !== J(vb) ? vl : vr);
     else if (vl) { if (!vb || J(vl) !== J(vb)) out.push(vl); }      /* öbüründe yok: tabanda varsa orada silinmiş (bu cihazda değişmediyse sil) */
     else if (vr) { if (!vb || J(vr) !== J(vb)) out.push(vr); }      /* bu cihazda yok: tabanda varsa burada silinmiş */
   });
@@ -49,7 +50,7 @@ function harita(b, l, r) {
 function birlestir(b, l, r) {
   b = b || {}; var o = {};
   VERI.forEach(function (k) {
-    if (LISTE[k]) o[k] = liste(b[k], l[k], r[k], LISTE[k]);
+    if (LISTE[k]) o[k] = liste(b[k], l[k], r[k], LISTE[k], k === 'kcal');
     else if (k === 'takviye') {
       var tb = b[k] || {}, tl = l[k] || {}, tr = r[k] || {};
       o[k] = { liste: liste(tb.liste, tl.liste, tr.liste, 'id'), alinan: harita(tb.alinan, tl.alinan, tr.alinan) };
@@ -96,8 +97,10 @@ function coz(metin, sifre) {
 function ayar() { try { return JSON.parse(localStorage.getItem(LS_AYAR) || 'null'); } catch (e) { return null; } }
 function ayarYaz(a) { if (a) localStorage.setItem(LS_AYAR, JSON.stringify(a)); else localStorage.removeItem(LS_AYAR); }
 function istek(a, yol, yontem, govde) {
-  var b = govde ? JSON.stringify(govde) : undefined;
-  return fetch(API + yol, { method: yontem || 'GET', headers: { Authorization: 'Bearer ' + a.token, Accept: 'application/vnd.github+json' }, body: b, cache: 'no-store', keepalive: !!b && b.length < 60000 })
+  var b = govde ? JSON.stringify(govde) : undefined, ka = !!b && b.length < 60000;
+  var git = function (k) { return fetch(API + yol, { method: yontem || 'GET', headers: { Authorization: 'Bearer ' + a.token, Accept: 'application/vnd.github+json' }, body: b, cache: 'no-store', keepalive: k }); };
+  /* keepalive + CORS ön kontrolü bazı tarayıcılarda desteklenmez: hata olursa bir kez keepalive'sız dene */
+  return (ka ? git(true).catch(function () { return git(false); }) : git(false))
     .then(function (r) {
       if (r.status === 401) { var h = new Error('anahtar'); h.kod = 'anahtar'; throw h; }
       if (!r.ok) { var e = new Error('github ' + r.status); e.kod = 'ag'; throw e; }
