@@ -2,7 +2,7 @@
    Veri kullanıcının GitHub hesabında GİZLİ bir gist'te ("agirlik-takip-esitleme") durur; içerik kullanıcının
    şifresiyle şifrelenir (PBKDF2-SHA256 150k → AES-GCM 256; varsa gzip). Anahtar: yalnız "gist" yetkili GitHub token.
    Birleştirme üç yönlü: son eşitlenen hâl (taban) + bu cihaz + öbür cihaz. Kimlikli listelerde (antrenman, kilo,
-   kalori, takviye) yeni kayıtlar birleşir, bir cihazda silinen öbüründe de silinir; tekil alanlarda değişen taraf kazanır.
+   kalori, takviye, defter) yeni kayıtlar birleşir, bir cihazda silinen öbüründe de silinir; tekil alanlarda değişen taraf kazanır.
    Cihaza özel alanlar (tema vb.) eşitlenmez. Tetik: açılış, değişiklikten 15 sn sonra, pencereden çıkış/dönüş, "Şimdi eşitle".
    AT.bolum.esitle() → Ayarlar bölümü; AT.degisti() ← app.js kaydet(); AT.yeniDurum(S) → app.js durumu değiştirir. */
 (function (AT) {
@@ -10,8 +10,8 @@
 
 var LS_AYAR = 'agirlik-esit', LS_TABAN = 'agirlik-esit-taban', ACIKLAMA = 'agirlik-takip-esitleme', DOSYA = 'agirlik-takip.json';
 var API = 'https://api.github.com', TEL_ADRES = 'https://azizcanx.github.io/agirlik-takip/';
-var VERI = ['sessions', 'bw', 'kcal', 'ozel', 'takviye', 'bulk', 'active', 'dinlenme', 'dinlenmeEgz', 'rpe', 'ses', 'kcalOneri'];
-var LISTE = { sessions: 'id', bw: 'id', kcal: 'date', ozel: 'ad' };   /* kalori günde tek: tarihle */
+var VERI = ['sessions', 'bw', 'kcal', 'ozel', 'takviye', 'bulk', 'active', 'dinlenme', 'dinlenmeEgz', 'rpe', 'ses', 'kcalOneri', 'defter'];
+var LISTE = { sessions: 'id', bw: 'id', kcal: 'date', ozel: 'ad', defter: 'id' };   /* kalori günde tek: tarihle */
 var DESTEK = !!(window.crypto && crypto.subtle && window.fetch && window.TextEncoder);
 
 /* ---------- saf: birleştirme ---------- */

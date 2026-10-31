@@ -16,7 +16,7 @@ function kutuyla(id, deger, act) {
   e.value = deger; AT.islem[act]();
 }
 
-var SEKMELER = [['bugun', 'Bugün'], ['gecmis', 'Geçmiş'], ['ilerleme', 'İlerleme'], ['takviye', 'Takviye'], ['ayarlar', 'Ayarlar']];
+var SEKMELER = [['bugun', 'Bugün'], ['gecmis', 'Geçmiş'], ['ilerleme', 'İlerleme'], ['defter', 'Defter'], ['takviye', 'Takviye'], ['ayarlar', 'Ayarlar']];
 /* q -> [{ad, alt, f}] (ilk = Enter) */
 function oneriler(q) {
   var k = kucuk(q), o = [], S = AT.S, sayi = /^(kilo\s*)?(\d{2,3}([.,]\d)?)\s*(kg)?$/.exec(k), kc = /^(kalori|kcal)?\s*(\+?\s*\d{2,5})\s*(kcal|kalori)?$/.exec(k);

@@ -43,7 +43,7 @@ function $(s, r) { return (r || document).querySelector(s); }
 
 /* ---------- veri ---------- */
 var S;
-function bos() { return { v: 1, sessions: [], bw: [], kcal: [], takviye: { liste: [], alinan: {} }, ozel: [], active: null, dinlenme: 90, tema: 'koyu', temaV: 2, bulk: null }; }
+function bos() { return { v: 1, sessions: [], bw: [], kcal: [], takviye: { liste: [], alinan: {} }, defter: [], ozel: [], active: null, dinlenme: 90, tema: 'koyu', temaV: 2, bulk: null }; }
 function yukle() {
   try { var r = localStorage.getItem(KEY); S = r ? Object.assign(bos(), { temaV: 0 }, JSON.parse(r)) : bos(); } catch (e) { S = bos(); }
   /* tek seferlik: eski varsayılan açık temadan koyuya (Aziz: "açık çok göz alıyor"); sonra seçim kullanıcının */
@@ -585,7 +585,7 @@ var SOZLUK = [
   ['Makro', 'Protein, karbonhidrat ve yağ (gram). 1 g protein ve karbonhidrat 4 kcal, 1 g yağ 9 kcal eder; makroyla eklediğin öğünün kalorisi kendiliğinden hesaplanır.']
 ];
 function vAyarlar() {
-  var demoVar = S.sessions.some(function (s) { return s.demo; }) || S.bw.some(function (b) { return b.demo; }) || (S.kcal || []).some(function (k) { return k.demo; });
+  var demoVar = S.sessions.some(function (s) { return s.demo; }) || S.bw.some(function (b) { return b.demo; }) || (S.kcal || []).some(function (k) { return k.demo; }) || (S.defter || []).some(function (n) { return n && n.demo; });
   var o0 = '<h1>Ayarlar</h1><p class="sub">' + (AT.esitBagli && AT.esitBagli() ? 'Kayıtların bu cihazda ve şifreli olarak GitHub\'daki gizli dosyanda durur.' : 'Kayıtların yalnız bu cihazda durur; internete gönderilmez.') + '</p>';
   /* yedek, otomatik yedek, eşitleme ve Excel tek grupta; ayrıntılar katlanır (durumları özet satırında) */
   var a0 = '<h2>Yedek ve eşitleme</h2><div class="panel liste">' +
@@ -933,9 +933,9 @@ document.addEventListener('change', function (ev) {
   if (ev.target.id === 'egzsec') { secEgz = ev.target.value; render(); var g = $('#egzsec'); if (g) g.focus(); }
 });
 /* ---------- klavye (PC) ----------
-   1–5 sekme · N antrenman başlat / egzersiz ekle · ? kısayollar · Esc kapat
+   1–6 sekme · N antrenman başlat / egzersiz ekle · ? kısayollar · Esc kapat
    set satırında Enter: kg → tekrar → (RPE) → seti tamamla, sonraki setin kg'sine geç */
-var SEKME = { '1': 'bugun', '2': 'gecmis', '3': 'ilerleme', '4': 'takviye', '5': 'ayarlar' };
+var SEKME = { '1': 'bugun', '2': 'gecmis', '3': 'ilerleme', '4': 'defter', '5': 'takviye', '6': 'ayarlar' };
 function sekmeAc(t) { tab = t; render(); window.scrollTo(0, 0); }
 function yaziyor(t) { return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable); }
 function odakla(sel) { var e = $(sel); if (e) { e.focus(); if (e.select) e.select(); } return e; }
@@ -947,8 +947,8 @@ function setEnter(t) {
   if (!odakla('input[data-e="' + e + '"][data-s="' + (s + 1) + '"][data-f="kg"]')) odakla('.addset[data-e="' + e + '"]');
 }
 function kisayolSheet() {
-  var l = [['1 – 5', 'Bugün · Geçmiş · İlerleme · Takviye · Ayarlar'], ['N', 'Antrenmanı başlat / egzersiz ekle'], ['Enter', 'Set satırında: kg → tekrar → seti tamamla'],
-    ['Enter', 'Egzersiz aramada: ilk sonucu ekle'], ['Enter', 'Kilo ya da kalori alanında: kaydet'], ['Ctrl + K', 'Hızlı komut: 82,4 · +650 · bench · özet'], ['Esc', 'Pencereyi kapat'], ['?', 'Bu liste']];
+  var l = [['1 – 6', 'Bugün · Geçmiş · İlerleme · Defter · Takviye · Ayarlar'], ['N', 'Antrenmanı başlat / egzersiz ekle'], ['Enter', 'Set satırında: kg → tekrar → seti tamamla'],
+    ['Enter', 'Egzersiz aramada: ilk sonucu ekle'], ['Enter', 'Kilo ya da kalori alanında: kaydet'], ['Ctrl + Enter', 'Defterde: notu kaydet'], ['Ctrl + K', 'Hızlı komut: 82,4 · +650 · bench · özet'], ['Esc', 'Pencereyi kapat'], ['?', 'Bu liste']];
   sheet('<h3>Klavye kısayolları</h3><p class="mut">Bilgisayarda daha hızlı kayıt için.</p><dl class="kv">' + l.map(function (x) { return '<div><dt>' + h(x[1]) + '</dt><dd><kbd>' + h(x[0]) + '</kbd></dd></div>'; }).join('') +
     '</dl><div class="yigin" style="margin-top:18px"><button class="btn-big" data-act="kapat">Kapat</button></div>');
 }

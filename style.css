@@ -435,7 +435,8 @@ button.satir.tk:hover .tk-kutu{border-color:var(--acl)}
 .kcal-bugun b{color:var(--tx);font-variant-numeric:tabular-nums}
 .kcal-bugun .mini{margin-left:auto;margin-right:-12px;color:var(--mut)}
 .kcal-bugun{flex-wrap:wrap}
-.makro-bugun{font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums}
+.makro-bugun{font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;order:9;flex-basis:100%;margin-top:-2px}   /* kendi satırında: "Sıfırla" yukarıda kalsın */
+.kcal-bugun+.durum{margin-top:12px}
 /* makro girişi (bulk.js kcalGir): tek satır "Makro ile ekle"; açılınca Protein / Karb / Yağ + Ekle */
 details.makro{margin:6px 0 0}
 details.makro>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:36px;font-size:14px;color:var(--ac)}
@@ -543,6 +544,36 @@ details.katla.seansnot textarea{margin-bottom:12px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
+/* ---------- defter (defter.js) ----------
+   Çizgili yazı alanı (satır 26px, çizgiler yalnız yazı bölgesinde), notlar günlere göre: serif gün başlığı,
+   solda saat, sağda metin (satır sonları korunur). PC'de sol sütun (yazı + arama) yapışkan, notlar sağda. */
+.df-alan{line-height:26px;padding:13px 14px;min-height:106px;max-height:55vh;resize:none;overflow-y:hidden;
+  background:linear-gradient(transparent 25px,var(--line) 25px) 0 0/100% 26px content-box local,var(--s1)}
+.df-yaz .df-alan{margin:0 0 10px}
+#sheet .df-alan{margin:4px 0 16px}
+.df-ara{margin:16px 0 0;-webkit-appearance:none;appearance:none}
+#df-liste{margin-top:28px}
+h2.df-gun{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-.005em;margin:28px 0 6px}
+#df-liste>h2.df-gun:first-child{margin-top:0}
+.df-sonuc{font-size:14px;color:var(--mut);margin:0}
+.df-sonuc+h2.df-gun{margin-top:10px}
+button.satir.df-not{align-items:flex-start;gap:14px;min-height:0;padding:12px 0}
+button.satir.df-not::after{display:none}
+.df-saat{flex:none;width:40px;padding-top:2px;font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums}
+.df-metin{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:12;overflow:hidden}
+button.satir.df-not:hover .df-saat{color:var(--ac)}
+.df-not .tag{flex:none;margin-top:2px}
+.df-metin mark{background:var(--ac2);color:inherit;border-radius:3px}
+#df-liste>.btn-big{margin-top:8px}
+#tabs{grid-template-columns:repeat(6,1fr)}   /* 6 sekme */
+.kv kbd{white-space:nowrap}   /* kısayol listesinde "1 – 6" telefonda kırılmasın */
+@media (max-width:1023px){ #tabs button[data-tab]{font-size:12px;padding:0 2px} }
+@media (min-width:1024px){
+  .duzen.defter{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
+  .duzen.defter>.kol:first-child{position:sticky;top:24px}
+  #df-liste{margin-top:0}
+}
+
 /* ---------- masaüstü (PC) ----------
    Telefonda: marka, kısayol düğmesi ve <kbd> ipuçları gizli; .duzen alt alta (sıra aynı).
    ≥1024px: solda sabit menü, iki sütun (.duzen), ortada açılan pencere, sağ altta dinlenme sayacı. */
@@ -567,8 +598,9 @@ kbd{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--mut);back
   #tabs button[data-tab=bugun]::after{content:"1"}
   #tabs button[data-tab=gecmis]::after{content:"2"}
   #tabs button[data-tab=ilerleme]::after{content:"3"}
-  #tabs button[data-tab=takviye]::after{content:"4"}
-  #tabs button[data-tab=ayarlar]::after{content:"5"}
+  #tabs button[data-tab=defter]::after{content:"4"}
+  #tabs button[data-tab=takviye]::after{content:"5"}
+  #tabs button[data-tab=ayarlar]::after{content:"6"}
   #tabs .tema-dugme{display:flex;margin-top:auto;font-size:14px;color:var(--dim)}
   #tabs .tema-dugme svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
   #tabs .kisayol{display:flex;font-size:14px;color:var(--dim)}
