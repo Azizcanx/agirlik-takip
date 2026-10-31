@@ -77,13 +77,13 @@ function turet(sifre, tuz) {
 function akis(u8, tur) {   /* gzip varsa sıkıştır/aç */
   return new Response(new Blob([u8]).stream().pipeThrough(tur === 'z' ? new CompressionStream('gzip') : new DecompressionStream('gzip'))).arrayBuffer().then(function (a) { return new Uint8Array(a); });
 }
-function sifrele(obj, sifre) {
+function sifrele(obj, sifre, rev) {
   if (!sifTuz || sifTuz.sifre !== sifre) sifTuz = { sifre: sifre, tuz: crypto.getRandomValues(new Uint8Array(16)) };
   var tuz = sifTuz.tuz, iv = crypto.getRandomValues(new Uint8Array(12)), ham = new TextEncoder().encode(JSON.stringify(obj));
   var z = typeof CompressionStream === 'function';
   return Promise.all([anahtar(sifre, tuz), z ? akis(ham, 'z') : ham]).then(function (x) {
     return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, x[0], x[1]);
-  }).then(function (c) { return JSON.stringify({ v: 1, z: z ? 1 : 0, tuz: b64(tuz), iv: b64(iv), veri: b64(new Uint8Array(c)) }); });
+  }).then(function (c) { return JSON.stringify({ v: 1, rev: rev || 0, z: z ? 1 : 0, tuz: b64(tuz), iv: b64(iv), veri: b64(new Uint8Array(c)) }); });
 }
 function coz(metin, sifre) {
   var p = JSON.parse(metin);
@@ -124,23 +124,31 @@ function esitle(elle) {
   if (calisiyor) { bekliyor = true; return Promise.resolve(false); }
   if (!navigator.onLine && !elle) return Promise.resolve(false);
   calisiyor = true; ciz('Eşitleniyor…');
-  var yerel = veriAl(AT.S), uzakHam = null;
+  var yerel = veriAl(AT.S), uzakRev = 0, tabanRev = +a.rev || 0;
   return gistBul(a).then(function (id) {
     if (!id) return null;
-    a.gist = id; ayarYaz(a);
-    return uzakOku(a).then(function (m) { uzakHam = m; return m ? coz(m, a.sifre) : null; });
+    a.gist = id;
+    return uzakOku(a).then(function (m) {
+      if (!m) return null;
+      try { uzakRev = +JSON.parse(m).rev || 0; } catch (e) { uzakRev = 0; }
+      /* bayat okuma koruması: bu cihazın son gördüğünden eski sürüm geldiyse (önbellek/vekil) birleştirme yok, kayıt silinmez */
+      if (uzakRev < tabanRev) { var h = new Error('bayat'); h.kod = 'ag'; throw h; }
+      return coz(m, a.sifre);
+    });
   }).then(function (uzak) {
+    if (!ayar()) return false;   /* eşitleme bu arada kaldırıldıysa hiçbir şey yazma */
     var son = uzak ? birlestir(taban(), yerel, uzak) : yerel;
-    var yaz = !uzak || J(son) !== J(uzak), yerelDegisti = J(son) !== J(yerel);
-    return (yaz ? sifrele(son, a.sifre).then(function (m) {
+    var yaz = !uzak || J(son) !== J(uzak), yerelDegisti = J(son) !== J(yerel), yeniRev = yaz ? Math.max(uzakRev, tabanRev) + 1 : uzakRev;
+    return (yaz ? sifrele(son, a.sifre, yeniRev).then(function (m) {
       var govde = { files: {} }; govde.files[DOSYA] = { content: m };
       if (a.gist) return istek(a, '/gists/' + a.gist, 'PATCH', govde);
       govde.description = ACIKLAMA; govde.public = false;
       return istek(a, '/gists', 'POST', govde).then(function (g) { a.gist = g.id; ayarYaz(a); });
     }) : Promise.resolve()).then(function () {
+      if (!ayar()) return false;
       localStorage.setItem(LS_TABAN, JSON.stringify(son));
       if (yerelDegisti) { uygulaniyor = true; try { AT.yeniDurum(Object.assign({}, AT.S, son)); } finally { uygulaniyor = false; } }
-      a.son = Date.now(); a.hata = null; ayarYaz(a); sonHata = null;
+      a.son = Date.now(); a.hata = null; a.rev = yeniRev; ayarYaz(a); sonHata = null;
       return yerelDegisti;
     });
   }).then(function (d) { calisiyor = false; ciz(); if (elle) AT.toast(d ? 'Eşitlendi, yeni kayıtlar geldi' : 'Eşitlendi'); if (bekliyor) { bekliyor = false; planla(2000); } return d; },
