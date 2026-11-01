@@ -1910,6 +1910,27 @@ document.addEventListener('keydown', function (ev) {
   if (ev.key === '?') { ev.preventDefault(); kisayolSheet(); }
 });
 
+/* setdil.js (doğal dille set): setler süren antrenmana bitmiş (✓) olarak yazılır; aynı tipte boş bekleyen set satırı varsa
+   o dolar, yoksa sona eklenir. Rekor duyurusu ve dinlenme sayacı ✓ akışıyla aynı. tam: antrenman yeni kurulduysa tam kayıt */
+function aktifSetEkle(ad, sets, tam) {
+  var a = S.active; if (!a || !sets.length) return -1;
+  var ei = -1; a.exs.forEach(function (e, i) { if (e.ad === ad) ei = i; });
+  if (ei < 0) { a.exs.push({ ad: ad, kas: kasOf(ad), sets: [] }); ei = a.exs.length - 1; }
+  var e = a.exs[ei], t = Date.now(), yer = [];
+  sets.forEach(function (x, k) {
+    var y = { kg: String(x.kg).replace('.', ','), reps: String(x.reps), done: true, t: t + k }, i = -1;
+    if (x.tip) y.tip = x.tip;
+    e.sets.forEach(function (s, j) { if (i < 0 && !s.done && String(s.kg).trim() === '' && String(s.reps).trim() === '' && (s.tip || '') === (y.tip || '')) i = j; });
+    if (i < 0) { e.sets.push(y); i = e.sets.length - 1; } else e.sets[i] = y;
+    yer.push(i);
+  });
+  sahne.i = ei; kaydet(tam ? undefined : true); render();
+  yer.forEach(function (si) { var rv = aktifRek[ei + '|' + si]; if (rv) duyur('Yeni rekor: ' + ad + (aktifRek['t' + ei + '|' + si] ? ', en çok tekrar ' + rv : ', tahmini max ~' + fmt(rv) + ' kg')); });
+  if (a.exs.every(function (x) { return x.sets.every(function (y) { return y.done; }); })) { clearInterval(restTimer); $('#rest').hidden = true; sahneDinlen(null); }
+  else if (sets.some(function (x) { return x.tip !== 'isinma'; })) { restEgz = ad; restBasla(dinlenmeOf(ad)); }
+  return ei;
+}
+
 /* ---------- modül arayüzü ----------
    bulk.js, notlar.js, disa.js bu nesneye kayıt olur (index.html'de app.js'ten sonra yüklenir).
    AT.bolum.<ad>() -> HTML döndürür, AT.islem['eylem'] = function (dataset) {} -> data-act tıklaması. */
@@ -1917,7 +1938,8 @@ var AT = window.AT = {
   islem: islem, bolum: {}, KAS: KAS, AYLAR: AYLAR, p2: p2, iso: iso, parse: parse, h: h, num: num, fmt: fmt, tarih: tarih, uid: uid,
   e1rm: e1rm, tahminiMax: tahminiMax, MAX_TEKRAR: MAX_TEKRAR, haftaBasi: haftaBasi, $: $, kaydet: kaydet, render: render, toast: toast, sheet: sheet, kapat: kapat, onayla: onayla,
   bitenSeanslar: bitenSeanslar, yapilanSetler: yapilanSetler, tumSetler: tumSetler, hacim: hacim, seansHacim: seansHacim, kasOf: kasOf, ikincilOf: ikincilOf, prHesapla: prHesapla,
-  cizgi: cizgi, cubuk: cubuk, sayData: sayData, indir: indir, bos: bosDurum, duyur: duyur, geriAl: geriAl, kol: kol, masaustu: masaustu
+  cizgi: cizgi, cubuk: cubuk, sayData: sayData, indir: indir, bos: bosDurum, duyur: duyur, geriAl: geriAl, kol: kol, masaustu: masaustu,
+  aktifSetEkle: aktifSetEkle, sonTarti: sonTarti, tartiKaydet: tartiKaydet, dinlenmeOf: dinlenmeOf
 };
 Object.defineProperty(AT, 'S', { get: function () { return S; } });
 AT.surum = function () { return surum; };   /* önbellek anahtarı (notlar.js, bulk.js) */

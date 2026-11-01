@@ -101,7 +101,8 @@ function gorunum() {
   var l = notlar(AT.S), bugun = AT.iso(new Date());
   var o = '<h1>Defter</h1><p class="sub">' + AT.h(tamTarih(bugun, bugun)) + (l.length ? ' · ' + l.length + ' not' : '') + '</p>';
   var a = '<div class="df-yaz"><textarea id="df-metin" class="df-alan" rows="3" maxlength="' + UZUN + '" placeholder="Aklına geleni yaz…" aria-label="Yeni not">' + AT.h(taslakOku()) + '</textarea>' +
-    '<div class="df-dugmeler"><button class="btn-ac btn-big" data-act="df-kaydet">Kaydet<kbd>Ctrl + Enter</kbd></button>' + (AT.bolum.kocDugme ? AT.bolum.kocDugme() : '') + '</div>' +
+    '<div class="df-dugmeler"><button class="btn-ac btn-big" data-act="df-kaydet">Kaydet<kbd>Ctrl + Enter</kbd></button>' + (AT.bolum.kocDugme ? AT.bolum.kocDugme() : '') +
+    (AT.setDil ? AT.setDil.mik('df-metin') : '') + '</div>' +
     (AT.bolum.kocAlt ? AT.bolum.kocAlt() : '') + '</div>';
   if (l.length > ARA_ESIK) a += '<input id="df-ara" class="df-ara" type="search" placeholder="Notlarda ara" aria-label="Notlarda ara" autocomplete="off" value="' + AT.h(aramaQ) + '">';
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { boyutla(AT.$('#df-metin')); });   /* taslak varsa boyu */
@@ -109,9 +110,12 @@ function gorunum() {
 }
 
 /* ---------- işlemler ---------- */
-AT.islem['df-kaydet'] = function () {
-  var e = AT.$('#df-metin'), m = temizle(e ? e.value : '');
+AT.islem['df-kaydet'] = function (d) {
+  var e = AT.$('#df-metin'), m = temizle(e ? e.value : ''), not = d && d.not;
+  if (not) AT.kapat();   /* setdil.js seçim penceresinden "Not olarak kaydet" */
   if (!m) { AT.toast('Önce bir şey yaz'); if (e && e.focus) e.focus(); return; }
+  /* setdil.js: metin güçlü biçimde set ("curl 3x10 15") ya da soruysa önce seçim; yanlışlıkla notlar set olmasın */
+  if (!not && AT.setDil && AT.setDil.defterOnce(m)) return;
   var t = Date.now();
   veri(AT.S).push({ id: AT.uid(), t: t, d: AT.iso(new Date(t)), metin: m });
   taslakYaz(''); aramaQ = '';   /* yeni not aramaya takılıp gizlenmesin */

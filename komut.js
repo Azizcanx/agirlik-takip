@@ -49,7 +49,9 @@ function oneriler(q) {
     Object.keys(gor).filter(function (ad) { var x = (window.HAREKETLER || []).filter(function (y) { return y.ad === ad; })[0]; return (kucuk(ad) + ' ' + kucuk(x && x.tr)).indexOf(k) >= 0; })
       .slice(0, 5).forEach(function (ad) { o.push({ ad: ad, alt: 'gelişimini gör', f: function () { AT.kapat(); sekme('ilerleme'); AT.islem['egz-sec']({ ad: ad }); } }); });
   }
-  return o.slice(0, 8);
+  /* setdil.js: "curl 3x10 15", "bir set daha", "bench rekorum" → başa; koç yedeği / "Anlayamadım" sona */
+  var sd = AT.setDil ? AT.setDil.komutOneri(q) : [[], []];
+  return sd[0].concat(o.slice(0, Math.max(0, 8 - sd[0].length - sd[1].length)), sd[1]);
 }
 
 var liste = [];
@@ -60,7 +62,8 @@ function ciz() {
   }).join('') : '<p class="mut">Eşleşen komut yok</p>';
 }
 function ac() {
-  AT.sheet('<input id="komut" class="komut-kutu" placeholder="Komut yaz: 82,4 · +650 · bench · özet" autocomplete="off" aria-label="Hızlı komut"><div id="komut-liste" class="liste komut-liste"></div>');
+  AT.sheet('<div class="komut-ust"><input id="komut" class="komut-kutu" placeholder="Komut yaz: 82,4 · +650 · curl 3x10 15" autocomplete="off" aria-label="Hızlı komut">' +
+    (AT.setDil ? AT.setDil.mik('komut') : '') + '</div><div id="komut-liste" class="liste komut-liste"></div>');
   var e = AT.$('#komut'); e.addEventListener('input', ciz); e.focus(); ciz();
 }
 AT.islem['komut-sec'] = function (d) { var x = liste[+d.i]; if (x) x.f(); };

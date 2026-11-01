@@ -1964,3 +1964,21 @@ kbd{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--mut);back
   .duzen.bugun>.b-not>h2:first-child,.duzen.bugun>.b-son>h2:first-child,.duzen.bugun>.b-tarti>h2:first-child{margin-top:0}
   .duzen.bugun .notlar summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
 }
+
+/* ---------- Doğal dille kayıt (setdil.js): önizleme, cevap, mikrofon ---------- */
+.sd-grup{padding:12px 14px;margin:0 0 10px}
+.sd-grup.kapali{opacity:.5}
+.sd-ust{display:flex;align-items:center;gap:10px;min-height:32px}
+.sd-ust input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--ac);flex:none}
+.sd-alt{margin:2px 0 6px;color:var(--mut);font-size:14px}
+.sd-tek{display:flex;align-items:center;gap:6px;color:var(--mut);white-space:nowrap}
+.sd-tek input{width:92px;text-align:right}
+.sd-hedef{margin:4px 0 0;font-size:14px}
+.sd-cevap{font-size:17px;line-height:1.5;margin:4px 0 8px}
+.komut-ust{display:flex;gap:8px;align-items:stretch;padding-right:46px}   /* sağ üstteki × ile çakışmasın */
+.komut-ust .komut-kutu{flex:1 1 auto;min-width:0}
+.mik{flex:none;width:52px;min-height:52px;padding:0;display:inline-grid;place-items:center;border-radius:var(--r)}
+.mik svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.mik.dinliyor{color:var(--on-ac);background:var(--ac);border-color:var(--ac);animation:sd-nabiz 1.2s ease-in-out infinite}
+@keyframes sd-nabiz{50%{box-shadow:0 0 0 6px var(--ac2)}}
+@media (prefers-reduced-motion:reduce){.mik.dinliyor{animation:none}}

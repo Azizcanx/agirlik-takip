@@ -589,8 +589,8 @@ AT.islem['bulk-bitir'] = function () {
   AT.onayla('Hedef bitirilsin mi?', 'Hedef ayarları silinir; kilo kayıtların kalır.', 'bulk-bitir-kesin', 'Hedefi bitir');
 };
 AT.islem['bulk-bitir-kesin'] = function () { AT.S.bulk = null; AT.kaydet(); AT.kapat(); AT.render(); AT.toast('Hedef bitti'); };
-AT.islem['kcal-ekle'] = function () {
-  var e = AT.$('#kcalgir'), ham = e ? String(e.value).trim().replace(/\s|\./g, '') : '';
+AT.islem['kcal-ekle'] = function (d) {
+  var e = AT.$('#kcalgir'), ham = d && d.v != null ? String(d.v).replace(/\s|\./g, '') : e ? String(e.value).trim().replace(/\s|\./g, '') : '';   /* d.v: setdil.js "650 kalori yedim" */
   var ekle = /^\+/.test(ham), v = AT.num(ham.replace(/^\+/, ''));
   var bugun = AT.iso(new Date()), k = kcalBugun(bugun), yeni = ekle ? (k && !k.demo ? +k.kcal || 0 : 0) + v : v;   /* örnek kaloriye eklenmez */
   if (!(v > 0) || v > 10000) return AT.toast('Kaloriyi 1–10.000 arası gir (öğün için +650)');

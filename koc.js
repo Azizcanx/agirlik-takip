@@ -516,6 +516,8 @@ AT.islem['koc-sor'] = function (d) {
   var a = ayar(); if (!a || !bagli()) return;
   var e = AT.$('#df-metin'), cip = !!(d && d.q), soru = temizle(cip ? d.q : e ? e.value : '').slice(0, 2000);
   if (!soru) { AT.toast('Önce sorunu yaz'); if (e && e.focus) e.focus(); return; }
+  /* setdil.js: set kalıbı ("curl 3x10 15") → koça gitmeden önizleme; "bench rekorum" → kural cevabı (limit harcamaz) */
+  if (!cip && AT.setDil && AT.setDil.kocOnce(soru)) return;
   if (SAG[a.s].tur === 'web') return webSor(a.s, soru, cip ? null : e);
   if (is && is.durum === 'bekle') return AT.toast('Koç hâlâ düşünüyor');
   var bu = is = { soru: soru, s: a.s, metin: '', durum: 'bekle' };
@@ -621,6 +623,13 @@ AT.kocSatir = function (n, ts, saatYazi, vurgula) {
 var eskiHepsi = AT.islem['hepsini-kesin'];
 AT.islem['hepsini-kesin'] = function (d) { iptalEt(); ayarYaz(null); secim = null; yazilan = ''; deneme = null; if (eskiHepsi) return eskiHepsi(d); };
 AT.kocBagli = bagli;
+/* setdil.js yedeği: koçtan yalnız JSON. Yalnız API ya da PC yerel koç (anahtarsız web modunda cevap uygulamaya dönmez) */
+AT.kocJsonVar = function () { var a = ayar(); return !!a && bagli() && SAG[a.s].tur !== 'web'; };
+AT.kocJson = function (istem) {
+  var a = ayar(); if (!AT.kocJsonVar()) return Promise.reject(hata('kapali'));
+  var sis = 'Yalnız geçerli JSON döndür; açıklama ya da kod bloğu yazma.';
+  return (SAG[a.s].tur === 'yerel' ? codexCagir(a.s, sis + '\n\n' + istem, {}) : cagir(a.s, a.a, a.m, sis, istem, {})).then(function (r) { return String(r && r.metin || ''); });
+};
 AT.kocLink = function () { var a = ayar(); return a && SAG[a.s].tur !== 'yerel' ? (a.a ? { s: a.s, a: a.a } : { s: a.s }) : null; };
 /* PC'den gelen linkteki koç ayarı: bu cihazda koç yoksa alınır (var olanın üstüne yazılmaz) */
 AT.kocAl = function (k) {
