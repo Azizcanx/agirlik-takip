@@ -7,7 +7,7 @@
      Sayfa önbellekten açıldıysa aynı yüklemedeki dosyalar da önbellekten gelir (beklemesin, sürümler karışmasın).
    - Kurulum HTTP önbelleğini atlar (cache: 'reload'): yeni sürüm eski dosyalarla kurulmasın.
    Test: Temp/agt/sw-test.js (sahte fetch/caches) ve yavaş/kopuk sunucuyla tarayıcıda. */
-const V = 'agirlik-v49';
+const V = 'agirlik-v50';
 const DOSYALAR = ['./', 'index.html', 'style.css', 'hareketler.js', 'app.js', 'bulk.js', 'halka.js', 'notlar.js', 'disa.js', 'excel.js', 'ekstra.js', 'pc.js', 'takviye.js', 'defter.js', 'koc.js', 'duzenle.js', 'ozet.js', 'haftalik.js', 'komut.js', 'setdil.js', 'esitle.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 const BEKLE = 3000, ONBELLEK_MODU = 15000;
 let onbellekten = 0;   /* son sayfa önbellekten açıldıysa zamanı */

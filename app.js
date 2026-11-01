@@ -52,7 +52,7 @@ function yukle() {
   /* tek seferlik: eski varsayılan açık temadan koyuya (Aziz: "açık çok göz alıyor"); sonra seçim kullanıcının */
   if (!S.temaV) { if (S.tema === 'acik') S.tema = 'koyu'; S.temaV = 2; }
   /* tek seferlik (v42): sade varsayılan Koyu; otomatik Apple'a alınanlar (temaV 3) bir kez Koyu'ya döner; Apple Ayarlar'dan seçilebilir */
-  if (S.temaV < 4) { if (S.temaV < 3 || S.tema === 'apple') S.tema = 'koyu'; S.temaV = 4; }
+  if (S.temaV < 4) { if (S.tema === 'apple') S.tema = 'koyu'; S.temaV = 4; }   /* yalnız otomatik Apple döner; açık/sistem seçimleri kalır, Ayarlar'dan seçilen Apple temaV 4 ile kalır */
   /* süren antrenmanın son hâli ayrı anahtardaysa (kaydet(true)) onu al; antrenman bittiyse eski kopya yok sayılır */
   try { var a = JSON.parse(localStorage.getItem(KEY_AKTIF) || 'null'); if (a && S.active && a.id === S.active.id) S.active = a; } catch (e) { }
 }

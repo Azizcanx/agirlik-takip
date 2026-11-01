@@ -404,6 +404,10 @@ function satirHtml(x, i, cok) {
         '<input inputmode="numeric"' + a + ' data-sf="reps" value="' + AT.h(s.reps) + '" aria-label="' + AT.h(x.ad) + ' set ' + (k + 1) + ' tekrar">' +
         '<button class="done dz-sil" data-act="sd-set-sil"' + a + ' aria-label="Seti çıkar">×</button></div>';
     });
+  } else if (x.tur === 'makro') {
+    o += '<div class="sd-ust">' + sec + '<b class="grow">Makro</b><span class="sd-tek">' + [['p', 'Protein'], ['k', 'Karb'], ['y', 'Yağ']].map(function (a) {
+      return '<input inputmode="decimal" data-sd="' + i + '" data-sf="' + a[0] + '" value="' + AT.h(x[a[0]]) + '" placeholder="0" aria-label="' + a[1] + ' gram" size="3"> ' + a[0].toLocaleUpperCase('tr'); }).join(' ') + ' g</span></div>' +
+      '<p class="sd-alt">' + AT.h(makroKcalYaz(x) + ' · bugünün toplamına eklenir') + '</p>';
   } else if (x.tur === 'kilo' || x.tur === 'kcal') {
     var kilo = x.tur === 'kilo';
     o += '<div class="sd-ust">' + sec + '<b class="grow">' + (kilo ? 'Tartı' : 'Kalori') + '</b><span class="sd-tek">' + (kilo ? '' : '+') +
@@ -457,6 +461,19 @@ function setleriOku(x) {
   }
   return out;
 }
+function makroOku(x) {
+  var m = {}, hata = '';
+  ['p', 'k', 'y'].forEach(function (a) {
+    var t = String(x[a] == null ? '' : x[a]).trim(); if (!t) return;
+    var n = AT.num(t); if (!(n >= 0 && n <= 1000)) hata = 'Makro 0–1000 g arası olmalı'; else if (n > 0) m[a] = n;
+  });
+  if (!hata && !Object.keys(m).length) hata = 'En az bir makro yaz (gram)';
+  return hata ? hata : m;
+}
+function makroKcalYaz(x) {
+  var m = makroOku(x); if (typeof m === 'string') return '';
+  return '≈ ' + AT.fmt(Math.round((m.p || 0) * 4 + (m.k || 0) * 4 + (m.y || 0) * 9), 0) + ' kcal';
+}
 function uygula() {
   if (!on) return;
   var S = AT.S, l = on.satirlar.filter(function (x) { return !x.kapali; });
@@ -467,6 +484,7 @@ function uygula() {
     if (x.tur === 'set') { var s = setleriOku(x); if (typeof s === 'string') return AT.toast(s); if (!s.length) continue; y.sets = s; }
     else if (x.tur === 'kilo') { y.v = AT.num(x.v); if (!(y.v > 20 && y.v < 400)) return AT.toast('Tartı 20–400 kg arası olmalı'); }
     else if (x.tur === 'kcal') { y.v = AT.num(String(x.v).replace(/[\s.]/g, '')); if (!(y.v > 0 && y.v <= 10000)) return AT.toast('Kaloriyi 1–10.000 arası gir'); }
+    else if (x.tur === 'makro') { y.m = makroOku(x); if (typeof y.m === 'string') return AT.toast(y.m); }
     if ((x.aktif || x.ref || x.tur === 'dinlen') && !S.active) return AT.toast('Süren antrenman yok');
     hazir.push(y);
   }
@@ -474,7 +492,7 @@ function uygula() {
   /* geçmiş güne yazılacak set satırları ayrı gider (o günün antrenmanına eklenir ya da yeni biten antrenman olur) */
   var gec = hazir.filter(function (y) { return y.x.tur === 'set' && y.x.tarih && y.x.tarih < bugun(); });
   if (gec.length) hazir = hazir.filter(function (y) { return gec.indexOf(y) < 0; });
-  var ant = hazir.filter(function (y) { return y.x.tur !== 'kilo' && y.x.tur !== 'kcal'; });
+  var ant = hazir.filter(function (y) { return y.x.tur !== 'kilo' && y.x.tur !== 'kcal' && y.x.tur !== 'makro'; });
   var eski = { active: kopya(S.active), sessions: S.sessions.slice(), bw: S.bw, kcal: kopya(S.kcal || []), din: S.dinlenmeEgz ? Object.assign({}, S.dinlenmeEgz) : null };
   /* bugün bitmiş antrenmana: önce doğrula, sonra hiçbir şey yazılmadıysa dur */
   var seans = null, seansI = -1;
@@ -508,8 +526,10 @@ function uygula() {
   }
   var kaynak = on.kaynak, yzOn = !!on.yz; on = null; AT.kapat();
   var ozet = [], setSay = 0, detay = [];
+  var makroHata = false;
   hazir.forEach(function (y) {
-    if (y.x.tur === 'kilo') { AT.tartiKaydet(y.v); ozet.push('tartı ' + AT.fmt(y.v) + ' kg'); }
+    if (y.x.tur === 'makro') { if (AT.makroEkle(y.m, true)) ozet.push('+' + AT.fmt(Math.round((y.m.p || 0) * 4 + (y.m.k || 0) * 4 + (y.m.y || 0) * 9), 0) + ' kcal (' + ['p', 'k', 'y'].filter(function (a) { return y.m[a]; }).map(function (a) { return a.toLocaleUpperCase('tr') + ' ' + AT.fmt(y.m[a], 0); }).join(' · ') + ' g)'); else makroHata = true; }
+    else if (y.x.tur === 'kilo') { AT.tartiKaydet(y.v); ozet.push('tartı ' + AT.fmt(y.v) + ' kg'); }
     else if (y.x.tur === 'kcal') { AT.islem['kcal-ekle']({ v: '+' + Math.round(y.v) }); ozet.push('+' + AT.fmt(Math.round(y.v), 0) + ' kcal'); }
   });
   gecSeans.forEach(function (g) {
@@ -584,7 +604,7 @@ var TARIHLI = /\b(dun|evvelki|onceki gun|gecen|pazartesi|sali|carsamba|persembe|
 /* metin kayıt gibi mi (sayı + set/tekrar/kilo/kalori/tartı)? Yalnız o zaman yapay zekâya gider; düz not gitmez */
 function kayitBenzeri(metin) {
   var n = normal(metin); if (!/\d/.test(n)) return false;
-  return /\b(set\w*|tekrar\w*|rep\w*|kg|kilo\w*|kcal|kalori\w*|tart\w*)\b|\dx\d/.test(n);
+  return /\b(set\w*|tekrar\w*|rep\w*|kg|kilo\w*|kcal|kalori\w*|tart\w*|protein\w*|karb\w*|karbonhidrat\w*|yag\w*|makro\w*)\b|\dx\d/.test(n);
 }
 /* kural çözümü yeterli mi? false → yapay zekâ denenir (varsa) */
 function eminMi(r, metin) {
@@ -633,6 +653,15 @@ function yzDogrula(c) {
     } else if (e.tur === 'kcal') {
       if (typeof e.kcal !== 'number' || !(e.kcal >= 1 && e.kcal <= 10000)) return null;
       satir.push({ tur: 'kcal', v: String(Math.round(e.kcal)) });
+    } else if (e.tur === 'makro') {
+      var mk = {}, say = 0;
+      ['p', 'k', 'y'].forEach(function (a) {
+        var v = e[a]; if (v == null || v === 0) return;
+        if (typeof v !== 'number' || !(v > 0 && v <= 1000)) { say = -99; return; }
+        mk[a] = Math.round(v * 10) / 10; say++;
+      });
+      if (say < 1) return null;
+      satir.push({ tur: 'makro', p: mk.p != null ? String(mk.p).replace('.', ',') : '', k: mk.k != null ? String(mk.k).replace('.', ',') : '', y: mk.y != null ? String(mk.y).replace('.', ',') : '' });
     } else if (e.tur === 'set') {
       if (typeof e.hareket !== 'string' || !e.hareket.trim() || e.hareket.length > 80 || !Array.isArray(e.setler) || !e.setler.length || e.setler.length > 20) return null;
       var tarih = e.tarih == null || e.tarih === '' ? bg : e.tarih;
@@ -679,10 +708,11 @@ function yzIstem(metin) {
   var adlar = (window.HAREKETLER || []).map(function (x) { return x.ad; }).concat((AT.S.ozel || []).map(function (x) { return x.ad; }));
   adlar = adlar.filter(function (x, i) { return x && adlar.indexOf(x) === i; });
   return 'Sen bir spor salonu kayıt asistanısın. Kullanıcının Türkçe notunu uygulamanın tablolarına yazılacak eylemlere çevir. Yalnız şu JSON biçimini yaz:\n' +
-    '{"eylemler":[{"tur":"set","hareket":"<HAREKET LİSTESİNDEN aynen>","setler":[{"kg":10,"reps":8}],"tarih":"YYYY-MM-DD"},{"tur":"kilo","kg":82.4},{"tur":"kcal","kcal":700}],"soru":null}\n' +
+    '{"eylemler":[{"tur":"set","hareket":"<HAREKET LİSTESİNDEN aynen>","setler":[{"kg":10,"reps":8}],"tarih":"YYYY-MM-DD"},{"tur":"kilo","kg":82.4},{"tur":"kcal","kcal":700},{"tur":"makro","p":40,"k":80,"y":20}],"soru":null}\n' +
     'Kurallar: "3 set 60 kilo 8 tekrar" = setler listesinde 3 öğe (her biri kg 60, reps 8). "ilk set"/"son set" gibi tek set söylenirse tek öğe yaz (uygulama sıradaki boş seti doldurur). ' +
     'kg ya da reps söylenmediyse null yaz (uygulama son değerlerden kendisi tamamlar; bunun için soru sorma). tarih yoksa yazma (bugün); "dün" = bugünden bir önceki gün, gün adı = en yakın geçmiş o gün. Gelecek tarih yazma. ' +
     'Hareket adı listede yoksa en yakın listedeki hareketi seç (ör. "fly" için kullanıcının daha önce yaptığı fly hareketi, yoksa Dumbbell Fly); yalnız hareket gerçekten belirsizse eylemler boş, soru alanına kısa bir Türkçe soru yaz. ' +
+    'Protein/karbonhidrat/yağ gram olarak söylenirse tek "makro" eylemi yaz (p=protein, k=karbonhidrat, y=yağ gram; söylenmeyen alanı yazma; kalori bu üçünden uygulama hesaplar, ayrıca kcal eylemi ekleme). Söylenen kalori varsa ayrı "kcal" eylemi. ' +
     'Sayı uydurma. Kayıt değilse (düz not/soru) {"eylemler":[],"soru":null}. Açıklama, kod bloğu yazma.\n' +
     'BAĞLAM: ' + JSON.stringify(yzBaglam()) + '\nHAREKET LİSTESİ: ' + adlar.join(', ') + '\nNOT: ' + String(metin).slice(0, 300);
 }
@@ -692,6 +722,9 @@ function yzHataMetni(e) {
     k === 'cx-mesgul' ? 'Koç başka bir soruyu cevaplıyor; birazdan tekrar dene, hiçbir şey eklenmedi' :
     k === 'kapali' || k === 'cx-kapali' || k === 'cx-yok' ? 'Yapay zekâya ulaşılamadı; hiçbir şey eklenmedi' : 'Anlayamadım; hiçbir şey eklenmedi';
 }
+var bekleTik = null;
+/* sn: geçen saniye. 8 sn'den sonra "uyanıyor" (ChatGPT/Codex ilk çağrıda soğuk başlayabilir) */
+function bekleYazi(sn) { return sn >= 8 ? 'ChatGPT uyanıyor… ' + sn + ' sn' : 'Anlıyorum…' + (sn >= 3 ? ' ' + sn + ' sn' : ''); }
 function bekleGoster(ac) {
   yzMesgul = ac;
   var d = AT.$ ? AT.$('[data-act="df-kaydet"]') : null;
@@ -701,7 +734,16 @@ function bekleGoster(ac) {
     if (ac) { kl.innerHTML = '<div class="yz-bekle" role="status"><span class="yz-nokta" aria-hidden="true"></span><span class="yz-yazi">Anlıyorum…</span></div>'; if (ki) ki.disabled = true; }
     else if (ki) { ki.disabled = false; if (typeof Event === 'function' && ki.dispatchEvent) ki.dispatchEvent(new Event('input')); }
   }
-  if (ac && !kl) AT.toast('Anlıyorum…', 90000);
+  if (bekleTik) { clearInterval(bekleTik); bekleTik = null; }
+  if (ac) {
+    var t0 = Date.now(); bekleTik = setInterval(function () {
+      var m = bekleYazi(Math.round((Date.now() - t0) / 1000));
+      var dd = AT.$ ? AT.$('[data-act="df-kaydet"][aria-busy]') : null; if (dd) dd.textContent = m;
+      var yy = typeof document !== 'undefined' && document.querySelector ? document.querySelector('.yz-yazi') : null; if (yy) yy.textContent = m;
+      var tt = typeof document !== 'undefined' && document.querySelector ? document.querySelector('.toast.yz-toast') : null; if (tt) tt.textContent = m;
+    }, 1000);
+  }
+  if (ac && !kl) { var tz = AT.toast('Anlıyorum…', 90000); if (tz && tz.classList) tz.classList.add('yz-toast'); }
   else if (typeof document !== 'undefined' && document.querySelectorAll) Array.prototype.forEach.call(document.querySelectorAll('.toast'), function (x) { x.remove(); });
 }
 function soruGoster(soru, kaynak, metin) {
@@ -733,7 +775,7 @@ function yz(metin, kaynak) {
 function kuralYaz(r, kaynak, metin) {
   var set = r.satirlar.filter(function (x) { return x.tur === 'set'; });
   var guvenli = r.guclu && !!AT.S.active && !TARIHLI.test(normal(metin)) && !set.some(function (x) { return x.tarih || (x.eksik && x.eksik.length); }) &&
-    r.satirlar.every(function (x) { return x.tur === 'set' || x.tur === 'kilo' || x.tur === 'kcal'; });
+    r.satirlar.every(function (x) { return x.tur === 'set' || x.tur === 'kilo' || x.tur === 'kcal' || x.tur === 'makro'; });
   if (!guvenli) return onizle(r, kaynak, metin);
   on = { satirlar: r.satirlar, kaynak: kaynak || '', metin: metin || '', yz: true }; uygula(); return true;
 }
@@ -752,6 +794,7 @@ function ozetYaz(r) {
       return x.ad + ' ' + (ayni ? s.length + '×' + s[0].reps : s.map(function (y) { return y.reps; }).join('-')) + (s[0].kg !== '' ? ' · ' + s[0].kg + ' kg' : ''); }
     if (x.tur === 'kilo') return 'tartı ' + x.v + ' kg';
     if (x.tur === 'kcal') return '+' + x.v + ' kcal';
+    if (x.tur === 'makro') return 'makro ' + ['p', 'k', 'y'].filter(function (a) { return x[a]; }).map(function (a) { return a.toLocaleUpperCase('tr') + ' ' + x[a]; }).join(' · ') + ' g';
     if (x.tur === 'dinlen') return 'dinlenme ' + x.ad;
     return x.tur === 'sil' ? 'son seti sil' : 'son seti düzelt';
   }).join(' + ');
@@ -852,10 +895,10 @@ if (typeof document !== 'undefined') document.addEventListener('input', function
   var t = ev.target; if (!on || !t || !t.dataset || t.dataset.sd == null) return;
   var x = on.satirlar[+t.dataset.sd]; if (!x) return;
   if (t.type === 'checkbox') { x.kapali = !t.checked; var s = t.closest && t.closest('.sd-grup'); if (s) s.classList.toggle('kapali', x.kapali); return; }
-  if (t.dataset.sf === 'v') x.v = t.value; else if (x.setler && x.setler[+t.dataset.sk]) x.setler[+t.dataset.sk][t.dataset.sf] = t.value;
+  if (t.dataset.sf === 'v') x.v = t.value; else if (x.tur === 'makro') x[t.dataset.sf] = t.value; else if (x.setler && x.setler[+t.dataset.sk]) x.setler[+t.dataset.sk][t.dataset.sf] = t.value;
 });
 
 AT.setAyristir = setAyristir;
 AT.setDil = { yz: yz, yzDene: yzDene, coz: coz, onizle: onizle, uygula: uygula, komutOneri: komutOneri, defterOnce: defterOnce, sade: sade, kocOnce: kocOnce, mik: mik, kocla: kocla };
-AT._setdil = { yzDogrula: yzDogrula, yzIstem: yzIstem, yzEsle: yzEsle, yzDirekt: yzDirekt, kayitBenzeri: kayitBenzeri, eminMi: eminMi, normal: normal, hareketBul: hareketBul, jsonDogrula: jsonDogrula, kocIstem: kocIstem, setBenzeri: setBenzeri, on: function () { return on; }, sonKg: sonKg };   /* test için */
+AT._setdil = { bekleYazi: bekleYazi, yzDogrula: yzDogrula, yzIstem: yzIstem, yzEsle: yzEsle, yzDirekt: yzDirekt, kayitBenzeri: kayitBenzeri, eminMi: eminMi, normal: normal, hareketBul: hareketBul, jsonDogrula: jsonDogrula, kocIstem: kocIstem, setBenzeri: setBenzeri, on: function () { return on; }, sonKg: sonKg };   /* test için */
 })(window.AT);

@@ -631,15 +631,22 @@ AT.islem['makro-ekle'] = function () {
     m[x[0]] = n;
   });
   if (hata) return AT.toast(hata);
-  if (!makroVar(m)) return AT.toast('En az bir makro yaz (gram)');
+  if (!AT.makroEkle(m)) return;
+  var p = AT.$('#mk-p'); if (p && AT.masaustu && AT.masaustu()) p.focus();
+};
+/* m: {p,k,y} gram. Bugünün S.kcal kaydına ekler (kcal = 4·4·9); false = reddedildi (toast gösterildi). setdil.js yapay zekâ yolu da bunu kullanır */
+AT.makroEkle = function (m, sessiz) {
+  if (!makroVar(m)) { AT.toast('En az bir makro yaz (gram)'); return false; }
+  MAKRO.forEach(function (x) { if (m[x[0]] != null && !(+m[x[0]] >= 0 && +m[x[0]] <= 1000)) m = null; });
+  if (!m) { AT.toast('Makro 0–1000 g arası olmalı'); return false; }
   var bugun = AT.iso(new Date()), eski = kcalBugun(bugun), ek = makroKcal(m);
-  if ((eski && !eski.demo ? +eski.kcal || 0 : 0) + ek > KCAL_MAX) return AT.toast('Günlük toplam çok yüksek');
+  if ((eski && !eski.demo ? +eski.kcal || 0 : 0) + ek > KCAL_MAX) { AT.toast('Günlük toplam çok yüksek'); return false; }
   var g = gunuGuncelle(bugun, function (x) {
     MAKRO.forEach(function (y) { if (m[y[0]] != null) x[y[0]] = Math.round(((+x[y[0]] || 0) + m[y[0]]) * 10) / 10; });
     x.kcal = Math.round((+x.kcal || 0) + ek);
   });
-  AT.kaydet(); AT.render(); AT.toast('Bugün ' + kcalSay(g.kcal) + ' · ' + makroYaz(g));
-  var p = AT.$('#mk-p'); if (p && AT.masaustu && AT.masaustu()) p.focus();
+  AT.kaydet(); AT.render(); if (!sessiz) AT.toast('Bugün ' + kcalSay(g.kcal) + ' · ' + makroYaz(g));
+  return true;
 };
 AT.islem['kcal-sil'] = function () {
   var bugun = AT.iso(new Date()), k = kcalBugun(bugun);

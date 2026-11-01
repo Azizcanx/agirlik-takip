@@ -245,7 +245,7 @@ function baglam(S, bugun, kisa) {
       dft.l.push('- ' + n.d + ' ' + saat(n.t) + ': ' + (n.koc ? '(koça sordu) ' + kisalt(n.koc.s, kisa ? 80 : 140) : kisalt(n.metin, kisa ? 100 : 220)));
     });
 
-  var bl = [genel, kilo, kal, ant, kas, har, not, dft, sea], butce = kisa ? BUTCE_KISA : BUTCE;
+  var bl = [genel, kilo, kal, ant, kas, har, not, dft, sea], butce = typeof kisa === 'number' ? kisa : kisa ? BUTCE_KISA : BUTCE;
   var KES = [sea, dft, not, har, kal, kilo];
   var m = metinOf(bl);
   while (bayt(m) > butce) {
@@ -557,7 +557,13 @@ AT.islem['koc-iptal'] = function () { if (!is) return; var s = is.soru; iptalEt(
 AT.islem['koc-tamam'] = function () { is = null; durumCiz(); if (!bagli()) yenile(); };
 
 /* ---------- anahtarsız mod (ChatGPT / Claude): pano + ?q= adresi ---------- */
-function webMetin(soru) { return SISTEM_KISA + '\n\nVERİ:\n' + baglam(AT.S, AT.iso(new Date()), true) + '\n\nSORU: ' + soru; }
+function webMetin(soru, butce) { return SISTEM_KISA + '\n\nVERİ:\n' + baglam(AT.S, AT.iso(new Date()), butce == null ? true : butce) + '\n\nSORU: ' + soru; }
+/* adres uzunluk sınırını aşarsa özet adım adım kısalır (önce 1500 → 900 → 450 → 0 bayt); pano her zaman tam kısa özetli metni alır. Soru tek başına sığmazsa yalnız site açılır */
+function webKur(s, soru) {
+  var tam = webMetin(soru), w = webAdres(s, tam), b = [900, 450, 0];
+  for (var i = 0; w.uzun && i < b.length; i++) { var m = webMetin(soru, b[i]), w2 = webAdres(s, m); if (!w2.uzun) w = w2; }
+  return { metin: tam, url: w.url, uzun: w.uzun, kisaltildi: !w.uzun && w.url !== webAdres(s, tam).url };
+}
 function webAdres(s, metin) { var p = SAG[s], u = p.q + encodeURIComponent(metin); return u.length <= URL_SINIR ? { url: u, uzun: false } : { url: p.bos, uzun: true }; }
 /* pano: clipboard API, olmazsa seçili textarea + execCommand; ikisi de olmazsa false */
 function kopyala(m) {
@@ -579,7 +585,7 @@ function panoPenceresi(s, metin) {
   var t = AT.$('#koc-pano'); if (t && t.select) { t.focus && t.focus(); t.select(); }
 }
 function webSor(s, soru, e) {
-  var p = SAG[s], metin = webMetin(soru), w = webAdres(s, metin);
+  var p = SAG[s], kur = webKur(s, soru), metin = kur.metin, w = kur;
   var k = kopyala(metin);   /* pano önce: sekme açılınca belge odağı kaybeder */
   try { window.open(w.url, '_blank', 'noopener'); } catch (x) {}
   notEkle(soru, '', s, s);
@@ -669,7 +675,7 @@ if (typeof document !== 'undefined') {
 }
 
 AT._koc = { SAG: SAG, SIRA: SIRA, SISTEM: SISTEM, LS: LS, URL_SINIR: URL_SINIR, BUTCE: BUTCE, BUTCE_KISA: BUTCE_KISA, ayar: ayar, ayarYaz: ayarYaz, bagli: bagli,
-  baglam: baglam, bayt: bayt, istekKur: istekKur, cagir: cagir, oku: oku, hataMetni: hataMetni, bicim: bicim, webMetin: webMetin, webAdres: webAdres, kopyala: kopyala,
+  baglam: baglam, bayt: bayt, istekKur: istekKur, cagir: cagir, oku: oku, hataMetni: hataMetni, bicim: bicim, webMetin: webMetin, webAdres: webAdres, webKur: webKur, kopyala: kopyala,
   codexDurum: codexDurum, codexSifirla: function () { codex = null; codexSorgu = null; }, codex: function () { return codex; },
   durum: function () { return is; }, zaman: function (ms) { ZAMAN = ms; }, codexZaman: function (ms) { CODEX_ZAMAN = ms; } };   /* test için */
 })(window.AT);
