@@ -233,7 +233,7 @@ function linkCoz(m) { return JSON.parse(decodeURIComponent(escape(atob(decodeURI
 function bagla(token, sifre) {
   token = String(token || '').trim(); sifre = String(sifre || '');
   var lm = /esitle=([^&\s#]+)/.exec(token);   /* PC'den gelen bağlantı linki yapıştırıldıysa anahtar + şifre ondan */
-  if (lm) { try { var lx = linkCoz(lm[1]); token = String(lx.t || ''); sifre = String(lx.s || ''); } catch (e) { return AT.toast('Bağlantı linki bozuk'); } }
+  if (lm) { try { var lx = linkCoz(lm[1]); token = String(lx.t || ''); sifre = String(lx.s || ''); if (lx.k && AT.kocAl) AT.kocAl(lx.k); } catch (e) { return AT.toast('Bağlantı linki bozuk'); } }
   if (!/^(gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}$/.test(token)) return AT.toast('GitHub anahtarı ghp_ ya da github_pat_ ile başlar');
   if (sifre.length < 6) return AT.toast('Şifre en az 6 karakter olmalı');
   ayarYaz({ token: token, sifre: sifre });
@@ -248,10 +248,12 @@ AT.islem['es-kaldir'] = function () {
   AT.onayla('Eşitleme kaldırılsın mı?', 'Bu cihazdaki kayıtlar yerinde kalır; GitHub\'daki gizli dosya silinmez.', 'es-kaldir-kesin', 'Kaldır');
 };
 AT.islem['es-kaldir-kesin'] = function () { ayarYaz(null); localStorage.removeItem(LS_TABAN); AT.kapat(); AT.render(); AT.toast('Eşitleme kaldırıldı'); };
-/* telefon için tek seferlik link: anahtar + şifre adresin # kısmında (sunucuya gitmez); açılınca kendiliğinden bağlanır */
+/* telefon için tek seferlik link: anahtar + şifre adresin # kısmında (sunucuya gitmez); açılınca kendiliğinden bağlanır.
+   Koç (koc.js) açıksa ayarı da (k) linkte; telefonda koç yoksa alınır */
+function linkVeri(a) { var o = { t: a.token, s: a.sifre }, k = AT.kocLink ? AT.kocLink() : null; if (k) o.k = k; return o; }
 AT.islem['es-link'] = function () {
   var a = ayar(); if (!a) return;
-  var link = TEL_ADRES + '#esitle=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify({ t: a.token, s: a.sifre })))));
+  var link = TEL_ADRES + '#esitle=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(linkVeri(a))))));
   var bitti = function () { AT.toast('Link kopyalandı; kendine gönder, telefonda aç'); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(bitti, function () { prompt('Linki kopyala:', link); });
   else prompt('Linki kopyala:', link);
@@ -261,7 +263,7 @@ AT.islem['es-link'] = function () {
 document.addEventListener('DOMContentLoaded', function () {
   var m = /[#&]esitle=([^&]+)/.exec(location.hash);
   if (m) {
-    try { var x = linkCoz(m[1]); history.replaceState(null, '', location.pathname + location.search); setTimeout(function () { bagla(x.t, x.s); }, 300); }
+    try { var x = linkCoz(m[1]); history.replaceState(null, '', location.pathname + location.search); setTimeout(function () { if (x.k && AT.kocAl) AT.kocAl(x.k); bagla(x.t, x.s); }, 300); }
     catch (e) { AT.toast('Bağlantı linki bozuk'); }
     return;
   }

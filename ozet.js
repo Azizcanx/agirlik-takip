@@ -25,13 +25,14 @@ function veri(se) {
 function say(n, d) { return '<b data-say="' + n + '" data-d="' + (d || 0) + '">' + AT.fmt(n, d || 0) + '</b>'; }
 var YILDIZ = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.8 3.7 4 .6-2.9 2.8.7 4L8 11l-3.6 1.9.7-4L2.2 6.1l4-.6z"/></svg>';
 
-/* rekor şeridi kartı: tahmini max öncelikli (eski → yeni), yoksa en ağır */
+/* rekor şeridi kartı: tahmini max öncelikli (eski → yeni), yoksa en ağır; vücut ağırlığında (d8) en çok tekrar */
 function rekorKart(r, i) {
   var tm = r.t.filter(function (t) { return t.ad === 'Tahmini max'; })[0], ea = r.t.filter(function (t) { return t.ad === 'En ağır'; })[0];
-  var t = tm || ea, d = t === ea ? 2 : 1;
+  var tk = r.t.filter(function (t) { return t.va; })[0];
+  var t = tm || ea || tk, d = t === ea ? 2 : t === tk ? 0 : 1;
   return '<li style="--i:' + i + '"><span class="an-yildiz">' + YILDIZ + '</span><span class="an-ad"><b>' + AT.h(r.ad) + '</b><small>' +
-    (tm ? 'tahmini max' : 'en ağır') + (tm && ea ? ' · en ağır ' + AT.fmt(ea.yeni, 2) + ' kg' : '') + '</small></span>' +
-    '<span class="an-deger"><s>' + AT.fmt(t.yeni - t.fark, d) + '</s><span aria-hidden="true"> → </span><span class="sr"> yerine </span><strong>' + AT.fmt(t.yeni, d) + '</strong><small> kg</small></span></li>';
+    (tm ? 'tahmini max' : ea ? 'en ağır' : 'en çok tekrar') + (tm && ea ? ' · en ağır ' + AT.fmt(ea.yeni, 2) + ' kg' : '') + '</small></span>' +
+    '<span class="an-deger"><s>' + AT.fmt(t.yeni - t.fark, d) + '</s><span aria-hidden="true"> → </span><span class="sr"> yerine </span><strong>' + AT.fmt(t.yeni, d) + '</strong><small>' + (t === tk ? ' tekrar' : ' kg') + '</small></span></li>';
 }
 
 AT.seansOzet = function (se) {

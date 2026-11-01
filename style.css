@@ -585,6 +585,64 @@ details.katla.seansnot textarea{margin-bottom:12px}
   h1{font-size:36px}
 }
 
+/* ---------- yapay zekâ koçu (koc.js) ----------
+   Defter: Kaydet yanında ikincil "Koça sor" (anahtarsız modda "ChatGPT'ye sor" / "Claude'a sor"), alan boşken üç soru çipi,
+   beklerken nabız noktalı kart + akan cevap. Koç notu: soru üstte soluk, cevap altında, küçük etiket; sol ince vurgu çizgisi.
+   Ayarlar: 5 servis kartı (Gemini tam genişlik, altında ikişer), anahtar kutusu + Göster. */
+.df-dugmeler{display:flex;gap:10px;align-items:stretch}
+.df-dugmeler>.btn-big{margin-top:0}
+.df-dugmeler>.btn-ac{flex:1 1 auto;min-width:0}
+.btn-big.koc-dugme{flex:0 0 auto;width:auto;padding:0 18px;color:var(--ac);font-weight:600;white-space:nowrap}
+.koc-cipler{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+.koc-cipler[hidden]{display:none}
+.cip{min-height:36px;padding:0 14px;border-radius:99px;font-size:14px;background:var(--s1);border:1px solid var(--kenar);color:var(--mut);box-shadow:none;position:relative}
+.cip::before{content:"";position:absolute;inset:-4px 0}   /* dokunma alanı 44 px */
+.cip:hover{color:var(--ac);border-color:var(--ac)}
+#koc-durum{margin-top:14px}
+#koc-durum:empty{display:none}
+.koc-bekle{background:var(--s1);border:1px solid var(--kenar);border-radius:var(--r);padding:8px 16px 14px;box-shadow:var(--golge-2)}
+.koc-ust{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--mut)}
+.koc-ust .btn-ghost.mini{margin-right:-12px}
+.koc-nokta{flex:none;width:8px;height:8px;border-radius:50%;background:var(--ac);animation:koc-nabiz 1.2s ease-in-out infinite}
+@keyframes koc-nabiz{50%{opacity:.25;transform:scale(.7)}}
+@media (prefers-reduced-motion:reduce){ .koc-nokta{animation:none} }
+.koc-soru{color:var(--mut);font-size:14px;line-height:1.45;margin:2px 0 8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.koc-cevap{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}
+.koc-cevap:empty{display:none}
+.koc-cevap b{font-weight:650}
+.koc-hata .btn-ghost.mini{margin-left:6px;vertical-align:baseline}
+/* koç notu (Defter listesi) */
+.koc-not{display:flex;flex-direction:column;gap:4px;min-width:0;border-left:2px solid var(--ac2);padding-left:12px}
+.koc-not .koc-soru{margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.koc-not .koc-cevap{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:14;overflow:hidden}
+.koc-etiket{font-size:12px;color:var(--dim);letter-spacing:.01em;margin-top:2px}
+.satir .grow.koc-not>.koc-cevap{font-size:inherit;color:var(--tx);line-height:1.5;margin:0}   /* .satir .grow>span (14 px soluk) cevabı ezmesin */
+.satir .grow.koc-not>.koc-soru{font-size:14px;color:var(--mut);margin:0}
+.satir .grow.koc-not>.koc-etiket{font-size:12px;color:var(--dim);margin-top:2px}
+.koc-yok{color:var(--dim);font-style:italic}
+.df-koc-sar{border-top:1px solid var(--line);padding-bottom:12px}
+.liste>.df-koc-sar:first-child{border-top:0}
+.df-koc-sar>button.satir{border-top:0}
+.btn-ghost.mini.koc-yap-dugme{margin-left:44px}
+#view[data-sekme=defter] .btn-ghost.mini.koc-yap-dugme{margin-left:46px}
+#sheet p.koc-soru{margin:0 0 12px;font-size:15px}
+/* Ayarlar */
+.koc-sec{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}
+.koc-sec button{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-height:56px;padding:8px 12px;text-align:left;border-radius:var(--yaricap);background:var(--s2);border:1px solid transparent;box-shadow:none;color:var(--tx)}
+.koc-sec button:first-child{grid-column:1/-1}
+.koc-sec button b{font-weight:600;font-size:15px}
+.koc-sec button small{font-size:12.5px;color:var(--mut);line-height:1.3}
+.koc-sec button:hover{border-color:var(--kenar-g)}
+.koc-sec button[aria-checked=true]{background:var(--s3);border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+.koc-link{margin:0 0 6px}
+.koc-link a{color:var(--ac);display:inline-flex;align-items:center;min-height:44px;text-underline-offset:3px}
+.koc-anahtar{display:flex;gap:8px;align-items:center}
+.koc-anahtar input{flex:1;min-width:0}
+.koc-anahtar .btn-ghost.mini{flex:none}
+#koc-bolum .alan{margin-bottom:12px}
+#koc-bolum p.koc-giz{margin:0 0 14px}
+#koc-bolum .durum+p.koc-giz{margin-top:-2px}
+
 /* ---------- defter (defter.js) ----------
    Çizgili yazı alanı (satır 26px, çizgiler yalnız yazı bölgesinde), notlar günlere göre: serif gün başlığı,
    solda saat, sağda metin (satır sonları korunur). PC'de sol sütun (yazı + arama) yapışkan, notlar sağda. */
@@ -904,6 +962,46 @@ body>.toast{font-size:15px;padding:13px 20px;border-radius:16px;max-width:min(44
 .an-deger strong{color:var(--warn);font-weight:600}
 .an-deger small{font-family:var(--sans);font-size:13px;font-weight:400;color:var(--mut)}
 .ozet-son.an .an-tamam{margin-top:22px}
+/* hikâye duraklat düğmesi (hafta + yıl): kapatın solunda aynı biçimde, 36 px görünür / 44 px dokunma; aria-pressed=true iken ▶ */
+.hk-durdur{position:absolute;top:calc(24px + env(safe-area-inset-top));right:58px;z-index:3;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:50%;
+  display:grid;place-items:center;background:color-mix(in srgb,var(--tx) 10%,transparent);color:var(--tx);box-shadow:none}
+.hk-durdur::before{content:"";position:absolute;inset:-4px}
+.hk-durdur:hover{background:color-mix(in srgb,var(--tx) 18%,transparent)}
+.hk-durdur:active{transform:none}
+.hk-durdur svg{grid-area:1/1;width:18px;height:18px}
+.hk-durdur .dur{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+.hk-durdur .oyna{fill:currentColor;margin-left:2px}
+.hk-durdur[aria-pressed=true] .dur,.hk-durdur[aria-pressed=false] .oyna{display:none}
+.hikaye .hk-ust{padding-right:104px}
+@media (min-width:600px){ .hk-durdur{top:26px;right:62px} }
+/* ---------- tasarım: yıl hikâyesi (haftalik.js yilKartlar) ----------
+   Hafta hikâyesinin bileşenleri aynen; yalnız yıla özgü olanlar: 12 ay noktası, aylık sütunlar, yılın haftaları ızgarası,
+   yeni kart tonları (hareket camgöbeği, seri kiremit, defter mürdüm). Üst satırda gezinme oku yok. */
+.hikaye.yil[data-kart=hareket]{--hk-ton:#2a8f8c}
+.hikaye.yil[data-kart=seri]{--hk-ton:#c8653a}
+.hikaye.yil[data-kart=defter]{--hk-ton:#a5587f}
+.yil-ust{padding-left:20px;min-height:44px}
+.yil .hk-dev.kelime{white-space:normal;overflow-wrap:anywhere;text-wrap:balance}
+.yil .hk-dev.kelime.uzun-ad{font-size:clamp(44px,15cqw,80px)}
+.yil-aylar{gap:4px;max-width:420px}
+.yil-aylar span{font-size:11px;gap:7px}
+.yil-aylar i{max-width:24px}
+.yil-satir{margin:22px 0 0;font-size:16px;line-height:1.35;color:color-mix(in srgb,var(--tx) 72%,transparent)}
+.yil-satir b{color:var(--tx);font-weight:600}
+/* aylık toplam: alttan büyüyen sütunlar, en yüklü ay vurgulu */
+.yil-sutun{display:flex;align-items:flex-end;gap:6px;height:120px;margin:28px 0 0;max-width:420px}
+.yil-sutun span{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px;font-size:11px;color:color-mix(in srgb,var(--tx) 58%,transparent)}
+.yil-sutun i{display:block;width:100%;max-width:26px;height:max(3px,var(--h));border-radius:5px 5px 2px 2px;background:color-mix(in srgb,var(--tx) 24%,transparent);transform-origin:bottom;animation:yilSutun .8s .3s var(--egri) both}
+.yil-sutun .en{color:var(--tx);font-weight:600}
+.yil-sutun .en i{background:var(--hk-ac)}
+@keyframes yilSutun{from{transform:scaleY(0)}}
+.yil .hk-rekor small{text-transform:none;letter-spacing:.02em;font-size:13px}
+/* yılın haftaları: 13 sütun (52 hafta = 4 çeyrek), 53 haftalık yılda 18 sütun; antrenmanlı hafta dolu, en uzun seri vurgulu */
+.yil-hafta{display:grid;grid-template-columns:repeat(var(--k,13),1fr);gap:5px;margin:26px 0 0;max-width:380px}
+.yil-hafta i{aspect-ratio:1;border-radius:4px;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--tx) 16%,transparent)}
+.yil-hafta .on{background:color-mix(in srgb,var(--tx) 30%,transparent);box-shadow:none}
+.yil-hafta .seri{background:var(--hk-ac);box-shadow:none}
+.yil-hafta .ileri{opacity:.3}
 /* ---------- tasarım: bileşenler ----------
    Ortak dil: katmanlı yüzeyler (--bg < --s1 < --s2 < --s3), ince --kenar, form kenarı --kenar-g (≥3:1),
    köşeler --yaricap-k 10 / --yaricap 12 / --r 14, hareket --hiz + --egri (yalnız transform/opacity/renk). */
@@ -1755,6 +1853,21 @@ button.satir.seans-satir .grow>.num{font-size:13.5px;color:var(--mut);margin-top
 @keyframes kh-dol{from{fill-opacity:0}}
 @media (max-width:370px){ .kh-fig svg{height:244px} .kh-s{padding:7px 6px 8px} .kh-s span{font-size:13.5px} }
 
+/* ---------- dinlenme aşımı, hareket seçici, protein çubuğu (d10, d7, d12) ----------
+   Aşım: süre bitince "+0:45" sayar (bitiş nabzı aynı), 10 dk'da "Uzun ara" soluk. Seçici: arama boşken "Son yapılanlar" küçük başlığı.
+   Protein: hedef (1,8 g/kg) işareti çubuğun %80'inde; 1,6 g/kg'ı geçince sakin yeşil, altında nötr (kırmızı yok). */
+#rest[data-k=bitti] .t .sn{font-variant-numeric:tabular-nums}
+#rest.uzun .t .sn{color:var(--mut);font-size:19px}
+#rest.uzun .halka{opacity:.6}
+.egz-ara-b{margin:0;padding:14px 0 6px;font-size:12.5px;font-weight:500;color:var(--mut);letter-spacing:.02em}
+.egz-ara-b+button.satir{border-top:0}
+.egz-ara-b:not(:first-child){border-top:1px solid var(--line);margin-top:4px;padding-top:16px}
+.mk-pbar{position:relative;overflow:visible}
+.mk-pbar i{background:color-mix(in srgb,var(--tx) 38%,transparent);transition:background-color .4s ease}
+.mk-pbar.tamam i{background:var(--iyi)}
+.mk-pbar::after{content:"";position:absolute;left:var(--hedef,80%);top:-3px;bottom:-3px;width:1.5px;margin-left:-.75px;border-radius:1px;background:var(--mut);opacity:.7}
+@media (prefers-reduced-motion:reduce){ .mk-pbar i{transition:none} }
+
 /* ---------- masaüstü (PC) ----------
    Telefonda: marka, kısayol düğmesi ve <kbd> ipuçları gizli; .duzen alt alta (sıra aynı).
    ≥1024px: solda sabit menü, iki sütun (.duzen), ortada açılan pencere, sağ altta dinlenme sayacı. */
@@ -1813,4 +1926,41 @@ kbd{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--mut);back
   /* dinlenme sayacı sağ altta, bildirim içerik ortasında */
   #rest{left:auto;right:24px;bottom:24px;width:360px;max-width:none;margin:0}
   .toast,.toast.yukari{bottom:28px;left:calc(50% + 116px)}
+}
+
+/* ---------- tasarım: Codex incelemesi (1 Kas) ---------- */
+.sahneler .setgrid.dev input::placeholder{color:var(--mut);opacity:1}
+.mk-alan{display:flex;flex-direction:column;gap:6px;min-width:0}
+.mk-alan>span{font-size:13px;line-height:1.4;color:var(--mut)}
+.makrorow .mk-alan input{width:100%;font-size:16px}
+.row.makrorow{align-items:end}
+.gecmis-kas>h2{margin-top:32px}
+.cal .g.diger.on{opacity:1;color:var(--mut)}
+.chart text,.chart text.hedeft,.chart text.tas-v{font-size:14px;font-family:var(--sans);font-variant-numeric:tabular-nums}
+.chart text.kx{fill:var(--mut)}
+.chart .ln{stroke-width:2.25}
+.grafik-tarihler>text:nth-child(n+5),.chart>.grafik-tarih:nth-child(n+5 of .grafik-tarih){display:none}
+.duzen.bugun h2{margin-top:32px;margin-bottom:12px}
+.duzen.bugun .basla-baska{margin-bottom:0}
+.ex-dug{gap:8px}
+.ex-dug .mini,.ex-dug .mini+.mini{min-height:44px;margin-left:0;margin-right:0}
+.ex-dug .mini::before{inset:0}
+.duzen.ilerleme .durum{padding:12px 12px 12px 30px}
+.duzen.ilerleme .durum::before{left:12px;top:calc(12px + .72em - 4px)}
+#view[data-sekme=defter] button.satir.df-not{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
+.df-not .df-saat{grid-column:1;grid-row:1;font-size:13px;color:var(--mut)}
+.df-not .tag{grid-column:2;grid-row:1;margin-top:0;font-size:12px}
+.df-not .df-metin{grid-column:1 / -1;grid-row:2;font-size:16px;line-height:1.5}
+@media (max-width:1023px){
+  .duzen.takvim{display:flex;flex-direction:column}
+  .duzen.takvim>.kol:first-child{display:contents}
+  .duzen.takvim>.kol:last-child{order:1}
+  .duzen.takvim .gecmis-kas{order:2}
+  .kh-fig svg{height:200px}
+  .duzen.bugun>.b-tarti>h2:first-child{margin-top:24px}
+}
+@media (min-width:1024px){
+  .duzen.bugun{row-gap:24px}
+  .duzen.bugun>.b-not>h2:first-child,.duzen.bugun>.b-son>h2:first-child,.duzen.bugun>.b-tarti>h2:first-child{margin-top:0}
+  .duzen.bugun .notlar summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
 }

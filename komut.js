@@ -72,4 +72,5 @@ document.addEventListener('keydown', function (ev) {
 }, true);
 
 AT._komut = { oneriler: oneriler };   /* test için */
+AT.harfsiz = kucuk;   /* tek kaynak: app.js hareket seçici araması da bunu kullanır */
 })(window.AT);

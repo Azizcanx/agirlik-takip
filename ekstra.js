@@ -197,17 +197,22 @@ AT.islem.kart = function () {
   var v = kartVeri(); if (!v) return AT.toast('Kart için veri yok');
   var cv = kartCiz(v); kartBlob = null;
   cv.toBlob(function (b) { kartBlob = b; });
-  var paylas = !!(navigator.canShare && window.File && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] }));
+  var paylas = dosyaPaylasilir();
   AT.sheet('<h3>Sezon kartı</h3><img class="kart-onizleme" alt="Sezon kartı önizlemesi" src="' + cv.toDataURL('image/png') + '">' +
     (paylas ? '<button class="btn-ac btn-big" data-act="kart-paylas" style="margin-bottom:8px">Paylaş</button>' : '') +
     '<button class="btn-big' + (paylas ? '' : ' btn-ac') + '" data-act="kart-indir" style="margin-bottom:8px">PNG indir</button><button class="btn-ghost btn-big" data-act="kapat">Kapat</button>');
 };
 function kartAd() { return 'sezon-karti-' + AT.iso(new Date()) + '.png'; }
+/* ortak PNG kart altyapısı (sezon kartı + haftalik.js yıllık kart): dosya paylaşımı destekleniyor mu, paylaş ya da indir */
+function dosyaPaylasilir() { try { return !!(navigator.canShare && window.File && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })); } catch (e) { return false; } }
+function pngPaylas(blob, ad, baslik) {
+  if (!blob) return AT.toast('Hazırlanıyor, tekrar dene');
+  if (!dosyaPaylasilir()) { AT.indir(blob, ad); return AT.toast('Kart indirildi'); }
+  navigator.share({ files: [new File([blob], ad, { type: 'image/png' })], title: baslik }).catch(function () {});
+}
 AT.islem['kart-indir'] = function () { if (!kartBlob) return AT.toast('Hazırlanıyor, tekrar dene'); AT.indir(kartBlob, kartAd()); AT.toast('Kart indirildi'); };
-AT.islem['kart-paylas'] = function () {
-  if (!kartBlob) return AT.toast('Hazırlanıyor, tekrar dene');
-  navigator.share({ files: [new File([kartBlob], kartAd(), { type: 'image/png' })], title: 'Sezon kartı' }).catch(function () {});
-};
+AT.islem['kart-paylas'] = function () { pngPaylas(kartBlob, kartAd(), 'Sezon kartı'); };
+AT.pngKart = { rr: rr, paylasilir: dosyaPaylasilir, paylas: pngPaylas };
 
 AT._ekstra = { plakalar: plakalar, isinma: isinma, kartVeri: kartVeri };
 })(window.AT);

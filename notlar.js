@@ -61,6 +61,30 @@ function kisaSet(rs) { return rs.every(function (r) { return r === rs[0]; }) ? r
 function ort(a) { return a.reduce(function (t, x) { return t + x; }, 0) / a.length; }
 /* tekrar aralığı: çalışma setlerinin hepsi 6 ve altıysa 3–6, değilse 8–12 */
 function aralik(rs) { return Math.max.apply(0, rs) <= 6 ? [3, 6] : [8, 12]; }
+/* d8: vücut ağırlığı hareketi (son seansın bütün iş setleri 0 kg): tekrar ilerlemesi. Hedef = en zayıf set + 1, en çok TEPE_VA;
+   önceki 0 kg seansın hedefi tutmadıysa o hedef kalır (bu seansın en iyi setini aşmadan, en zayıf + 1'in altına inmeden).
+   Hepsi TEPE_VA'ya varınca "ağırlık ekle".
+   15: 12 tekrar tavanının (MAX_TEKRAR) biraz üstü; barfiks/dipste 15 temiz tekrar ağırlık eklemeye yeter */
+var TEPE_VA = 15;
+function vaHedef(rs) { var mn = Math.min.apply(0, rs); return mn >= TEPE_VA ? mn : mn + 1; }
+function vaOneri(a, l, ws, g, gs) {
+  var rs = tekrarlar(ws), mn = Math.min.apply(0, rs), mx = Math.max.apply(0, rs), n = ws.length, x = { g: g, n: l.length };
+  if (mn >= TEPE_VA) {
+    x.sinif = 1; x.hedef = { kg: 0, tekrar: mn, n: n, va: 1 };
+    x.not = { tip: 'iyi', baslik: a + ': ' + mn + ' tekrar oldu, ağırlık eklemeyi dene',
+      aciklama: gs + ' ' + kisaSet(rs) + ' vücut ağırlığıyla, bütün setler ' + TEPE_VA + '+. Kemer ya da dambılla 2,5–5 kg ekle, tekrarı 8\'e indir; hepsi 12 olunca yine ekle.' };
+    return x;
+  }
+  var on = l.length > 1 ? calisma(l[l.length - 2].sets) : [];
+  var onH = on.length >= 2 && AT.num(on[0].kg) === 0 ? vaHedef(tekrarlar(on)) : 0, tuttu = !onH || mn >= onH;
+  /* tutmadıysa önceki hedef kalır ama bu seansın en iyi setini aşmaz; her durumda en az en zayıf + 1 (8, 8 -> 9; 8, 7 -> 8) */
+  var ht = tuttu ? mn + 1 : Math.min(onH, Math.max(mx, mn + 1));
+  x.sinif = 2; x.hedef = { kg: 0, tekrar: ht, n: n, va: 1 };
+  x.not = { tip: tuttu ? 'iyi' : 'bilgi', baslik: a + ': ' + n + ' set × ' + ht + ' tekrar',
+    aciklama: gs + ' ' + rs.join(', ') + ' tekrar, vücut ağırlığıyla. ' +
+      (tuttu ? 'En zayıf sete bir tekrar ekle; ' : onH + ' tekrar hedefi tutmadı, ' + (ht === onH ? 'aynı hedefle yine dene; ' : 'bu sefer ' + ht + ' hedefle; ')) + 'hepsi ' + TEPE_VA + ' olunca ağırlık ekle.' };
+  return x;
+}
 function rpeOf(s) { var r = s ? AT.num(s.rpe) : NaN; return r >= 6 && r <= 10 ? r : null; }
 var RPE_KOLAY = 7, RPE_ZOR = 9.5;
 
@@ -95,11 +119,39 @@ function kuralIhmal(seanslar, bugun) {
   return {
     tip: 'uyari',
     baslik: baslik,
-    aciklama: 'Son ' + ilk.kas + ': ' + AT.tarih(ilk.tarih, true) + '. Kas başına haftada 2 seans hedefle; sıradaki antrenmana ' + ilk.kas + ' koy.'
+    aciklama: 'Son ' + ilk.kas + ': ' + AT.tarih(ilk.tarih, true) + '. Kas başına haftada en az 4 set hedefle; sıradaki antrenmana ' + ilk.kas + ' koy.'
   };
 }
 
-/* 3) Durağanlık: 4+ seanslı egzersizde en iyi e1RM son 3+ seanstır geçilmedi (son seans 28 gün içinde) */
+/* 2b) d3 az set: son 7 günde (bugün dahil) büyük grubun seti 1–3 (yardımcı kas yarım, Geçmiş > kaslar ile aynı sayım ve yuvarlama).
+   0 set ihmal kuralına kalır (8+ gün). Son 30 günde 3+ antrenman şartı ihmal ile aynı; en düşük öncelikli not */
+var AZ_SET = 4;
+function ikincil(ad) { return (AT.ikincilOf && AT.ikincilOf(ad)) || []; }
+function kuralAz(seanslar, bugun) {
+  if (seanslar.filter(function (se) { var g = gunFark(se.date, bugun); return g >= 0 && g < 30; }).length < 3) return null;
+  var lim = gunEkle(bugun, -6), say = {};
+  seanslar.forEach(function (se) {
+    if (se.date < lim || se.date > bugun) return;
+    (se.exs || []).forEach(function (ex) {
+      var n = AT.yapilanSetler(ex).length, k = kasi(ex); if (!n) return;
+      say[k] = (say[k] || 0) + n;
+      ikincil(ex.ad).forEach(function (y) { if (y !== k) say[y] = (say[y] || 0) + n * 0.5; });
+    });
+  });
+  var l = IZLENEN.map(function (k) { return { kas: k, n: Math.round(say[k] || 0) }; })
+    .filter(function (x) { return x.n > 0 && x.n < AZ_SET; }).sort(function (a, b) { return a.n - b.n; });
+  if (!l.length) return null;
+  var liste = l.map(function (x) { return x.kas + ' ' + x.n; }).join(', ');
+  return {
+    tip: 'bilgi',
+    baslik: l.length === 1 ? l[0].kas + ': bu hafta ' + l[0].n + ' set, en az ' + AZ_SET + ' hedefle' : 'Bu hafta az set: ' + liste + '; en az ' + AZ_SET + ' hedefle',
+    aciklama: 'Son 7 günde ' + liste + ' set (yardımcı kas olarak çalıştığı setler yarım sayılır). Kas başına haftada en az ' + AZ_SET +
+      ' set gelişim için en küçük doz; sıradaki antrenmana birkaç set ' + l[0].kas + ' ekle.'
+  };
+}
+
+/* 3) Durağanlık: 4+ seanslı egzersizde en iyi e1RM son 3+ seanstır geçilmedi (son seans 28 gün içinde).
+   0 kg (vücut ağırlığı) seansların tahmini maxı 0, süzülür: yalnız tekrarı artan harekete yanlış alarm yok (d8) */
 function durgunlar(h, bugun) {
   var out = [];
   Object.keys(h).forEach(function (ad) {
@@ -123,7 +175,7 @@ function kuralDurgun(d, S) {
 }
 
 /* 4) Sonraki seans önerisi: çift ilerleme (double progression) + deload + isteğe bağlı RPE.
-   Aday: son 14 günde yapılan, 2+ çalışma seti (en ağır kg'daki setler), kg > 0.
+   Aday: son 14 günde yapılan, 2+ çalışma seti (en ağır kg'daki setler), kg > 0 (0 kg: vaOneri, tekrar ilerlemesi).
    Aralık 8–12 (setlerin hepsi ≤6 ise 3–6). Öncelik: deload > kg artır > aynı kg + 1 tekrar.
    - deload: son 3 seans aynı kg, ortalama tekrar düştü ya da iki seans üst üste artmadı, son seans tepeye ulaşmadı
              -> 1 hafta −%10 (2,5'e yuvarlı). Son set RPE ≤ 7 ise deload yok (kolay geçmiş).
@@ -136,10 +188,12 @@ function oneriler(h, bugun) {
     var l = h[a], son = l[l.length - 1], g = gunFark(son.date, bugun);
     if (g < 0 || g > 14) return;
     var ws = calisma(son.sets), kg = AT.num(ws[0] && ws[0].kg);
+    var ne = AT.tarih(son.date, true), gs = g === 0 ? 'Bugün' : 'Geçen sefer (' + ne + ')';
+    if (ws.length >= 2 && kg === 0) { m[a] = vaOneri(a, l, ws, g, gs); return; }   /* d8: bütün setler 0 kg */
     if (ws.length < 2 || !(kg > 0)) return;
     var rs = tekrarlar(ws), ilk = rs[0], mn = Math.min.apply(0, rs), ar = aralik(rs), alt = ar[0], tepe = ar[1];
     var rpe = rpeOf(ws[ws.length - 1]), rpeYaz = rpe != null ? 'son set RPE ' + AT.fmt(rpe) : '';
-    var ne = AT.tarih(son.date, true), gs = g === 0 ? 'Bugün' : 'Geçen sefer (' + ne + ')', n = ws.length, ek = artis(son.ex, kg), yeni = kg + ek;
+    var n = ws.length, ek = artis(son.ex, kg), yeni = kg + ek;
     var bolge = (altVucut(son.ex) ? 'Alt vücut' : 'Üst vücut') + ': +' + AT.fmt(ek, 2) + ' kg';
     var x = { g: g, n: l.length };
     /* a7: bu hafta (Pzt'den beri) bu harekette kg zaten artırıldıysa ikinci kez artırma */
@@ -253,6 +307,7 @@ function hesapla(seanslar, S, bugun, bd) {
   ekle(kuralDurgun(d, S));
   kuralIlerleme(o, d.length ? [d[0].ad] : []).forEach(ekle);
   ekle(kuralHacim(seanslar, bugun));
+  ekle(kuralAz(seanslar, bugun));   /* d3: en düşük öncelik; kalabalıkta MAX'a takılır */
   return out.slice(0, MAX);
 }
 
@@ -271,7 +326,7 @@ AT.notlar = function (bugun) {
   return v;
 };
 AT.notlarHesapla = hesapla;   // test için saf giriş
-/* bugünkü hedef (öneriyle aynı kural): ad -> {kg, tekrar, n} ya da null (son seans 14 günden eski / yeterli set yok).
+/* bugünkü hedef (öneriyle aynı kural): ad -> {kg, tekrar, n, va?} ya da null (va: vücut ağırlığı, kg 0) (son seans 14 günden eski / yeterli set yok).
    app.js antrenman ekranında soluk sayıları (placeholder) bununla doldurur. Seans listesi değişmedikçe önbellekte. */
 var hedefOnb = { k: null, m: null };
 AT.hedefSet = function (ad) {

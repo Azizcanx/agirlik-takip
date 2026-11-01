@@ -4,7 +4,9 @@
    Kaydet ya da Ctrl+Enter (PC). Altta notlar günlere göre (Bugün, Dün, "29 Ekim Perşembe"), en yeni üstte.
    Nota dokun → düzenle / sil (6 sn Geri al); boş bırakıp kaydetmek de siler. 15'ten fazla notta "Notlarda ara":
    büyük/küçük harf ve Türkçe harf duyarsız (göğüs = gogus), bütün kelimeleri geçen notlar, eşleşen yer işaretli.
-   Eşitleme: esitle.js VERI + LISTE (defter: 'id'). AT.gorunum.defter() -> sekme HTML'i */
+   Eşitleme: esitle.js VERI + LISTE (defter: 'id'). AT.gorunum.defter() -> sekme HTML'i
+   Koç (koc.js, isteğe bağlı): Kaydet yanında "Koça sor" (AT.bolum.kocDugme), altında çipler + bekleme satırı (AT.bolum.kocAlt);
+   koç notu {…, koc: {s: soru, model, ss: sağlayıcı}} AT.kocSatir ile çizilir; aramada soru da taranır. Ctrl+Shift+Enter = Koça sor. */
 (function (AT) {
 'use strict';
 
@@ -42,7 +44,7 @@ function katla(s) {
   return k.replace(/[çğıöşüâîû]/g, function (c) { return HARF[c]; });
 }
 function terimler(q) { return katla(q).split(/\s+/).filter(Boolean); }
-function eslesir(n, ts) { var m = katla(n.metin); return ts.every(function (t) { return m.indexOf(t) >= 0; }); }
+function eslesir(n, ts) { var m = katla(n.metin + (n.koc && n.koc.s ? '\n' + n.koc.s : '')); return ts.every(function (t) { return m.indexOf(t) >= 0; }); }
 function bulNotlar(l, q) { var ts = terimler(q); return ts.length ? l.filter(function (n) { return eslesir(n, ts); }) : l.slice(); }
 /* metin kaçışla yazılır (HTML çalışmaz); terimlerin geçtiği yerler <mark> */
 function vurgula(metin, ts) {
@@ -77,6 +79,7 @@ function boyutla(e) {
   if (window.scrollY !== y) window.scrollTo(0, y);
 }
 function notSatir(n, ts) {
+  if (n.koc && AT.kocSatir) return AT.kocSatir(n, ts, saat(n.t), vurgula);
   return '<button class="satir df-not" data-act="df-ac" data-id="' + AT.h(n.id) + '"><span class="df-saat">' + saat(n.t) + '</span>' +
     '<span class="grow df-metin">' + vurgula(n.metin, ts) + '</span>' + (n.demo ? '<span class="tag demo">örnek</span>' : '') + '</button>';
 }
@@ -98,7 +101,8 @@ function gorunum() {
   var l = notlar(AT.S), bugun = AT.iso(new Date());
   var o = '<h1>Defter</h1><p class="sub">' + AT.h(tamTarih(bugun, bugun)) + (l.length ? ' · ' + l.length + ' not' : '') + '</p>';
   var a = '<div class="df-yaz"><textarea id="df-metin" class="df-alan" rows="3" maxlength="' + UZUN + '" placeholder="Aklına geleni yaz…" aria-label="Yeni not">' + AT.h(taslakOku()) + '</textarea>' +
-    '<button class="btn-ac btn-big" data-act="df-kaydet">Kaydet<kbd>Ctrl + Enter</kbd></button></div>';
+    '<div class="df-dugmeler"><button class="btn-ac btn-big" data-act="df-kaydet">Kaydet<kbd>Ctrl + Enter</kbd></button>' + (AT.bolum.kocDugme ? AT.bolum.kocDugme() : '') + '</div>' +
+    (AT.bolum.kocAlt ? AT.bolum.kocAlt() : '') + '</div>';
   if (l.length > ARA_ESIK) a += '<input id="df-ara" class="df-ara" type="search" placeholder="Notlarda ara" aria-label="Notlarda ara" autocomplete="off" value="' + AT.h(aramaQ) + '">';
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { boyutla(AT.$('#df-metin')); });   /* taslak varsa boyu */
   return o + AT.kol(a, '<div id="df-liste">' + listeHtml() + '</div>', 'defter');
@@ -122,7 +126,8 @@ AT.islem['df-ac'] = function (d) {
     alt += ' · düzenlendi ' + (dg === g ? '' : (ad === 'Bugün' || ad === 'Dün' ? ad.toLocaleLowerCase('tr') : ad) + ' ') + saat(n.duz);
   }
   var id = AT.h(n.id);
-  AT.sheet('<h3>Notu düzenle' + (n.demo ? ' <span class="tag demo">örnek</span>' : '') + '</h3><p class="mut">' + AT.h(alt) + '</p>' +
+  AT.sheet('<h3>' + (n.koc ? 'Koç notu' : 'Notu düzenle') + (n.demo ? ' <span class="tag demo">örnek</span>' : '') + '</h3><p class="mut">' + AT.h(alt) + '</p>' +
+    (n.koc ? '<p class="koc-soru">' + AT.h(n.koc.s) + '</p>' : '') +
     '<textarea id="df-duz" class="df-alan" data-id="' + id + '" maxlength="' + UZUN + '" aria-label="Not">' + AT.h(n.metin) + '</textarea>' +
     '<div class="yigin"><button class="btn-ac btn-big" data-act="df-duz-kaydet" data-id="' + id + '">Kaydet<kbd>Ctrl + Enter</kbd></button>' +
     '<button class="btn-big" data-act="kapat">Vazgeç</button>' +
@@ -192,7 +197,8 @@ if (typeof document !== 'undefined') {
   document.addEventListener('keydown', function (ev) {
     var t = ev.target; if (!t) return;
     if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey) && !ev.isComposing) {
-      if (t.id === 'df-metin') { ev.preventDefault(); AT.islem['df-kaydet'](); }
+      if (t.id === 'df-metin' && ev.shiftKey && AT.kocBagli && AT.kocBagli()) { ev.preventDefault(); AT.islem['koc-sor'](); }
+      else if (t.id === 'df-metin') { ev.preventDefault(); AT.islem['df-kaydet'](); }
       else if (t.id === 'df-duz') { ev.preventDefault(); AT.islem['df-duz-kaydet']({ id: t.dataset.id }); }
     } else if (ev.key === 'Escape' && t.id === 'df-metin' && t.blur) t.blur();
   });
@@ -201,5 +207,6 @@ if (typeof document !== 'undefined') {
 AT.gorunum = AT.gorunum || {};
 AT.gorunum.defter = gorunum;
 AT._defter = { veri: veri, grupla: grupla, gunAdi: gunAdi, tamTarih: tamTarih, katla: katla, terimler: terimler, bulNotlar: bulNotlar, vurgula: vurgula,
-  temizle: temizle, demoNotlar: demoNotlar, listeHtml: listeHtml, aramaYaz: function (q) { aramaQ = q; }, taslakOku: taslakOku };   /* test için */
+  temizle: temizle, demoNotlar: demoNotlar, listeHtml: listeHtml, aramaYaz: function (q) { aramaQ = q; }, taslakOku: taslakOku,
+  taslakYaz: taslakYaz, boyutla: boyutla };   /* test için; koc.js de kullanır (taslak, yazı alanı boyu, liste) */
 })(window.AT);

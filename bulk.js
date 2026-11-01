@@ -168,18 +168,27 @@ function hedefKcalOf(tdee, min, max) { return Math.round((tdee + (min + max) / 2
    50'ye yuvarlı. o = {hafta, deger, anahtar}; anahtar (hedef ayarları) değişti ya da 3 haftadan eskiyse hesaplanan doğrudan alınır.
    Saf: yeni o'yu döndürür, kaydetmez. */
 var ONERI_ADIM = 200;
-function haftalikOneri(o, ham, hafta, anahtar) {
+/* d9: eksik = son 7 günde 4'ten az kalori günü (yalnız "iyi günler" girilen hafta harcamayı yukarı çekmesin). Eksikse taze öneri
+   (aynı hedef, 3 haftadan yeni) olduğu gibi kalır, saklanmaz; ertesi gün yeniden bakılır. Saklı öneri yoksa / hedef değiştiyse hesaplanan alınır */
+function haftalikOneri(o, ham, hafta, anahtar, eksik) {
   if (ham == null || !isFinite(ham)) return null;
   if (o && o.anahtar === anahtar && o.hafta === hafta && isFinite(o.deger)) return o;
   var taze = o && o.anahtar === anahtar && isFinite(o.deger) && gunFark(hafta, o.hafta) > 0 && gunFark(hafta, o.hafta) <= 21;
+  if (eksik && taze) return o;
   var d = taze ? o.deger + Math.max(-ONERI_ADIM, Math.min(ONERI_ADIM, 0.5 * (ham - o.deger))) : ham;
   return { hafta: hafta, deger: Math.round(d / 50) * 50, anahtar: anahtar };
+}
+/* d9: bugünden önceki 7 günde geçerli kalori günü sayısı (bugün yarım olabilir, sayılmaz) */
+var ONERI_KCAL_GUN = 4;
+function kcalHaftaGun(kcal, bugun) {
+  var bas = gunEkle(bugun, -7);
+  return kcalGecerli(kcal).filter(function (x) { return x.date >= bas && x.date < bugun; }).length;
 }
 /* gösterimden önce: r.hedefKcal'i haftalık öneriyle değiştirir, değiştiyse S.kcalOneri'yi saklar */
 function oneriUygula(r, bulk, bugun) {
   if (!r || r.hedefKcal == null || r.durum === 'erken' || r.durum === 'veri') return r;   /* ilk 2 hafta ve bayat tartıda saklanan öneri değişmez */
   var anahtar = [bulk.bas, bulk.hedefKg, bulk.min, bulk.max].join('|'), o = AT.S.kcalOneri;
-  var y = haftalikOneri(o, r.hedefKcal, AT.haftaBasi(bugun), anahtar);
+  var y = haftalikOneri(o, r.hedefKcal, AT.haftaBasi(bugun), anahtar, kcalHaftaGun(AT.S.kcal, bugun) < ONERI_KCAL_GUN);
   if (y && (!o || y.hafta !== o.hafta || y.deger !== o.deger || y.anahtar !== o.anahtar)) { AT.S.kcalOneri = y; AT.kaydet(); }
   if (y) r.hedefKcal = y.deger;
   return r;
@@ -432,14 +441,22 @@ function makroOrt(kcal, bugun, n) {
    Bugünün kaydı ham okunur: 300 kcal altı (ör. ilk öğün bir shake) da görünür ve üstüne eklenir; harcama yine kcalGecerli ile süzer */
 function kcalBugun(bugun) { var k = (AT.S.kcal || []).filter(function (x) { return x && x.date === bugun; }); return k.length ? k[k.length - 1] : null; }
 /* günlük protein hedefi: kilo × 1,8 g (1,6–2,2 aralığının alt-orta ucu); kilo = İlerleme'deki "Protein kilo başına" ile aynı kaynak (ortalamaKilo) */
-var PROTEIN_GKG = 1.8;
-function proteinHedef() { var l = gecerli(AT.S.bw), kg = l.length ? ortalamaKilo(l) : null; return kg > 0 ? Math.round(kg * PROTEIN_GKG / 5) * 5 : null; }
+var PROTEIN_GKG = 1.8, PROTEIN_YETER = 1.6;
+function proteinKg() { var l = gecerli(AT.S.bw), kg = l.length ? ortalamaKilo(l) : null; return kg > 0 ? kg : null; }
+function proteinHedef() { var kg = proteinKg(); return kg ? Math.round(kg * PROTEIN_GKG / 5) * 5 : null; }
+/* d12: protein çubuğu. Hedef 1,8 g/kg (işaret çubuğun %80'inde, tam boy = hedef × 1,25); 1,6 g/kg'ı geçince "tamam" tonu
+   (kazancın kırılma noktası ~1,6, Nunes 2022), altında nötr. Kırmızı yok. Saf: {hedef, yeter, max, yuzde, isaret, tamam} */
+function proteinDurum(g, kg) {
+  if (!(kg > 0)) return null;
+  var hedef = Math.round(kg * PROTEIN_GKG / 5) * 5, max = hedef * 1.25;
+  return { hedef: hedef, yeter: kg * PROTEIN_YETER, max: max, yuzde: Math.max(0, Math.min(100, g / max * 100)), isaret: hedef / max * 100, tamam: g >= kg * PROTEIN_YETER };
+}
 /* kalori çubuğu: önceki yüzdeden yenisine akar (yalnız değer değişince; ilk çizimde 0'dan). Yalnız bu oturumda, gösterim */
 var kcalYuzde = null, makroAcik = null;
-function cubukHtml(sinif, yuzde, eski, etiket, now, max) {
+function cubukHtml(sinif, yuzde, eski, etiket, now, max, stil) {
   var w = Math.round(Math.max(0, Math.min(100, yuzde)));
   var akar = eski !== undefined && eski !== w ? ' class="akar" style="--o:' + (eski || 0) + '%;width:' + w + '%"' : ' style="width:' + w + '%"';
-  return '<div class="' + sinif + '" role="progressbar" aria-label="' + AT.h(etiket) + '" aria-valuenow="' + Math.round(now) + '" aria-valuemin="0" aria-valuemax="' + Math.round(max) + '"><i' + akar + '></i></div>';
+  return '<div class="' + sinif + '"' + (stil ? ' style="' + stil + '"' : '') + ' role="progressbar" aria-label="' + AT.h(etiket) + '" aria-valuenow="' + Math.round(now) + '" aria-valuemin="0" aria-valuemax="' + Math.round(max) + '"><i' + akar + '></i></div>';
 }
 /* bugünün kalori toplamı: hedef varsa "2.740 / 3.000 kcal · 260 kaldı" + ince çubuk (aşınca dolu, "+120 fazla", sakin renk);
    hedef yoksa (ilk 14 gün, bayat tartı, hedef yok) yalnız sayı. Makro yazıldıysa altında P/K/Y şeridi (protein hedefe göre mini çubuk) */
@@ -459,11 +476,11 @@ function kcalOzet(k, hedef, yon) {
     o += '<div class="kc-ozet"><div class="kc-ust"><span class="kc-say"' + sayOz(kc) + '><b>' + AT.h(AT.fmt(kc, 0)) + '</b> kcal</span>' + demoTag(k) + '</div>';
   }
   if (makroVar(k)) {
-    var ph = proteinHedef();
+    var pkg = proteinKg();
     o += '<ul class="mk-serit" aria-label="Bugünkü makrolar">' + MAKRO.map(function (x) {
-      var g = +k[x[0]] || 0, hp = x[0] === 'p' && ph ? ph : null;
+      var g = +k[x[0]] || 0, pd = x[0] === 'p' ? proteinDurum(g, pkg) : null, hp = pd ? pd.hedef : null;
       return '<li class="mk-' + x[0] + '"><span>' + x[1] + '</span><b>' + AT.h(AT.fmt(g, 0)) + '<small>' + (hp ? ' / ' + AT.h(AT.fmt(hp, 0)) : '') + ' g</small></b>' +
-        (hp ? cubukHtml('mk-bar', g / hp * 100, undefined, 'Protein, hedef ' + AT.fmt(hp, 0) + ' g', g, hp) : '') + '</li>';
+        (pd ? cubukHtml('mk-bar mk-pbar' + (pd.tamam ? ' tamam' : ''), pd.yuzde, undefined, 'Protein, hedef ' + AT.fmt(hp, 0) + ' g' + (pd.tamam ? ', yeterli' : ''), g, pd.max, '--hedef:' + pd.isaret.toFixed(1) + '%') : '') + '</li>';
     }).join('') + '</ul>';
   }
   return o + '</div>';
@@ -476,7 +493,7 @@ function kcalGir(bugun, hedef, yon) {
     '<div class="row kcalrow"><input id="kcalgir" class="grow" inputmode="text" autocomplete="off" placeholder="' + (k ? 'öğün ekle: +650' : 'kalori, örn. 2800 · öğün +650') + '" aria-label="Bugün yediğin kalori">' +
     '<button data-act="kcal-ekle">' + (k ? 'Ekle' : 'Kaydet') + '</button></div>' +
     '<div class="kc-alt"><details class="makro"' + (acik ? ' open' : '') + '><summary>Makro ile ekle</summary><div class="row makrorow">' +
-    MAKRO.map(function (x) { return '<input id="mk-' + x[0] + '" inputmode="decimal" autocomplete="off" placeholder="' + x[1] + ' g" aria-label="' + x[1] + ', gram">'; }).join('') +
+    MAKRO.map(function (x) { return '<label class="mk-alan"><span>' + x[1] + ' g</span><input id="mk-' + x[0] + '" inputmode="decimal" autocomplete="off" aria-label="' + x[1] + ', gram"></label>'; }).join('') +
     '<button data-act="makro-ekle">Ekle</button></div><p class="mut kucuk makro-kcal" id="mk-kcal"></p></details>' +
     (k ? '<button class="btn-ghost mini kc-sil" data-act="kcal-sil">Sıfırla</button>' : '') + '</div>';
 }
@@ -621,5 +638,5 @@ AT.bolum.bulk = function () { var l = gecerli(AT.S.bw); return AT.S.bulk ? bolum
 AT.bolum.tarti = tarti;
 AT.demoBw = demoBw;
 /* test/başka modüller için saf hesaplar */
-AT.bulkHesap = { koni: koniOf, makroKcal: makroKcal, makroOrt: makroOrt, makroYaz: makroYaz, cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, haftalikOneri: haftalikOneri, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
+AT.bulkHesap = { koni: koniOf, makroKcal: makroKcal, makroOrt: makroOrt, makroYaz: makroYaz, cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, haftalikOneri: haftalikOneri, kcalHaftaGun: kcalHaftaGun, oneriUygula: oneriUygula, proteinDurum: proteinDurum, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
 })(window.AT);
