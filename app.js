@@ -55,6 +55,7 @@ function yukle() {
   if (S.temaV < 4) { if (S.tema === 'apple') S.tema = 'koyu'; S.temaV = 4; }   /* yalnız otomatik Apple döner; açık/sistem seçimleri kalır, Ayarlar'dan seçilen Apple temaV 4 ile kalır */
   /* süren antrenmanın son hâli ayrı anahtardaysa (kaydet(true)) onu al; antrenman bittiyse eski kopya yok sayılır */
   try { var a = JSON.parse(localStorage.getItem(KEY_AKTIF) || 'null'); if (a && S.active && a.id === S.active.id) S.active = a; } catch (e) { }
+  if (S.active && !Array.isArray(S.active.exs)) S.active = null;   /* bozuk süren antrenman ekranı çökertmesin (render dışındaki setVurgu/sahneKur) */
 }
 /* kaydet(true): yalnız süren antrenman değişti (set kutusu, ✓, set ekle/tipi, ad, not). Bütün veriyi yeniden yazmak yerine
    ~2 KB'lık S.active ayrı anahtara yazılır; eşitleme tetiklenmez (antrenman bitince tam kayıt). 5 yıllık veride telefonda
@@ -1370,7 +1371,7 @@ function render() {
   v.classList.toggle('giris', yeniSekme && !vtSuruyor); v.dataset.sekme = tab;
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   var f = $('#dosya'); if (f) f.addEventListener('change', iceAl);
-  if (tab === 'bugun') { setVurgu(); sahneKur(); }
+  if (tab === 'bugun') { try { setVurgu(); sahneKur(); } catch (e) { if (window.console) console.error(e); } }
   if (yeniSekme || !hapEl) hapYerlestir();
   sayilariSay();
 }

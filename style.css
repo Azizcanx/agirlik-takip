@@ -345,7 +345,7 @@ section.panel+section.panel{margin-top:-12px}
 /* ---------- alt sayfa ---------- */
 #sheet{position:fixed;inset:0;background:var(--scrim);z-index:20;display:flex;align-items:flex-end;justify-content:center;animation:sfade .18s ease-out}
 #sheet[hidden]{display:none}
-#sheet .in{position:relative;background:var(--bg);border-radius:22px 22px 0 0;width:100%;max-width:640px;max-height:88vh;overflow:auto;padding:26px 16px calc(18px + env(safe-area-inset-bottom));animation:sup .22s ease-out;box-shadow:var(--pop)}
+#sheet .in{position:relative;background:var(--bg);border-radius:22px 22px 0 0;width:100%;max-width:640px;max-height:88vh;max-height:88dvh;overflow:auto;padding:26px 16px calc(18px + env(safe-area-inset-bottom));animation:sup .22s ease-out;box-shadow:var(--pop)}
 #sheet .in::before{content:"";position:absolute;top:9px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:99px;background:var(--line)}
 #sheet h3{font-family:var(--serif);margin:0 0 6px;font-size:24px;font-weight:600;letter-spacing:-.01em;line-height:1.25}
 #sheet h3+.mut{margin:0 0 18px}
@@ -1919,7 +1919,7 @@ kbd{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--mut);back
 
   /* pencere: ortada */
   #sheet{align-items:center;padding:24px}
-  #sheet .in{max-width:580px;max-height:86vh;border-radius:18px;padding:26px 28px 24px;animation:spop .18s ease-out}
+  #sheet .in{max-width:580px;max-height:86vh;max-height:86dvh;border-radius:18px;padding:26px 28px 24px;animation:spop .18s ease-out}
   #sheet .in::before{display:none}
   @keyframes spop{from{transform:scale(.97);opacity:0}}
 
