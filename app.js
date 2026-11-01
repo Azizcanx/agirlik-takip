@@ -22,6 +22,8 @@ function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (
 function num(v) { var n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : NaN; }
 var NF = {};   /* fmt: ondalık sayısı başına tek biçimleyici (toLocaleString her çağrıda yenisini kuruyordu; 5 yılda %8-10 CPU) */
 function fmt(n, d) { d = d == null ? 1 : d; return (NF[d] || (NF[d] = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: d }))).format(+n); }
+/* büyük sayı: sayarak yükselme animasyonu için data-say (ham sayı) + data-say-ond (ondalık hane); metin fmt ile normal yazılır */
+function sayData(n, d) { d = d == null ? 1 : d; var k = Math.pow(10, d), v = Math.round(+n * k) / k; return '<data class="say" value="' + v + '" data-say="' + v + '" data-say-ond="' + d + '">' + fmt(v, d) + '</data>'; }
 function tarih(s, kisa) { var d = parse(s); return d.getDate() + ' ' + AYLAR[d.getMonth()].slice(0, kisa ? 3 : 20) + (kisa ? '' : ' ' + d.getFullYear()); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 /* tahmini 1RM. rpe yok/geçersiz -> Epley. rpe (6–10) varsa RPE tablosu eğrisi:
@@ -245,7 +247,11 @@ function adim(r, n) {
 function ondalik(st) { var d = 0; while (d < 3 && Math.abs(st * Math.pow(10, d) - Math.round(st * Math.pow(10, d))) > 1e-6) d++; return d; }
 /* pts: [{x: ms, y: sayı, t: etiket, ham?: o günün gerçek tartısı}]
    o: {baslik, birim:'kg', ref:[{x,y},{x,y}] kesik hedef çizgisi, refAd:'Hedef', seriAd: açıklamada çizginin adı,
-       ham: true → ham tartılar soluk nokta (tek path; 200 noktaya kadar), ek: function (p) → dokunma etiketinin 3. satırı}
+       ham: true → ham tartılar soluk nokta (tek path; 200 noktaya kadar), ek: function (p) → dokunma etiketinin 3. satırı,
+       koni: {a, b: [[x,y]...] iki kenar (ilk nokta çizginin sonu), o: orta çizgi, v: [x,y] varış noktası?, bant: [x,x]?,
+             etiket?, ex: etiketin x'i, ozet?} gelecek tahmini (bulk.js); eksen koninin ucuna uzar, dokununca "tahmin" ve aralık,
+       hedef: {y, ad, alt: etiket çizginin altında} yatay ince hedef çizgisi,
+       rek: [nokta indeksi] altın rekor noktaları, tas: [{i, v, t}] kilometre taşı bayrakları (v eşik, t eksen tarihi)}
    Etkileşim: GV[id] (piksel konumları + noktalar) ve tek document dinleyicisi (grafikOlay); nokta başına dinleyici yok. */
 var GV = {};
 var AY3 = AYLAR.map(function (a) { return a.slice(0, 3); });
@@ -257,14 +263,22 @@ function cizgi(pts, o) {
   if (!pts.length) return '<p class="empty">Henüz veri yok.</p>';
   var id = grafikId(), n = pts.length;
   var ref = (o.ref || []).filter(function (p) { return p && isFinite(p.x) && isFinite(p.y); });
-  var hamVar = o.ham && n <= 200, T = ref.length > 1 || hamVar ? 34 : 14;
+  var kn = o.koni && o.koni.a && o.koni.a.length > 1 && o.koni.b && o.koni.b.length > 1 ? o.koni : null;
+  var hd = o.hedef && isFinite(o.hedef.y) ? o.hedef : null, tas = o.tas || [], rek = {};
+  (o.rek || []).forEach(function (i) { rek[i] = 1; });
+  var hamVar = o.ham && n <= 200, T = ref.length > 1 || hamVar || tas.length ? 34 : 14;
   var mn = Infinity, mx = -Infinity, x0 = Infinity, x1 = -Infinity;
   function kap(p, y) { if (y < mn) mn = y; if (y > mx) mx = y; if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; }
   pts.forEach(function (p) { kap(p, p.y); if (hamVar && p.ham > 0) kap(p, p.ham); });
   ref.forEach(function (p) { kap(p, p.y); });
+  if (kn) kn.a.concat(kn.b).forEach(function (q) { kap({ x: q[0] }, q[1]); });
+  if (hd) kap({ x: pts[0].x }, +hd.y);
   var st = adim(mx - mn > 0 ? mx - mn : Math.max(1, Math.abs(mx) * .05), 4);
   var y0 = Math.floor(mn / st + 1e-9) * st, y1 = Math.ceil(mx / st - 1e-9) * st;
   if (y1 - y0 < st * 2) { y0 -= st; y1 += st; }
+  /* hedef çizgisi grafiğin kenarına yapışmasın (koninin düz ucu çerçeve gibi okunur): bir adım pay */
+  if (hd && +hd.y > y1 - st * .2) y1 += st;
+  if (hd && +hd.y < y0 + st * .2 && y0 - st >= 0) y0 -= st;
   if (mn >= 0 && y0 < 0) { y0 = 0; }
   var dc = ondalik(st), et = [];
   for (var v = y0, k = 0; v <= y1 + st * 1e-6 && k < 12; v += st, k++) et.push([v, fmt(v, dc)]);
@@ -273,14 +287,31 @@ function cizgi(pts, o) {
   var yil = x1 - x0 > 300 * 864e5;
   function X(x) { return x1 === x0 ? (L + W - R) / 2 : L + (x - x0) / (x1 - x0) * (W - L - R); }
   function Y(y) { return T + (1 - (y - y0) / (y1 - y0)) * (H - T - B); }
+  function P(q) { return X(q[0]).toFixed(1) + ' ' + Y(q[1]).toFixed(1); }
   /* ekran okuyucu özeti: "Ortalama kilo, son 82,4 kg, 12 haftada +1,8 kg" (nokta <title>'ları role=img içinde okunmaz) */
   var fk = pts[n - 1].y - pts[0].y, gun = Math.round((pts[n - 1].x - pts[0].x) / 864e5);
-  var ozet = (o.baslik || 'Grafik') + ', son ' + fmt(pts[n - 1].y) + bir + (n > 1 && gun > 0 ? ', ' + (gun >= 14 ? Math.round(gun / 7) + ' haftada ' : gun + ' günde ') + (fk > 0 ? '+' : fk < 0 ? '−' : '±') + fmt(Math.abs(fk)) + bir : '') + '. Ok tuşlarıyla noktalar gezilir.';
+  var ozet = (o.baslik || 'Grafik') + ', son ' + fmt(pts[n - 1].y) + bir + (n > 1 && gun > 0 ? ', ' + (gun >= 14 ? Math.round(gun / 7) + ' haftada ' : gun + ' günde ') + (fk > 0 ? '+' : fk < 0 ? '−' : '±') + fmt(Math.abs(fk)) + bir : '') + '. ' + (kn && kn.ozet ? kn.ozet + '. ' : '') + 'Ok tuşlarıyla noktalar gezilir.';
   var s = '<svg class="chart cizgi" data-g="' + id + '" tabindex="0" width="' + W + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + h(ozet) + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity=".22"/><stop offset=".55" stop-opacity=".07"/><stop offset="1" stop-opacity="0"/></linearGradient></defs>';
   et.forEach(function (e) {
     var y = Math.round(Y(e[0])) + .5;
     s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/><text x="' + (L - 10) + '" y="' + (y + 4) + '" text-anchor="end">' + e[1] + '</text>';
   });
+  /* hedef kilo: yatay ince çizgi; etiket koninin uzağında, sol uçta (çizginin başı etiket tarafındaysa sağ uçta).
+     alt: çizgi hedefin üstünde, etiket çizginin altında */
+  if (hd) {
+    var hy = Math.round(Y(+hd.y)) + .5, solBos = hd.alt ? pts[0].y >= +hd.y : pts[0].y <= +hd.y;
+    s += '<line class="hedefc" x1="' + L + '" x2="' + (W - R) + '" y1="' + hy + '" y2="' + hy + '"/><text class="hedeft" x="' + (solBos ? L + 2 : W - R) + '" y="' + (hd.alt ? hy + 15 : hy - 6) + '" text-anchor="' + (solBos ? 'start' : 'end') + '">' + h(hd.ad) + '</text>';
+  }
+  /* gelecek konisi: iki kenar arası yumuşak degrade (soldan sağa söner), ince kenarlar, kesik orta çizgi, varış noktası, eksende
+     varış bandı. Çizginin altında çizilir; .koni CSS'te çizgi çizildikten sonra belirir */
+  if (kn) {
+    s += '<defs><linearGradient id="' + id + 'k" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-opacity=".34"/><stop offset="1" stop-opacity=".08"/></linearGradient></defs><g class="koni">' +
+      '<path class="koni-a" fill="url(#' + id + 'k)" d="M' + kn.a.map(P).join(' L') + ' L' + kn.b.slice().reverse().map(P).join(' L') + 'Z"/>' +
+      '<path class="koni-k" d="M' + kn.a.map(P).join(' L') + ' M' + kn.b.map(P).join(' L') + '"/>' +
+      (kn.o && kn.o.length > 1 ? '<path class="koni-o" d="M' + kn.o.map(P).join(' L') + '"/>' : '') +
+      (kn.bant ? '<rect class="bant" x="' + X(kn.bant[0]).toFixed(1) + '" y="' + (H - B - 2.5) + '" width="' + Math.max(5, X(kn.bant[1]) - X(kn.bant[0])).toFixed(1) + '" height="5" rx="2.5"/>' : '') +
+      (kn.v ? '<circle class="koni-v" cx="' + X(kn.v[0]).toFixed(1) + '" cy="' + Y(kn.v[1]).toFixed(1) + '" r="4"/>' : '') + '</g>';
+  }
   /* piksel konumları bir kez hesaplanır (path, noktalar ve dokunma aynı diziyi kullanır) */
   var px = new Array(n), py = new Array(n), d = new Array(n);
   for (var i = 0; i < n; i++) { px[i] = Math.round(X(pts[i].x) * 10) / 10; py[i] = Math.round(Y(pts[i].y) * 10) / 10; d[i] = (i ? 'L' : 'M') + px[i] + ' ' + py[i]; }
@@ -300,7 +331,7 @@ function cizgi(pts, o) {
   if (ref.length > 1) {
     s += '<path class="ref" d="' + ref.map(function (p, i) { return (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1); }).join(' ') + '"><title>' + h((o.refAd || 'Hedef') + ': ' + fmt(ref[ref.length - 1].y) + bir) + '</title></path>';
   }
-  if (T > 14) {   /* açıklama satırı: çizginin üstünde kendi şeridinde, hiçbir şeyle çakışmaz */
+  if (ref.length > 1 || hamVar) {   /* açıklama satırı: çizginin üstünde kendi şeridinde, hiçbir şeyle çakışmaz */
     lejant('ln', o.seriAd || 'değer');
     if (hamVar) lejant('ham', 'tartı');
     if (ref.length > 1 && o.refAd !== false) lejant('ref', o.refAd || 'Hedef');
@@ -309,18 +340,57 @@ function cizgi(pts, o) {
   var son = n - 1;
   for (i = 0; i < n; i++) {
     var tt = '<title>' + h(pts[i].t) + ': ' + fmt(pts[i].y) + h(bir) + '</title>';
-    if (i === son) s += '<circle class="hale" cx="' + px[i] + '" cy="' + py[i] + '" r="9"/><circle class="dot son" cx="' + px[i] + '" cy="' + py[i] + '" r="4.5">' + tt + '</circle>';
+    if (i === son) s += '<circle class="hale' + (rek[i] ? ' rek' : '') + '" cx="' + px[i] + '" cy="' + py[i] + '" r="9"/><circle class="dot son' + (rek[i] ? ' rek' : '') + '" cx="' + px[i] + '" cy="' + py[i] + '" r="4.5">' + tt + '</circle>';
+    else if (rek[i]) s += '<circle class="dot rek" cx="' + px[i] + '" cy="' + py[i] + '" r="' + (n <= 20 ? 4 : 3.5) + '">' + tt + '</circle>';
     else if (n <= 20) s += '<circle class="dot" cx="' + px[i] + '" cy="' + py[i] + '" r="3">' + tt + '</circle>';
     else s += '<circle class="hit" cx="' + px[i] + '" cy="' + py[i] + '" r="7">' + tt + '</circle>';
   }
-  /* son değer etiketi: çizginin geldiği yönün tersinde (yükselen çizgide üstte) */
+  /* kilometre taşları: noktadan yukarı ince direk + sola bakan flama, eşik değeri flamanın solunda (yükselen çizgide sol üst boştur);
+     soldaki eksen yazılarına taşarsa sağa döner. Yazılar sondan başa yerleşir, çakışan yazı atlanır (flama kalır) */
+  var kutu = [], tasSon = false;
+  function cakisir(a) { return kutu.some(function (k) { return a[0] < k[2] && a[2] > k[0] && a[1] < k[3] && a[3] > k[1]; }); }
+  tas.slice().reverse().forEach(function (m) {
+    var i = m.i; if (!(i >= 0 && i < n)) return; if (i === son) tasSon = true;
+    var x = px[i], y = py[i], ty = Math.max(4, y - 22), yt = fmt(m.v, 0), tw = 7 * yt.length + 2, sag = x - 12 - tw < L - 4;
+    s += '<g class="tas"><line class="tas-c" x1="' + x + '" x2="' + x + '" y1="' + (y + 6).toFixed(1) + '" y2="' + (H - B) + '"/><path class="tas-d" d="M' + x + ' ' + (y - 5).toFixed(1) + 'V' + ty.toFixed(1) + '"/>' +
+      '<path class="tas-f" d="M' + x + ' ' + ty.toFixed(1) + 'l' + (sag ? 9 : -9) + ' 3.5l' + (sag ? -9 : 9) + ' 3.5z"/>';
+    var bx = sag ? [x + 12, ty - 3, x + 12 + tw, ty + 11] : [x - 12 - tw, ty - 3, x - 12, ty + 11];
+    if (!cakisir(bx)) { kutu.push(bx); s += '<text class="tas-v" x="' + (sag ? x + 12 : x - 12) + '" y="' + (ty + 8).toFixed(1) + '" text-anchor="' + (sag ? 'start' : 'end') + '">' + h(yt) + '</text>'; }
+    s += '</g>';
+  });
+  /* son değer etiketi: çizginin geldiği yönün tersinde (yükselen çizgide üstte); son noktada taş varsa altta (flamayla çakışmasın) */
   var sv = fmt(pts[son].y) + bir, sw = 7 * sv.length + 16, onc = py[Math.max(0, son - Math.max(1, Math.round(n / 12)))];
-  var ust = n < 2 || onc >= py[son]; if (ust && py[son] - 30 < 2) ust = false; if (!ust && py[son] + 30 > H - B) ust = true;
+  var ust = (n < 2 || onc >= py[son]) && !tasSon; if (ust && py[son] - 30 < 2) ust = false; if (!ust && py[son] + 30 > H - B) ust = true;
   var sx = Math.max(L, Math.min(W - 2 - sw, px[son] - sw / 2)), sy = ust ? py[son] - 30 : py[son] + 10;
   s += '<g class="sonet"><rect x="' + sx.toFixed(1) + '" y="' + sy.toFixed(1) + '" width="' + sw + '" height="20" rx="10"/><text x="' + (sx + sw / 2).toFixed(1) + '" y="' + (sy + 14).toFixed(1) + '" text-anchor="middle">' + h(sv) + '</text></g>';
-  var ix = etiketIdx(n, Math.floor((W - L) / (yil ? 96 : 84)) + 1);
-  ix.forEach(function (j) { var tx = px[j]; s += '<text x="' + tx + '" y="' + (H - 6) + '" text-anchor="' + (tx < L + 30 ? 'start' : tx > W - R - 30 ? 'end' : 'middle') + '">' + h(yil ? eksenTarih(pts[j].x, true) : pts[j].t) + '</text>'; });
-  GV[id] = { tur: 'c', W: W, T: T, A: H - B, px: px, py: py, pts: pts, bir: bir, ref: ref.length > 1 ? ref.map(function (p) { return [X(p.x), p.y]; }) : null, refAd: o.refAd || 'hedef', ek: o.ek };
+  /* x ekseni: önce koni varış etiketi ve taş tarihleri, sonra düzenli tarihler; çakışan yazı atlanır */
+  var eks = [], xs = [];
+  function eksen(x, t, cls) {
+    var w = 6.6 * t.length, an = x < L + w / 2 ? 'start' : x > W - 2 - w / 2 ? 'end' : 'middle', a = an === 'start' ? x : an === 'end' ? x - w : x - w / 2;
+    if (xs.some(function (k) { return a < k[1] + 10 && a + w > k[0] - 10; })) return;
+    xs.push([a, a + w]); eks.push('<text' + (cls ? ' class="' + cls + '"' : '') + ' x="' + (+x).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + an + '">' + h(t) + '</text>');
+  }
+  if (kn && kn.etiket && kn.ex != null) eksen(X(kn.ex), kn.etiket, 'bant-t');
+  tas.slice().reverse().forEach(function (m) { if (m.i >= 0 && m.i < n && m.t) eksen(px[m.i], m.t, 'tas-t'); });
+  var ix = etiketIdx(n, Math.floor(((kn ? px[son] : W) - L) / (yil ? 96 : 84)) + 1);
+  ix.reverse().forEach(function (j) { eksen(px[j], yil ? eksenTarih(pts[j].x, true) : pts[j].t); });
+  if (kn) eksen(W - R, eksenTarih(x1, yil), 'kx');
+  s += eks.join('');
+  /* koni bölgesinde dokunma: o tarihteki tahmin aralığı (iki kenarın arası) */
+  var kHit = null;
+  if (kn) {
+    var kAra = function (pl, x) {
+      for (var j = 1; j < pl.length; j++) if (x <= pl[j][0] || j === pl.length - 1) { var q = pl[j - 1], w = pl[j]; return w[0] === q[0] ? w[1] : q[1] + (w[1] - q[1]) * (x - q[0]) / (w[0] - q[0]); }
+      return pl[0][1];
+    };
+    kHit = function (xp) {
+      var xd = Math.min(x1, x0 + (xp - L) / (W - L - R) * (x1 - x0));
+      var ya = kAra(kn.a, xd), yb = kAra(kn.b, xd), lo = Math.min(ya, yb), hi = Math.max(ya, yb);
+      var yo = kn.o && kn.o.length > 1 ? kAra(kn.o, Math.min(xd, kn.o[kn.o.length - 1][0])) : (lo + hi) / 2;
+      return { px: Math.round(X(xd) * 10) / 10, py: Math.round(Y(yo) * 10) / 10, d: eksenTarih(xd), v: (hi - lo < .05 ? fmt(lo) : fmt(lo) + '–' + fmt(hi)) + bir, e: 'tahmin' };
+    };
+  }
+  GV[id] = { tur: 'c', W: W, T: T, A: H - B, px: px, py: py, pts: pts, bir: bir, ref: ref.length > 1 ? ref.map(function (p) { return [X(p.x), p.y]; }) : null, refAd: o.refAd || 'hedef', ek: o.ek, koni: kHit };
   return s + imlec() + '</svg>';
 }
 /* dokunma/fare etiketi: kılavuz çizgi, nokta, yuvarlak kutu (2–3 satır). Başta görünmez; grafikOlay doldurur */
@@ -362,6 +432,8 @@ function imGoster(svg, cx, ki) {
   if (g.tur === 'b') {
     n = g.items.length; i = Math.max(0, Math.min(n - 1, ki != null ? ki : Math.floor((x - g.L) / g.bw)));
     px = g.L + (i + .5) * g.bw; py = g.ys[i]; d = g.items[i].l + g.donem; v = fmt(g.items[i].v || 0, 0) + g.bir;
+  } else if (g.koni && ki == null && x > g.px[g.px.length - 1] + 8) {   /* gelecek konisi: tahmin aralığı */
+    var kk = g.koni(x); i = 'k' + kk.px; px = kk.px; py = kk.py; d = kk.d; v = kk.v; e = kk.e;
   } else {
     var a = g.px; n = a.length; var lo = 0, hi = n - 1;
     while (hi - lo > 1) { j = (lo + hi) >> 1; if (a[j] < x) lo = j; else hi = j; }   /* x'ler sıralı: ikili arama */
@@ -492,6 +564,73 @@ function haftaSerit() {
   return '<div class="hserit" role="group" aria-label="Bu hafta ' + n + ' antrenman"><ol aria-hidden="true">' + o + '</ol>' +
     '<p class="hs-say" aria-hidden="true"><b>' + n + '</b><span>antrenman<br>bu hafta</span></p></div>';
 }
+/* ---------- Bugün'ün canlı başlığı ----------
+   Arkada son 30 günün ortalama kilo eğrisi (bulk.js cizgiSeri; çok soluk dalga, yalnız süs: aria-hidden), altında günün
+   durumuna göre tek kısa cümle (kural tabanlı). İkisi de sürüm + gün anahtarlı önbellekte; render başına iş yok denecek kadar az. */
+var basOnb = { k: null };
+function gunlerArasi(a, b) { return Math.round((parse(a) - parse(b)) / 864e5); }
+function kiloDalga(bugun) {
+  var B = AT.bulkHesap; if (!B || !S.bw || !S.bw.length) return '';
+  var bas = new Date(parse(bugun)); bas.setDate(bas.getDate() - 30); var basS = iso(bas);
+  var l = B.gecerli(S.bw), ham = l.filter(function (b) { return b.date >= basS; });
+  if (ham.length < 3) return '';
+  var p = B.cizgiSeri(B.trendSeri(l)).filter(function (x) { return x.date >= basS; });
+  var gun = p.length ? gunlerArasi(p[p.length - 1].date, p[0].date) : 0; if (gun < 5) return '';
+  var mn = Infinity, mx = -Infinity; p.forEach(function (x) { mn = Math.min(mn, x.kg); mx = Math.max(mx, x.kg); });
+  /* en az 1,5 kg'lık aralık: düz giden kiloda gürültü dağ gibi görünmesin */
+  var orta = (mn + mx) / 2, yay = Math.max(mx - mn, 1.5), W = 600, H = 120;
+  var pt = p.map(function (x) { return [gunlerArasi(x.date, p[0].date) / gun * W, 22 + (1 - ((x.kg - orta) / yay + 0.5)) * 76]; });
+  /* Catmull-Rom → kübik Bézier: noktalardan geçen yumuşak dalga */
+  var d = 'M' + pt[0][0].toFixed(1) + ' ' + pt[0][1].toFixed(1);
+  for (var i = 0; i < pt.length - 1; i++) {
+    var a = pt[i - 1] || pt[i], b = pt[i], c = pt[i + 1], e = pt[i + 2] || c;
+    d += 'C' + (b[0] + (c[0] - a[0]) / 6).toFixed(1) + ' ' + (b[1] + (c[1] - a[1]) / 6).toFixed(1) + ' ' + (c[0] - (e[0] - b[0]) / 6).toFixed(1) + ' ' + (c[1] - (e[1] - b[1]) / 6).toFixed(1) + ' ' + c[0].toFixed(1) + ' ' + c[1].toFixed(1);
+  }
+  return '<svg class="bg-dalga" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
+    '<defs><linearGradient id="bg-dolgu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".16"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>' +
+    '<path class="bg-alan" d="' + d + 'L' + W + ' ' + H + 'L0 ' + H + 'Z" fill="url(#bg-dolgu)"/><path class="bg-cizgi" d="' + d + '" vector-effect="non-scaling-stroke"/></svg>';
+}
+/* haftalık alışkanlık: son 8 tam haftanın (ilk antrenman haftasından sonrası) antrenman sayısı medyanı; 3 haftadan az veri ya da <2 ise yok */
+function haftaHedefi(bugun) {
+  var l = bitenSeanslar(); if (!l.length) return null;
+  var buHafta = haftaBasi(bugun), ilk = haftaBasi(l[0].date), say = {}, n = [];
+  l.forEach(function (s) { var k = haftaBasi(s.date); say[k] = (say[k] || 0) + 1; });
+  for (var i = 1; i <= 8; i++) {
+    var d = parse(buHafta); d.setDate(d.getDate() - 7 * i); var k = iso(d);
+    if (k < ilk) break; n.push(say[k] || 0);
+  }
+  if (n.length < 3) return null;
+  n.sort(function (a, b) { return a - b; });
+  var m = Math.round(n.length % 2 ? n[(n.length - 1) / 2] : (n[n.length / 2 - 1] + n[n.length / 2]) / 2);
+  return m >= 2 ? Math.min(m, 7) : null;
+}
+/* "Bacak günü" (kısa ad) ya da "Sıradaki: Pazartesi antrenmanı" */
+function gunAdi(s) { var n = sadeAd(s.name) || 'Antrenman'; return /gün|antrenman|day|workout/i.test(n) || n.length > 18 ? 'Sıradaki: ' + n : n + ' günü'; }
+/* günün tek cümlesi (öncelik sırası): bugün yapıldı → rekor haftası (3+) → dinlenme günü (3 gün üst üste ya da haftalık
+   alışkanlık doldu ve dün çalışıldı) → Sıradaki + dinlenme → yalnız dinlenme. Ek bilgi: haftalık alışkanlık varsa "haftada 3/4" */
+function bugunCumle(bugun, sr) {
+  var l = bitenSeanslar(); if (!l.length) return '';
+  var son = l[l.length - 1], g = gunlerArasi(bugun, son.date), hb = haftaBasi(bugun), pr = prHesapla(), gunler = {}, n = 0, rekH = 0, rekB = 0;
+  l.forEach(function (s) {
+    gunler[s.date] = 1;
+    if (s.date >= hb && s.date <= bugun) { n++; var r = pr && pr[s.id] ? Object.keys(pr[s.id]).length : 0; rekH += r; if (s.date === bugun) rekB += r; }
+  });
+  var hedef = haftaHedefi(bugun), oran = hedef ? 'haftada ' + n + '/' + hedef : '';
+  var ust = 0, d = parse(bugun); for (;;) { d.setDate(d.getDate() - 1); if (!gunler[iso(d)]) break; ust++; }
+  var dinlen = g >= 3 && g <= 5 ? (g - 1) + ' gündür dinlendin' : g === 2 ? 'dün dinlendin' : '';
+  function bir() { var c = Array.prototype.filter.call(arguments, Boolean).join(' · '); return c.charAt(0).toLocaleUpperCase('tr') + c.slice(1); }
+  if (g <= 0) return bir(rekB ? 'Bugün ' + rekB + ' rekor kırdın' : 'Bugünkü antrenman tamam', oran);
+  if (rekH >= 3) return bir('Rekor haftası: ' + rekH + ' rekor', oran || dinlen);
+  if (ust >= 3 || (hedef && n >= hedef && g === 1)) return bir('Bugün dinlenme günü', oran || ust + ' gün üst üste çalıştın');
+  if (sr) return bir(gunAdi(sr), g === 1 ? 'dün ' + (sadeAd(son.name) || 'antrenman') : dinlen, oran);
+  return bir(g === 1 ? 'Dün: ' + (sadeAd(son.name) || 'antrenman') : dinlen, oran);
+}
+function bugunBaslik(sr) {
+  var bugun = iso(new Date()), k = surum + '|' + bugun + '|' + (sr ? sr.id : '');
+  if (basOnb.k !== k) basOnb = { k: k, dalga: kiloDalga(bugun), cumle: bugunCumle(bugun, sr) };
+  return '<header class="bg-ust' + (basOnb.dalga ? ' dalgali' : '') + '">' + basOnb.dalga + '<h1>Bugün</h1><p class="sub">' + tarih(bugun) + '</p>' +
+    (basOnb.cumle ? '<p class="bg-cumle">' + h(basOnb.cumle) + '</p>' : '') + '</header>';
+}
 var IKON_BASLA = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
 var IKON_TIK = '<svg class="tik" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path pathLength="1" d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 var IKON_YILDIZ = '<svg class="yildiz" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.8 3.7 4 .6-2.9 2.8.7 4L8 11l-3.6 1.9.7-4L2.2 6.1l4-.6z"/></svg>';
@@ -520,8 +659,8 @@ function vBugun() {
   var a = S.active, o = '';
   if (!a) {
     var son = bitenSeanslar().filter(function (x) { return !x.demo; }).pop() || bitenSeanslar().pop(), hic = !S.sessions.length && !S.bw.length;
-    o += '<h1>Bugün</h1><p class="sub">' + tarih(iso(new Date())) + '</p>' + haftaSerit();
     var sr = siradaki();
+    o += bugunBaslik(sr) + haftaSerit();
     var a1 = (hic ? ilkAdimlar() : '') + (sr
       ? '<button class="btn-ac btn-big btn-sira" data-act="basla-tekrar" data-id="' + h(sr.id) + '"><span class="sira-yazi"><small class="sira-ust">Sıradaki</small><span class="sira-ad">' + h(sadeAd(sr.name)) + '<kbd>N</kbd></span><small>' + h(hareketOnizle(sr)) + '</small></span><span class="sira-ok">' + IKON_BASLA + '</span></button><button class="btn-ghost mini basla-baska" data-act="basla">Başka antrenman seç</button>'
       : '<button class="btn-ac btn-big btn-basla" data-act="basla"><span class="sira-ok">' + IKON_BASLA + '</span>Antrenmana başla<kbd>N</kbd></button>') + sonGunSatir(son);
@@ -541,14 +680,6 @@ function vBugun() {
   }
   var tamam = seansSetSayisi(a), topSet = 0, simdi = simdikiEgz(a), yeni = sonTik && Date.now() - sonTik.t < 900 ? sonTik : null;
   var segs = a.exs.map(function (e) { var n = e.sets.filter(function (s) { return s.tip !== 'isinma'; }).length, d = yapilanSetler(e).length; topSet += n; return { n: n, d: Math.min(d, n) }; });   /* ısınma sayılmaz */
-  o += '<input id="seansad" class="baslik-input" value="' + h(a.name) + '" aria-label="Antrenmanın adı (değiştirebilirsin)" autocomplete="off">';
-  o += '<p class="sub">Başladı ' + new Date(a.start).toTimeString().slice(0, 5) + ' · <span id="gecen">' + gecenSure(a.start) + '</span></p>';
-  /* hareket başına parçalı çubuk: parça genişliği set sayısı, dolu kısmı biten set; hareketi biten parça yeşil */
-  if (topSet) o += '<div class="ilerle"><div class="iseg" role="progressbar" aria-label="Biten set" aria-valuemin="0" aria-valuemax="' + topSet + '" aria-valuenow="' + tamam + '">' +
-    segs.map(function (x) { return x.n ? '<i style="flex-grow:' + x.n + '"' + (x.d >= x.n ? ' class="tam"' : '') + '><u style="width:' + Math.round(x.d / x.n * 100) + '%"></u></i>' : ''; }).join('') +
-    '</div><span><b>' + tamam + '</b> / ' + topSet + ' set</span></div>';
-  var o0 = o; o = '';
-  if (!a.exs.length) o += '<div class="bos-durum">' + BOS_CIZIM + '<p>Henüz hareket yok. Aşağıdan “+ Hareket ekle” ile başla.</p></div>';
   /* sıradaki set: şu anki hareketin ilk bitmemiş seti; o hareket bittiyse sonraki hareketlerden ilki */
   var hedefE = -1, hedefS = -1;
   for (var k = 0; k < a.exs.length && hedefE < 0; k++) {
@@ -556,8 +687,33 @@ function vBugun() {
     a.exs[ki].sets.some(function (x, i) { if (!x.done) { ks = i; return true; } return false; });
     if (ks >= 0) { hedefE = ki; hedefS = ks; }
   }
-  /* rekor kıran setler (yıldız); başlık satırı (Set/kg/Tekrar) yalnız ilk açık kartta */
+  /* telefonda odak sahnesi: hareket başına tam genişlik sahne (yalnız bellekte konum; yeni antrenmanda sıradaki hareketten başlar) */
+  var sm = !masaustu() && a.exs.length > 0;
+  if (sahne.id !== a.id) { sahne.id = a.id; sahne.i = hedefE >= 0 ? hedefE : a.exs.length; }
+  sahne.i = Math.max(0, Math.min(a.exs.length, sahne.i));
   var rek = aktifRek = aktifRekor(a), etiket = false;
+  var ctx = { rek: rek, yeni: yeni, hedefE: hedefE, hedefS: hedefS, rg: S.rpe ? ' rpe' : '' };
+  o += '<input id="seansad" class="baslik-input" value="' + h(a.name) + '" aria-label="Antrenmanın adı (değiştirebilirsin)" autocomplete="off">';
+  o += '<p class="sub">Başladı ' + new Date(a.start).toTimeString().slice(0, 5) + ' · <span id="gecen">' + gecenSure(a.start) + '</span></p>';
+  /* hareket başına parçalı çubuk (PC): parça genişliği set sayısı, dolu kısmı biten set; hareketi biten parça yeşil. Altında hareket şeridi */
+  if (a.exs.length) o += '<div class="ilerle' + (sm ? ' sahne-ust' : '') + '">' + (topSet ? '<div class="iseg" role="progressbar" aria-label="Biten set" aria-valuemin="0" aria-valuemax="' + topSet + '" aria-valuenow="' + tamam + '">' +
+    segs.map(function (x) { return x.n ? '<i style="flex-grow:' + x.n + '"' + (x.d >= x.n ? ' class="tam"' : '') + '><u style="width:' + Math.round(x.d / x.n * 100) + '%"></u></i>' : ''; }).join('') +
+    '</div><span class="ilerle-say"><b>' + tamam + '</b> / ' + topSet + ' set</span>' : '') + egzSerit(a, segs, ctx, sm ? sahne.i : hedefE, sm) + '</div>';
+  var o0 = o; o = '';
+  var hac = a.exs.reduce(function (t, e) { return t + hacim(e); }, 0), bitenEgz = segs.filter(function (x) { return x.n && x.d >= x.n; }).length;
+  var b2 = '<div class="bitir-ozet"><div><b data-gecen>' + gecenSure(a.start) + '</b><span>süre</span></div><div><b>' + bitenEgz + '<small>/' + a.exs.length + '</small></b><span>hareket</span></div><div><b>' + fmt(hac, 0) + '</b><span>kg toplam</span></div></div>';
+  b2 += '<details class="katla seansnot"' + (a.not ? ' open' : '') + '><summary>Seans notu' + (a.not ? '' : ' ekle') + '</summary><textarea id="seansnot" rows="3" placeholder="Uyku, ağrı, nasıl hissettin…" aria-label="Seans notu">' + h(a.not || '') + '</textarea></details>';
+  b2 += '<button class="btn-ac btn-big btn-bitir" data-act="bitir">Antrenmanı bitir ve kaydet</button>';
+  b2 += '<button class="btn-ghost btn-bad btn-big btn-cik" data-act="iptal">Kaydetmeden çık</button>';
+  if (sm) {
+    o += '<div class="sahneler" data-n="' + a.exs.length + '">';
+    a.exs.forEach(function (e, ei) { o += sahneKart(a, e, ei, ctx); });
+    o += '<section class="sahne-son" data-e="' + a.exs.length + '" aria-label="Antrenmanı bitir"><h2>' + (bitenEgz >= a.exs.length ? 'Hepsi bitti' : 'Bitirmeye hazır mısın?') + '</h2>' + b2 +
+      '<button class="btn-big ekle-egz" data-act="egz-ekle">+ Hareket ekle</button></section></div>';
+    return o0 + o;
+  }
+  if (!a.exs.length) o += '<div class="bos-durum">' + BOS_CIZIM + '<p>Henüz hareket yok. Aşağıdan “+ Hareket ekle” ile başla.</p></div>';
+  /* rekor kıran setler (yıldız); başlık satırı (Set/kg/Tekrar) yalnız ilk açık kartta */
   a.exs.forEach(function (e, ei) {
     var prev = oncekiSetler(e.ad);
     /* hareket bitti: ısınma olmayan bütün setleri ✓ — kart tek satır özete iner (dokununca açılır; durum yalnız bellekte) */
@@ -573,31 +729,138 @@ function vBugun() {
       '<span class="ex-dug">' + (AT.bolum.plakaDugme ? AT.bolum.plakaDugme(ei) : '') +
       '<button class="mini btn-ghost" data-act="egz-sil" data-e="' + ei + '" aria-label="Hareketi çıkar">Çıkar</button></span></div><div class="ex-govde">';
     o += miniGecmis(e.ad);
-    var rg = S.rpe ? ' rpe' : '';
-    if (!kapali && !etiket) { etiket = true; o += '<div class="setgrid etiket' + rg + '" aria-hidden="true"><span class="lbl">Set</span><span class="lbl">kg</span><span class="lbl">Tekrar</span>' + (S.rpe ? '<span class="lbl">Zorluk</span>' : '') + '<span class="lbl">Bitti</span></div>'; }
+    if (!kapali && !etiket) { etiket = true; o += setEtiket(); }
     var isNo = 0;
     e.sets.forEach(function (s, si) {
-      var isin = s.tip === 'isinma', wi = isin ? -1 : isNo++, pv = isin ? null : hedefPv(e.ad, prev, wi, e, si);
-      var etk = isin ? 'I' : String(wi + 1), ad = isin ? 'ısınma seti' : 'normal set', rk = s.done && rek[ei + '|' + si];
-      var sc = (s.done ? ' is-done' : '') + (isin ? ' isin' : '') + (ei === hedefE && si === hedefS ? ' siradaki' : '') + (rk ? ' rekor' : '') +
-        (yeni && yeni.e === ei && yeni.s === si && s.done ? ' yeni' + (rk ? ' rekor-yeni' : '') : '');
-      o += '<div class="setgrid' + sc + rg + '"><button class="n' + (s.tip ? ' ' + s.tip : '') + '" data-act="set-tip" data-e="' + ei + '" data-s="' + si + '" aria-label="Set ' + (si + 1) + ': ' + ad + ' (dokun: tipini değiştir)" title="' + ad + '">' + etk + '</button>' +
-        '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="kg" value="' + h(s.kg) + '" placeholder="' + (pv ? fmt(num(pv.kg), 2) : 'kg') + '" aria-label="' + h(e.ad) + ' set ' + etk + ' kg' + (pv ? ', hedef ' + fmt(num(pv.kg), 2) : '') + '">' +
-        '<input inputmode="numeric" data-e="' + ei + '" data-s="' + si + '" data-f="reps" value="' + h(s.reps) + '" placeholder="' + (pv ? h(pv.reps) : 'tekrar') + '" aria-label="' + h(e.ad) + ' set ' + etk + ' tekrar' + (pv ? ', hedef ' + h(pv.reps) : '') + '">' +
-        (S.rpe ? '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="rpe" value="' + h(s.rpe) + '" placeholder="–" aria-label="' + h(e.ad) + ' set ' + (si + 1) + ' zorluk (RPE 6–10, boş bırakılabilir)">' : '') +
-        '<button class="done' + (s.done ? ' on' : '') + '" data-act="tamam" data-e="' + ei + '" data-s="' + si + '" aria-label="' + h(e.ad) + ' set ' + etk + (isin ? ' (ısınma)' : '') + ' bitti' + (rk ? ', yeni rekor' : '') + '" aria-pressed="' + !!s.done + '">' + IKON_TIK + (rk ? '<span class="rek-yildiz" aria-hidden="true">' + IKON_YILDIZ + '</span>' : '') + '</button></div>';
+      var isin = s.tip === 'isinma', wi = isin ? -1 : isNo++;
+      o += setSatir(e, ei, s, si, wi, isin ? null : hedefPv(e.ad, prev, wi, e, si), ctx);
     });
     o += '<button class="addset" data-act="set-ekle" data-e="' + ei + '">+ Set ekle</button>';
     o += '</div></section>';
   });
   o += '<button class="btn-big ekle-egz" data-act="egz-ekle">+ Hareket ekle<kbd>N</kbd></button>';
-  var hac = a.exs.reduce(function (t, e) { return t + hacim(e); }, 0), bitenEgz = segs.filter(function (x) { return x.n && x.d >= x.n; }).length;
-  var b2 = '<div class="bitir-ozet"><div><b data-gecen>' + gecenSure(a.start) + '</b><span>süre</span></div><div><b>' + bitenEgz + '<small>/' + a.exs.length + '</small></b><span>hareket</span></div><div><b>' + fmt(hac, 0) + '</b><span>kg toplam</span></div></div>';
-  b2 += '<details class="katla seansnot"' + (a.not ? ' open' : '') + '><summary>Seans notu' + (a.not ? '' : ' ekle') + '</summary><textarea id="seansnot" rows="3" placeholder="Uyku, ağrı, nasıl hissettin…" aria-label="Seans notu">' + h(a.not || '') + '</textarea></details>';
-  b2 += '<button class="btn-ac btn-big btn-bitir" data-act="bitir">Antrenmanı bitir ve kaydet</button>';
-  b2 += '<button class="btn-ghost btn-bad btn-big btn-cik" data-act="iptal">Kaydetmeden çık</button>';
   b2 += '<p class="kisaipucu">Enter: kg → tekrar → seti tamamla · <kbd>?</kbd> kısayollar</p>';
   return o0 + kol(o, b2, 'yan antrenman');
+}
+function setEtiket() { return '<div class="setgrid etiket' + (S.rpe ? ' rpe' : '') + '" aria-hidden="true"><span class="lbl">Set</span><span class="lbl">kg</span><span class="lbl">Tekrar</span>' + (S.rpe ? '<span class="lbl">Zorluk</span>' : '') + '<span class="lbl">Bitti</span></div>'; }
+/* set satırı (liste ve sahne ortak). dev: sahnenin büyük "şimdiki set"i — aynı girişler (data-e/s/f), dev serif rakam, geniş ✓.
+   Soluk sayılar (placeholder) hedefPv: boş bırakıp ✓ = hedef kuralı her iki görünümde aynı */
+function setSatir(e, ei, s, si, wi, pv, ctx, dev) {
+  var isin = s.tip === 'isinma', rek = ctx.rek, yeni = ctx.yeni, rg = ctx.rg;
+  var etk = isin ? 'I' : String(wi + 1), ad = isin ? 'ısınma seti' : 'normal set', rk = s.done && rek[ei + '|' + si];
+  var sc = (s.done ? ' is-done' : '') + (isin ? ' isin' : '') + (ei === ctx.hedefE && si === ctx.hedefS ? ' siradaki' : '') + (rk ? ' rekor' : '') +
+    (yeni && yeni.e === ei && yeni.s === si && s.done ? ' yeni' + (rk ? ' rekor-yeni' : '') : '');
+  var nB = '<button class="n' + (s.tip ? ' ' + s.tip : '') + '" data-act="set-tip" data-e="' + ei + '" data-s="' + si + '" aria-label="Set ' + (si + 1) + ': ' + ad + ' (dokun: tipini değiştir)" title="' + ad + '">' +
+    (dev ? (isin ? 'Isınma seti' : 'Set ' + etk + '<small> / ' + dev.n + '</small>') : etk) + '</button>';
+  var kg = '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="kg" value="' + h(s.kg) + '" placeholder="' + (pv ? fmt(num(pv.kg), 2) : dev ? '–' : 'kg') + '" aria-label="' + h(e.ad) + ' set ' + etk + ' kg' + (pv ? ', hedef ' + fmt(num(pv.kg), 2) : '') + '">';
+  var tk = '<input inputmode="numeric" data-e="' + ei + '" data-s="' + si + '" data-f="reps" value="' + h(s.reps) + '" placeholder="' + (pv ? h(pv.reps) : dev ? '–' : 'tekrar') + '" aria-label="' + h(e.ad) + ' set ' + etk + ' tekrar' + (pv ? ', hedef ' + h(pv.reps) : '') + '">';
+  var rp = S.rpe ? '<input inputmode="decimal" data-e="' + ei + '" data-s="' + si + '" data-f="rpe" value="' + h(s.rpe) + '" placeholder="–" aria-label="' + h(e.ad) + ' set ' + (si + 1) + ' zorluk (RPE 6–10, boş bırakılabilir)">' : '';
+  var ok = '<button class="done' + (s.done ? ' on' : '') + (dev ? ' btn-ac' : '') + '" data-act="tamam" data-e="' + ei + '" data-s="' + si + '" aria-label="' + h(e.ad) + ' set ' + etk + (isin ? ' (ısınma)' : '') + ' bitti' + (rk ? ', yeni rekor' : '') + '" aria-pressed="' + !!s.done + '">' + IKON_TIK +
+    (dev ? '<span>Seti bitir</span>' : '') + (rk ? '<span class="rek-yildiz" aria-hidden="true">' + IKON_YILDIZ + '</span>' : '') + '</button>';
+  if (!dev) return '<div class="setgrid' + sc + rg + '">' + nB + kg + tk + rp + ok + '</div>';
+  return '<div class="setgrid dev' + sc + rg + (dev.yeni ? ' dev-yeni' : '') + '"><div class="dev-ust">' + nB + (pv ? '<span class="dev-hedef">hedef</span>' : '') + '</div>' +
+    '<label class="dev-kg">' + kg + '<span class="birim">kg</span></label><span class="dev-x" aria-hidden="true">×</span><label class="dev-tk">' + tk + '<span class="birim">tekrar</span></label>' +
+    (rp ? '<label class="dev-rpe"><span class="birim">Zorluk</span>' + rp + '</label>' : '') + ok + '</div>';
+}
+
+/* ---------- odak sahnesi (telefon, <1024 px) ----------
+   Üstte hareket şeridi (çip: ilerleme halkası, ✓, rekor altın), altında yana kayan sahneler (scroll-snap): her hareket tam genişlik,
+   üstte dev rakamla şimdiki set, altında kompakt set listesi; son sahne bitir. Konum (sahne.i) yalnız bellekte; yeniden çizimde korunur. */
+var sahne = { id: null, i: 0 }, sahneOto = null, sahneRaf = 0;
+function sahneModu() { return !!(S.active && S.active.exs.length && tab === 'bugun' && !masaustu()); }
+function egzSerit(a, segs, ctx, akt, sm) {
+  var rek = ctx.rek, yeni = ctx.yeni, o = '<nav class="eserit" aria-label="Hareketler">';
+  a.exs.forEach(function (e, ei) {
+    var x = segs[ei], bitti = x.n > 0 && x.d >= x.n, p = x.n ? x.d / x.n : 0, yr = yeni && yeni.e === ei && rek[ei + '|' + yeni.s];
+    o += '<button class="ecip' + (bitti ? ' bitti' : '') + (rek[ei] ? ' rek' : '') + (yr ? ' rek-yeni' : '') + '" data-act="sahne-git" data-e="' + ei + '"' + (ei === akt ? ' aria-current="true"' : '') +
+      ' aria-label="' + h(e.ad) + ', ' + x.d + ' / ' + x.n + ' set' + (bitti ? ', bitti' : '') + (rek[ei] ? ', rekor' : '') + '">' +
+      '<span class="ec-halka" aria-hidden="true"><svg viewBox="0 0 28 28"><circle class="iz" cx="14" cy="14" r="11.5"/><circle class="dolu" cx="14" cy="14" r="11.5" pathLength="100" style="stroke-dashoffset:' + (100 - p * 100).toFixed(1) + '"/></svg>' +
+      (rek[ei] ? IKON_YILDIZ : bitti ? IKON_TIK : '<i>' + x.d + '</i>') + '</span><span class="ec-ad">' + h(e.ad) + '</span></button>';
+  });
+  if (sm) o += '<button class="ecip ec-ekle" data-act="egz-ekle" aria-label="Hareket ekle">+</button><button class="ecip ec-bitir" data-act="sahne-git" data-e="' + a.exs.length + '"' + (akt === a.exs.length ? ' aria-current="true"' : '') + '>Bitir</button>';
+  return o + '</nav>';
+}
+/* bir hareketin sahnesi: başlık, rekor satırı, Geçen sefer (küçük), dev set (ilk bitmemiş set) ya da "bitti" kartı, kompakt liste */
+function sahneKart(a, e, ei, ctx) {
+  var rek = ctx.rek, yeni = ctx.yeni, prev = oncekiSetler(e.ad), n = a.exs.length;
+  var is0 = e.sets.filter(function (x) { return x.tip !== 'isinma'; }), bitti = is0.length > 0 && is0.every(function (x) { return x.done; });
+  var di = -1; e.sets.some(function (x, i) { if (!x.done) { di = i; return true; } return false; });
+  var yr = yeni && yeni.e === ei && rek[ei + '|' + yeni.s], enRek = 0;
+  Object.keys(rek).forEach(function (k) { var p = k.split('|'); if (p.length === 2 && +p[0] === ei) enRek = Math.max(enRek, rek[k]); });
+  var o = '<section class="panel ex sahne' + (bitti ? ' ex-bitti' : '') + (ei === ctx.hedefE ? ' sirada' : '') + (yr ? ' rekor-yeni' : '') + '" data-e="' + ei + '" aria-label="Hareket ' + (ei + 1) + ' / ' + n + ': ' + h(e.ad) + '">' +
+    '<div class="ex-head"><span class="grow"><small class="sahne-no">' + (ei + 1) + ' / ' + n + '</small><b>' + h(e.ad) + '</b><span class="tag">' + h(e.kas) + '</span></span>' +
+    '<span class="ex-dug">' + (AT.bolum.plakaDugme ? AT.bolum.plakaDugme(ei) : '') + '<button class="mini btn-ghost" data-act="egz-sil" data-e="' + ei + '" aria-label="Hareketi çıkar">Çıkar</button></span></div>';
+  if (enRek) o += '<p class="sahne-rek">' + IKON_YILDIZ + 'Rekor · tahmini max ~' + fmt(enRek) + ' kg</p>';
+  o += miniGecmis(e.ad);
+  var isNo = 0, nIs = is0.length, satir = '', dev = '';
+  e.sets.forEach(function (s, si) {
+    var isin = s.tip === 'isinma', wi = isin ? -1 : isNo++, pv = isin ? null : hedefPv(e.ad, prev, wi, e, si);
+    if (si === di) dev = setSatir(e, ei, s, si, wi, pv, ctx, { n: nIs, yeni: yeni && yeni.e === ei && Date.now() - yeni.t < 900 });
+    else satir += setSatir(e, ei, s, si, wi, pv, ctx);
+  });
+  if (di < 0) {
+    /* hepsi bitti: özet + sıradaki harekete tek dokunuş */
+    var j = -1; for (var k = 1; k < n && j < 0; k++) { var x = (ei + k) % n; if (a.exs[x].sets.some(function (y) { return !y.done; })) j = x; }
+    var ys = yapilanSetler(e);
+    dev = '<div class="dev-bitti' + (yeni && yeni.e === ei ? ' dev-yeni' : '') + '"><span class="db-tik' + (enRek ? ' rek' : '') + '" aria-hidden="true">' + (enRek ? IKON_YILDIZ : IKON_TIK) + '</span>' +
+      '<b>' + (enRek ? 'Rekorla bitti' : 'Bitti') + '</b><span class="db-ozet">' + (ys.length ? gecenYaz(ys) + ' · ' + fmt(hacim(e), 0) + ' kg' : 'Yalnız ısınma') + '</span>' +
+      (j >= 0 ? '<button class="btn-ac btn-big" data-act="sahne-git" data-e="' + j + '">Sıradaki: ' + h(a.exs[j].ad) + '<span class="ok" aria-hidden="true">→</span></button>'
+        : '<button class="btn-ac btn-big" data-act="sahne-git" data-e="' + n + '">Bitirmeye geç<span class="ok" aria-hidden="true">→</span></button>') + '</div>';
+  }
+  o += dev + (satir ? '<div class="sahne-liste">' + satir + '</div>' : '') + '<button class="addset" data-act="set-ekle" data-e="' + ei + '">+ Set ekle</button>';
+  return o + '</section>';
+}
+/* yeniden çizimden sonra: sahne konumu (scrollLeft) geri, şerit eşlenir, kaydırma dinlenir, dinlenme dolgusu sürer */
+function sahneKur() {
+  var k = $('#view .sahneler'); if (!k) return;
+  k.scrollLeft = sahne.i * k.clientWidth;
+  k.addEventListener('scroll', sahneKaydi, { passive: true });
+  seritEsle(false);
+  if (!$('#rest').hidden && restBitis > Date.now()) restCiz();
+}
+function sahneKaydi() {
+  if (sahneRaf) return;
+  sahneRaf = requestAnimationFrame(function () {
+    sahneRaf = 0; var k = $('#view .sahneler'); if (!k || !k.clientWidth) return;
+    var i = Math.max(0, Math.min(+k.dataset.n, Math.round(k.scrollLeft / k.clientWidth)));
+    if (i !== sahne.i) { sahne.i = i; seritEsle(true); }
+  });
+}
+/* aktif çip: aria-current + şeritte ortada (sayfa dikey kaymaz: scrollIntoView değil) */
+function seritEsle(yumusak) {
+  var nav = $('#view .eserit'); if (!nav) return;
+  var akt = null;
+  Array.prototype.forEach.call(nav.querySelectorAll('[data-act=sahne-git]'), function (b) { if (+b.dataset.e === sahne.i) { b.setAttribute('aria-current', 'true'); akt = b; } else b.removeAttribute('aria-current'); });
+  if (akt && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: Math.max(0, akt.offsetLeft - (nav.clientWidth - akt.offsetWidth) / 2), behavior: yumusak && !azHareket.matches ? 'smooth' : 'auto' });
+}
+function sahneGit(i, yumusak) {
+  var k = $('#view .sahneler'); if (!k) return;
+  sahne.i = i; k.scrollTo({ left: i * k.clientWidth, behavior: yumusak && !azHareket.matches ? 'smooth' : 'auto' }); seritEsle(yumusak);
+}
+/* hareketin son seti ✓: ~600 ms sonra sıradaki bitmemiş harekete (yoksa bitir sahnesine) kayar; arada dokunulursa kaymaz */
+function sahneIlerle(ei) {
+  if (sahneOto) clearTimeout(sahneOto);
+  var id = S.active.id;
+  sahneOto = setTimeout(function () {
+    sahneOto = null; var a = S.active; if (!a || a.id !== id || !sahneModu() || sahne.i !== ei) return;
+    var n = a.exs.length, j = n;
+    for (var k = 1; k < n; k++) { var x = (ei + k) % n; if (a.exs[x].sets.some(function (y) { return !y.done; })) { j = x; break; } }
+    sahneGit(j, true);
+  }, 600);
+}
+['pointerdown', 'keydown', 'wheel'].forEach(function (t) { document.addEventListener(t, function () { if (sahneOto) { clearTimeout(sahneOto); sahneOto = null; } }, { capture: true, passive: true }); });
+/* dinlenme süresince sahne kartlarının zemini aşağı doğru boşalır: CSS animasyonu (sahne-bosal-a/b), JS yalnız süre değişince kurar.
+   oran null: dolguyu kaldır. Az hareket isteyende adım adım (restCiz'in 250 ms tıkıyla) */
+function sahneDinlen(oran, kalanMs, ak, son) {
+  var k = $('#view .sahneler'); if (!k) return;
+  if (oran == null) { k.classList.remove('dinlen', 'son'); delete k.dataset.da; return; }
+  if (k.dataset.da !== ak) {
+    k.dataset.da = ak; k.style.setProperty('--d0', (100 - oran * 100).toFixed(2)); k.style.setProperty('--dsure', kalanMs + 'ms');
+    k.dataset.dn = k.dataset.dn === 'a' ? 'b' : 'a';
+  }
+  if (azHareket.matches) k.style.setProperty('--dsimdi', (100 - oran * 100).toFixed(2) + '%');
+  k.classList.add('dinlen');
+  if (k.classList.contains('son') !== son) { if (son) k.style.setProperty('--son-sure', Math.max(300, kalanMs) + 'ms'); k.classList.toggle('son', son); }
 }
 
 /* boş durum: tek renk çizgi çizim (currentColor) + tek kısa cümle. AT.bos = bosDurum(tur, metin, ek) */
@@ -624,24 +887,117 @@ function seansSatir(s, pr) {
     (np ? '<span class="rek rozet"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.8 3.7 4 .6-2.9 2.8.7 4L8 11l-3.6 1.9.7-4L2.2 6.1l4-.6z"/></svg>' + np + '<span class="rk-k"> rekor</span></span>' : '') + (demo ? '<span class="tag demo">örnek</span>' : '') + '</button>';
 }
 
-/* son 7 günde kas grubu başına set; yatay çubuk. Ölçek en az 12 set; ince çizgi = haftada 10 set hedefi, ulaşan yeşil */
+/* son 7 günde kas grubu başına set: vücut kas haritası (ön + arka, el çizimi SVG) + kompakt liste.
+   Renk: 0 set çok soluk + kesikli kontur, hedefe (haftada 10 set) yaklaştıkça --ac koyulaşır, hedefi geçen --iyi.
+   Bölgeye dokun / üzerine gel / Enter → kas adı, set, son çalışıldığı gün etiketi (+ #duyuru). */
 var KAS_HEDEF = 10;
+/* çizim: viewBox 0 0 100 226, sol yarı çizilir, khM aynalar (x → 100 − x) */
+function khM(s) { return s + '<g transform="matrix(-1 0 0 1 100 0)">' + s + '</g>'; }
+function khP(d) { return '<path d="' + d + '"/>'; }
+function khR(x, y, w, hh) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + hh + '" rx="2.6"/>'; }
+var KH_ORT = {
+  delt: khP('M38 34c-9-1-17 2-20 9-2 5-2 10-1 13 1 1 4 1 5 0 1-4 4-8 8-10 5-2 8-6 8-12z'),
+  kol: khP('M19 59c-3 6-4 14-3 22 1 3 6 3 8 1 2-7 3-15 2-21-2-2-5-3-7-2z') + khP('M16 86c-3 8-4 20-3 34h6c2-11 4-23 5-33-2-2-6-2-8-1z'),
+  bas: '<ellipse cx="50" cy="14" rx="9.5" ry="12"/><path d="M45 23h10v10H45z"/>',
+  uc: '<ellipse cx="15.5" cy="127" rx="4" ry="6"/><ellipse cx="39" cy="169.5" rx="5" ry="4"/><path d="M34 214h9l1.5 7c-3.5 1.5-8.5 1.5-12 0z"/>',
+  on: khP('M32 97c1 6 1 11 2 15 5 2 10 3 15 4v-8c-7-1-13-5-17-11z'),
+  arka: khP('M35 204h7l1 9h-9z')
+};
+var KH_ON = {
+  'Omuz': KH_ORT.delt,
+  'Göğüs': khP('M49 39v22c-6 3-13 3-17-1-2-4-2-9 0-13 3-5 10-8 17-8z'),
+  'Kol': KH_ORT.kol,
+  'Karın': khR(41, 65, 8, 10) + khR(41, 77, 8, 10) + khR(41, 89, 8, 10) + khR(42, 101, 7, 9) + khP('M33 64c2 10 2 24 1 36l5 4V66z'),
+  'Bacak': khP('M34 112c-4 14-5 32-2 50 3 3 10 3 13 0 3-15 4-32 3-46-4-1-10-2-14-4z') + khP('M34 176c-2 12-1 26 1 36h8c2-10 3-24 1-36-3-2-7-2-10 0z')
+};
+var KH_ARKA = {
+  'Sırt': khP('M49 27v30l-8-11c-2-3-3-4-5-5 5-3 9-7 10-14z') + khP('M31 48c4 3 9 6 13 12l3 6v18c-5 2-10 4-13 8-2-14-4-30-3-44z') + khR(43, 87, 6, 17),
+  'Omuz': KH_ORT.delt,
+  'Kol': KH_ORT.kol,
+  'Bacak': khP('M49 104v16c-6 3-12 2-16-2-2-5-1-10 2-13 4-2 9-2 14-1z') + khP('M33 123c-2 13-2 27 0 40 3 3 10 3 13 0 2-13 2-26 1-38-4-1-10-1-14-2z') +
+    khP('M33 176c-3 9-3 19 0 26 3 3 8 3 11 0 2-8 2-18-1-26-3-2-7-2-10 0z')
+};
+var KH_ODAK = { 'Göğüs': 'on', 'Omuz': 'on', 'Kol': 'on', 'Karın': 'on', 'Bacak': 'on', 'Sırt': 'arka' };   /* klavyede her kas bir kez */
+var khVeri = {}, khSecili = null;
+function khEtiketMetni(k) {
+  var v = khVeri[k] || { n: 0 };
+  return k + ' · ' + (v.n ? v.n + ' set' : '7 günde yok') + (v.son ? ' · son ' + gunOnce(v.son).toLowerCase() : ' · hiç çalışılmadı');
+}
+function khFigur(yon, bolge) {
+  var govde = KH_ORT.bas + khM(KH_ORT.uc + KH_ORT[yon]), g = '';
+  KAS.forEach(function (k, i) {
+    if (!bolge[k]) return;
+    var v = khVeri[k], odak = KH_ODAK[k] === yon;
+    govde += khM(bolge[k]);
+    g += '<g class="kh-b' + v.cls + '" data-act="kas-sec" data-kas="' + h(k) + '" data-yon="' + yon + '" style="--o:' + v.o + ';--i:' + i + '"' +
+      (odak ? ' tabindex="0" role="button" aria-label="' + h(khEtiketMetni(k).replace(' · ', ': ').replace(/ · /g, ', ')) + '"' : '') + '>' + khM(bolge[k]) + '</g>';
+  });
+  return '<figure class="kh-fig"><svg viewBox="0 0 100 226" role="group" aria-label="' + (yon === 'on' ? 'Ön' : 'Arka') + ' vücut"><g class="kh-govde" aria-hidden="true">' + govde + '</g>' + g + '</svg><figcaption>' + (yon === 'on' ? 'ön' : 'arka') + '</figcaption></figure>';
+}
 function kasBolum(l) {
-  var lim = new Date(); lim.setDate(lim.getDate() - 6); var limS = iso(lim), kasSet = {};
+  var lim = new Date(); lim.setDate(lim.getDate() - 6); var limS = iso(lim), kasSet = {}, son = {};
   KAS.forEach(function (k) { kasSet[k] = 0; });
-  /* a10: ana kas 1, hareketin ikincil kasları (hareketler.js) set başına 0,5; gösterimde yuvarlanır */
-  l.forEach(function (s) { if (s.date >= limS) s.exs.forEach(function (e) {
+  /* a10: ana kas 1, hareketin ikincil kasları (hareketler.js) set başına 0,5; gösterimde yuvarlanır. Son gün: tüm geçmişte ana ya da yardımcı */
+  l.forEach(function (s) { s.exs.forEach(function (e) {
     var k = e.kas || kasOf(e.ad), n = yapilanSetler(e).length; if (!n) return;
+    var y = ikincilOf(e.ad).filter(function (x) { return x !== k; });
+    [k].concat(y).forEach(function (x) { if (!son[x] || s.date > son[x]) son[x] = s.date; });
+    if (s.date < limS) return;
     kasSet[k] = (kasSet[k] || 0) + n;
-    ikincilOf(e.ad).forEach(function (y) { if (y !== k) kasSet[y] = (kasSet[y] || 0) + n * 0.5; });
+    y.forEach(function (x) { kasSet[x] = (kasSet[x] || 0) + n * 0.5; });
   }); });
   var kasl = KAS.concat(Object.keys(kasSet).filter(function (k) { return KAS.indexOf(k) < 0 && kasSet[k]; }));
-  var mxk = Math.max(KAS_HEDEF * 1.2, Math.max.apply(0, kasl.map(function (k) { return kasSet[k] || 0; })));
-  return '<h2>Son 7 günde kaslar <small>· set, yardımcı kas yarım</small></h2><div class="panel"><div class="kasbar" style="--hedef:' + (KAS_HEDEF / mxk * 100).toFixed(1) + '%">' + kasl.map(function (k) {
+  khVeri = {}; khSecili = null;
+  kasl.forEach(function (k) {
     var n = Math.round(kasSet[k] || 0);
-    return '<div' + (n ? n >= KAS_HEDEF ? ' class="tamam"' : '' : ' class="sifir"') + '><span>' + h(k) + '</span><div class="ibar"><i style="width:' + Math.round(n / mxk * 100) + '%"></i></div><b>' + n + '<small>set</small></b></div>';
-  }).join('') + '</div><p class="mut kucuk kas-not"><i class="hedef-cizgi" aria-hidden="true"></i>haftada ' + KAS_HEDEF + ' set iyi bir hedef · soluklar 7 günde hiç çalışılmadı</p></div>';
+    khVeri[k] = { n: n, son: son[k], cls: n ? n >= KAS_HEDEF ? ' tamam' : '' : ' sifir', o: n ? n >= KAS_HEDEF ? .82 : (.3 + .5 * n / KAS_HEDEF).toFixed(2) : .07 };
+  });
+  var liste = kasl.map(function (k) {
+    var v = khVeri[k];
+    return '<div class="kh-s' + v.cls + '" data-act="kas-sec" data-kas="' + h(k) + '" style="--o:' + v.o + ';--w:' + Math.min(100, Math.round(v.n / KAS_HEDEF * 100)) + '%"><span>' + h(k) + '</span><b>' + v.n + '</b><i aria-hidden="true"></i></div>';
+  }).join('');
+  return '<h2>Son 7 günde kaslar <small>· set, yardımcı kas yarım</small></h2><div class="panel kh-panel"><div class="kh-harita">' + khFigur('on', KH_ON) + khFigur('arka', KH_ARKA) +
+    '<div class="kh-etiket" aria-hidden="true" hidden></div></div><div class="kh-liste">' + liste + '</div>' +
+    '<p class="mut kucuk kh-not"><span class="kh-l">0<span class="kh-sw" aria-hidden="true"><i style="--o:.07"></i><i style="--o:.45"></i><i style="--o:.7"></i><i class="tamam"></i></span>' + KAS_HEDEF + '+ set hedef</span><span>kesikli: 7 günde hiç</span></p></div>';
 }
+/* bölge seçimi: etiket bölgenin üstünde (sığmazsa altında), haritanın içinde kalır.
+   kalici: tıklama / Enter (aç-kapa, duyurulur); değilse fareyle üzerine gelme (ayrılınca seçili olana döner) */
+function khGoster(k, yon, kalici) {
+  var hr = $('.kh-harita'); if (!hr) return;
+  var et = hr.querySelector('.kh-etiket'), bl = [].slice.call(document.querySelectorAll('.kh-b,.kh-s'));
+  if (kalici) khSecili = khSecili && khSecili.k === k && (!yon || khSecili.yon === yon) ? null : { k: k, yon: yon };
+  var a = kalici ? khSecili : k ? { k: k, yon: yon } : khSecili;
+  bl.forEach(function (x) { x.classList.toggle('sec', !!a && x.dataset.kas === a.k); });
+  if (!a) { et.hidden = true; return; }
+  var ad = function (x, y) { return x.classList.contains('kh-b') && x.dataset.kas === a.k && x.dataset.yon === y; };
+  var hedef = bl.filter(function (x) { return ad(x, a.yon); })[0] || bl.filter(function (x) { return ad(x, KH_ODAK[a.k]); })[0];
+  et.textContent = khEtiketMetni(a.k); et.hidden = false;
+  if (kalici) duyur(et.textContent);
+  var w = hr.getBoundingClientRect(), ew = et.offsetWidth, eh = et.offsetHeight;
+  if (!hedef) { et.className = 'kh-etiket alt'; et.style.left = w.width / 2 + 'px'; et.style.top = w.height + 'px'; return; }
+  var r = hedef.getBoundingClientRect(), alt = r.top - w.top < eh + 10;
+  et.className = 'kh-etiket' + (alt ? ' alt' : '');
+  et.style.left = Math.max(ew / 2 + 2, Math.min(w.width - ew / 2 - 2, r.left + r.width / 2 - w.left)) + 'px';
+  et.style.top = (alt ? r.bottom - w.top + 8 : r.top - w.top - 8) + 'px';
+}
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest && ev.target.closest('[data-act="kas-sec"]'); if (t) khGoster(t.dataset.kas, t.dataset.yon, true);
+});
+document.addEventListener('keydown', function (ev) {
+  var t = ev.target; if (!t.classList || !t.classList.contains('kh-b') || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+  ev.preventDefault(); khGoster(t.dataset.kas, t.dataset.yon, true);
+});
+document.addEventListener('pointerover', function (ev) {
+  if (ev.pointerType !== 'mouse' || !ev.target.closest) return;
+  var g = ev.target.closest('.kh-b'); if (g) khGoster(g.dataset.kas, g.dataset.yon);
+  else if (ev.target.closest('.kh-harita')) khGoster(null);
+});
+document.addEventListener('focusin', function (ev) { var t = ev.target; if (t.classList && t.classList.contains('kh-b')) khGoster(t.dataset.kas, t.dataset.yon); });
+document.addEventListener('focusout', function (ev) { var t = ev.target; if (t.classList && t.classList.contains('kh-b')) khGoster(null); });
+document.addEventListener('pointerout', function (ev) {
+  if (ev.pointerType !== 'mouse' || !ev.target.closest || !ev.target.closest('.kh-harita')) return;
+  if (!(ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.kh-harita'))) khGoster(null);
+});
 
 /* son 12 hafta: her hafta bir sütun (antrenman sayısı), solda üst üste hafta sayısı */
 function haftaSeridi() {
@@ -738,6 +1094,34 @@ function enIyiSet(p) {
   yapilanSetler(p.e).forEach(function (s) { var v = tahminiMax(num(s.kg), num(s.reps), s.rpe); if (v > m) { m = v; b = s; } });
   return b ? 'en iyi set ' + fmt(num(b.kg), 2) + ' kg × ' + b.reps : '';
 }
+/* "12 Ekim'de" / "3 Mart 2025'te": Türkçe bulunma eki (tarih Türkçe okunuşunun son ünlüsüne ve sertliğine göre) */
+var AY_EK = ['ta', 'ta', 'ta', 'da', 'ta', 'da', 'da', 'ta', 'de', 'de', 'da', 'ta'];
+function sayiEk(n) {
+  n = Math.abs(Math.round(n));
+  if (n === 0) return 'da';
+  var b = n % 10, o = Math.floor(n / 10) % 10;
+  if (b) return ['', 'de', 'de', 'te', 'te', 'te', 'da', 'de', 'de', 'da'][b];
+  if (o) return ['', 'da', 'de', 'da', 'ta', 'de', 'ta', 'te', 'de', 'da'][o];
+  return 'de';   /* yüz, bin */
+}
+function tarihDe(s) { var d = parse(s), y = d.getFullYear(); return d.getDate() + ' ' + AYLAR[d.getMonth()] + (y !== new Date().getFullYear() ? ' ' + y + "'" + sayiEk(y) : "'" + AY_EK[d.getMonth()]); }
+/* kilometre taşları: tahmini maxın ilk kez geçtiği yuvarlak eşikler (ilk seans başlangıç sayılır, onun altındakiler taş değil).
+   Adım hareketin aralığına göre: ilk seanstan en iyiye 40 kg+ artışta 20, daha azında (ya da 20'lik eşik geçilmediyse) 10. En son 4 taş. pts kronolojik */
+function kmTaslari(pts) {
+  if (pts.length < 2) return [];
+  function bul(st) {
+    var out = [], m = pts[0].y;
+    for (var i = 1; i < pts.length; i++) {
+      if (pts[i].y > m) { for (var e = (Math.floor(m / st) + 1) * st; e <= pts[i].y + 1e-9; e += st) out.push({ i: i, v: e, t: pts[i].t, date: pts[i].se ? pts[i].se.date : null }); m = pts[i].y; }
+    }
+    return out;
+  }
+  var enE = Math.max.apply(0, pts.map(function (p) { return p.y; })), t = enE - pts[0].y >= 40 ? bul(20) : [];
+  if (!t.length) t = bul(10);
+  /* aynı seansta iki eşik geçildiyse yalnız büyüğü (bayrak üst üste binmesin) */
+  t = t.filter(function (x, k) { return !(t[k + 1] && t[k + 1].i === x.i); });
+  return t.slice(-4);
+}
 function gucBolum(l) {
   var adlar = []; l.forEach(function (s) { s.exs.forEach(function (e) { if (yapilanSetler(e).length && adlar.indexOf(e.ad) < 0) adlar.push(e.ad); }); });
   var o = '<h2>Güç</h2>';
@@ -757,9 +1141,15 @@ function gucBolum(l) {
   });
   var ilkP = pts[0], sonP = pts[pts.length - 1], fark = sonP && ilkP && pts.length > 1 ? sonP.y - ilkP.y : 0;
   if (pts.length) {
-    o += '<div class="panel"><div class="hero"><b>' + fmt(enE) + ' <small>kg</small></b><span>tahmini max: tek tekrarda kaldırabileceğin kilo · en iyisi ' + h(enET).replace(' ', '&nbsp;') + '</span></div>';
+    o += '<div class="panel"><div class="hero"><b>' + sayData(enE, 1) + ' <small>kg</small></b><span>tahmini max: tek tekrarda kaldırabileceğin kilo · en iyisi ' + h(enET).replace(' ', '&nbsp;') + '</span></div>';
     if (fark > 0) o += '<p class="durum iyi">İlk kayıttan bu yana +' + fmt(fark) + ' kg güçlendin.</p>';
-    o += cizgi(pts, { baslik: secEgz + ' tahmini max', birim: 'kg', ek: enIyiSet }) + '</div>';
+    /* rekor noktaları (prHesapla: tahmini max rekoru kırılan seans) altın; kilometre taşları bayrak, en sonu altta tek satır */
+    var prm = prHesapla(), rk = [], ts = kmTaslari(pts);
+    pts.forEach(function (p, i) { var t = p.se && prm[p.se.id] && prm[p.se.id][secEgz]; if (t && t.some(function (x) { return x.ad === 'Tahmini max'; })) rk.push(i); });
+    o += cizgi(pts, { baslik: secEgz + ' tahmini max', birim: 'kg', ek: enIyiSet, rek: rk, tas: ts });
+    var st = ts[ts.length - 1];
+    if (st && st.date) o += '<p class="tas-son"><i aria-hidden="true"></i>' + h(fmt(st.v, 0)) + " kg'ı " + h(tarihDe(st.date)) + ' geçtin</p>';
+    o += '</div>';
   } else {
     o += '<p class="mut kucuk">Bu harekette ' + MAX_TEKRAR + ' tekrar ve altı set yok; tahmini max yalnız ' + MAX_TEKRAR + ' ve altı tekrardan hesaplanır.</p>';
   }
@@ -828,7 +1218,7 @@ function bwBolum() {
   var o = '<h2>Vücut ağırlığı</h2><div class="panel">';
   if (l.length) {
     var son = l[l.length - 1], ilk = l[0], fk = son.kg - ilk.kg;
-    o += '<div class="hero"><b>' + fmt(son.kg) + ' <small>kg</small></b><span>' + tarih(son.date, 1) + (l.length > 1 ? ' · ilk kayda göre ' + (fk > 0 ? '+' : fk < 0 ? '−' : '') + fmt(Math.abs(fk)) + ' kg' : '') + (son.demo ? ' <span class="tag demo">örnek</span>' : '') + '</span></div>';
+    o += '<div class="hero"><b>' + sayData(son.kg, 1) + ' <small>kg</small></b><span>' + tarih(son.date, 1) + (l.length > 1 ? ' · ilk kayda göre ' + (fk > 0 ? '+' : fk < 0 ? '−' : '') + fmt(Math.abs(fk)) + ' kg' : '') + (son.demo ? ' <span class="tag demo">örnek</span>' : '') + '</span></div>';
     o += cizgi(l.map(function (b) { return { x: parse(b.date).getTime(), y: b.kg, t: tarih(b.date, 1) }; }), { baslik: 'Vücut ağırlığı', birim: 'kg' });
   }
   o += '<div class="row" style="margin-top:' + (l.length ? 16 : 0) + 'px"><input id="bwkg" inputmode="decimal" placeholder="Bugünkü kilo, örn. 82,4" aria-label="Vücut ağırlığı kg"><button class="btn-ac" data-act="bw-ekle">Kaydet</button></div>';
@@ -912,25 +1302,110 @@ function render() {
       '<div class="yigin"><button class="btn-ac btn-big" data-act="disa">Yedeği indir</button>' + (tab !== 'bugun' ? '<button class="btn-big" data-tab="bugun">Bugün\'e dön</button>' : '') + '</div>' +
       '<p class="altnot">' + h(String(e && e.message || e)) + '</p>';
   }
-  v.classList.toggle('giris', v.dataset.sekme !== tab); v.dataset.sekme = tab;   /* yalnız sekme değişince giriş animasyonu (style.css) */
+  /* yalnız sekme değişince giriş animasyonu (style.css); View Transition sürerken o kaydırır, bu kapalı */
+  var yeniSekme = v.dataset.sekme !== tab;
+  v.classList.toggle('giris', yeniSekme && !vtSuruyor); v.dataset.sekme = tab;
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   var f = $('#dosya'); if (f) f.addEventListener('change', iceAl);
-  if (tab === 'bugun') setVurgu();
+  if (tab === 'bugun') { setVurgu(); sahneKur(); }
+  if (yeniSekme || !hapEl) hapYerlestir();
+  sayilariSay();
+}
+
+/* ---------- hareket dili ----------
+   Sekme geçişi: View Transitions API varsa içerik menü sırasına göre hafifçe yana kayıp solar (≤220 ms), menünün
+   etkin hapı (.sekme-hap, tek öğe) yeni sekmeye kayar; API yoksa eski .giris süzülmesi. Yalnız sekme değişince;
+   aynı sekmede yeniden çizim (yazı, ✓) geçişsiz. Hareketi azalt açıksa hiçbiri. */
+var vtSuruyor = false, hapEl = null, SIRA = ['bugun', 'gecmis', 'ilerleme', 'defter', 'takviye', 'ayarlar'];
+function hapYerlestir() {
+  var nav = $('#tabs'); if (!nav || !nav.getBoundingClientRect) return;
+  if (!hapEl) { hapEl = document.createElement('span'); hapEl.className = 'sekme-hap'; hapEl.setAttribute('aria-hidden', 'true'); nav.insertBefore(hapEl, nav.firstChild); nav.classList.add('hapli'); }
+  var b = $('#tabs button[aria-current=page]');
+  if (!b || !b.offsetWidth) { hapEl.style.opacity = '0'; return; }
+  var pc = masaustu(), w = pc ? b.offsetWidth : 46, hh = pc ? b.offsetHeight : 28;
+  var x = pc ? b.offsetLeft : b.offsetLeft + (b.offsetWidth - w) / 2, y = b.offsetTop + (pc ? 0 : 3);
+  hapEl.style.width = w + 'px'; hapEl.style.height = hh + 'px'; hapEl.style.opacity = '';
+  hapEl.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+  /* ilk yerleşim ve ekran değişimi kaymasın: geçiş, yer bir kez oturduktan sonra açılır */
+  if (!hapEl.classList.contains('kayar')) requestAnimationFrame(function () { requestAnimationFrame(function () { hapEl.classList.add('kayar'); }); });
+}
+window.addEventListener('resize', function () { if (hapEl) { hapEl.classList.remove('kayar'); clearTimeout(hapYerlestir.t); hapYerlestir.t = setTimeout(hapYerlestir, 120); } });
+function sekmeGecis(t, hemen, yap) {
+  var eski = SIRA.indexOf(tab), yeni = SIRA.indexOf(t), r = document.documentElement;
+  if (hemen || !document.startViewTransition || azHareket.matches || eski === yeni || vtSuruyor || document.hidden) { yap(); return; }
+  r.dataset.vt = yeni > eski ? 'ileri' : 'geri';
+  r.classList.toggle('vt-asagi', window.scrollY > 8);   /* aşağı kaymışken eski sayfanın üstü görünmesin: eski görüntü hemen kalkar */
+  vtSuruyor = true;
+  var bitti = function () { vtSuruyor = false; delete r.dataset.vt; r.classList.remove('vt-asagi'); };
+  try {
+    var g = document.startViewTransition(function () { yap(); });
+    g.finished.then(bitti, bitti);
+  } catch (e) { bitti(); yap(); }
+}
+/* Sayarak yükselen sayılar: #view içinde [data-say="82.1"] (data-say-ond: ondalık, varsayılan 0; data-say-ad: anahtar,
+   yoksa sekme + sıra; data-say-bas: ilk görünüşte başlangıç, yoksa %85'i). Öğenin içinde biçimli son değeri taşıyan ilk
+   metin parçası önceki gösterilen değerden yeniye ≤600 ms sayar; sonda metin tam olarak ilk hâline döner (ekran okuyucu
+   doğru değeri okur). Aynı değer yeniden çizilirse dokunulmaz. */
+var saySon = {}, sayIs = 0;
+function sayilariSay() {
+  var is = ++sayIs;
+  (window.requestAnimationFrame || setTimeout)(function () {
+    if (is !== sayIs) return;
+    var v = $('#view'); if (!v || !v.querySelectorAll) return;
+    var l = v.querySelectorAll('[data-say]'), sira = {};
+    Array.prototype.forEach.call(l, function (el) {
+      var hedef = +el.dataset.say, d = +el.dataset.sayOnd || 0; if (!isFinite(hedef)) return;
+      var ad = el.dataset.sayAd; if (!ad) { sira[tab] = (sira[tab] || 0) + 1; ad = tab + ':' + sira[tab]; }
+      var once = saySon[ad], yuv = Math.pow(10, d); saySon[ad] = hedef;
+      if (once === undefined) once = el.dataset.sayBas != null && isFinite(+el.dataset.sayBas) ? +el.dataset.sayBas : hedef * 0.85;
+      if (Math.round(once * yuv) === Math.round(hedef * yuv) || azHareket.matches) return;
+      sayAkit(el, once, hedef, d);
+    });
+  });
+}
+function sayAkit(el, bas, son, d) {
+  var yazi = fmt(son, d), tw = document.createTreeWalker(el, 4), dugum = null;   /* 4: NodeFilter.SHOW_TEXT */
+  while (tw.nextNode()) if (tw.currentNode.nodeValue.indexOf(yazi) >= 0) { dugum = tw.currentNode; break; }
+  if (!dugum) return;
+  var tam = dugum.nodeValue, i = tam.indexOf(yazi), on = tam.slice(0, i), arka = tam.slice(i + yazi.length);
+  var fark = Math.abs(son - bas), sure = Math.min(600, 260 + 340 * Math.min(1, fark / (Math.abs(son) * 0.15 || 1))), t0 = 0;
+  function adim(t) {
+    if (!dugum.isConnected) return;
+    if (!t0) t0 = t;
+    var k = Math.min(1, (t - t0) / sure), e = 1 - Math.pow(1 - k, 3);
+    dugum.nodeValue = k >= 1 ? tam : on + fmt(bas + (son - bas) * e, d) + arka;
+    if (k < 1) requestAnimationFrame(adim);
+  }
+  dugum.nodeValue = on + fmt(bas, d) + arka;
+  requestAnimationFrame(adim);
 }
 
 /* ---------- sheet / toast ---------- */
 /* pencere: diyalog rolü, arkası inert, odak içeri; kapanınca odak açan öğeye (yoksa #view) */
 var donus = null;
 function sheet(html) {
-  var s = $('#sheet'), app = $('#app'); if (s.hidden) donus = document.activeElement;
+  var s = $('#sheet'), app = $('#app'); if (s.hidden) donus = document.activeElement; sheetIzKaldir();
   /* sağ üstte kapat (×): telefonda başparmakla, PC'de fareyle rahat; arka plana dokunmak / Esc de kapatır */
   s.innerHTML = '<div class="in" role="dialog" aria-modal="true" tabindex="-1"><button type="button" class="sh-kapat" data-act="kapat" aria-label="Kapat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>' + html + '</div>'; s.hidden = false;
   if (app) app.inert = true;
   var b = s.querySelector('h3'); if (b) { b.id = 'sh-b'; s.firstChild.setAttribute('aria-labelledby', 'sh-b'); }
   if (!s.contains(document.activeElement)) (s.querySelector('[autofocus]') || s.firstChild).focus({ preventScroll: true });
 }
+/* kapanış yumuşak: asıl #sheet hemen gizlenir (durum, odak, testler aynı), yerinde etkisiz bir kopyası 180 ms'de aşağı süzülüp solar.
+   Hemen yeni pencere açılırsa (sheet()) kopya beklemeden kalkar */
+var sheetIz = null;
+function sheetIzKaldir() { if (sheetIz) { sheetIz.remove(); sheetIz = null; } }
+function sheetIzBirak(s) {
+  sheetIzKaldir();
+  if (azHareket.matches || s.hidden || !s.firstChild || !s.cloneNode) return;
+  var c = s.cloneNode(true); c.className = 'sheet-iz'; c.setAttribute('aria-hidden', 'true'); c.inert = true;
+  Array.prototype.forEach.call(c.querySelectorAll('[id]'), function (x) { x.removeAttribute('id'); });   /* kopya #sheet kimliğini taşır (biçim için) ama gövdenin sonunda: $('#sheet') hep asıl pencereyi bulur */
+  var ic = s.firstChild, k = c.firstChild; if (ic && k && ic.scrollTop) k.scrollTop = ic.scrollTop;
+  document.body.appendChild(c); if (ic && k && ic.scrollTop) k.scrollTop = ic.scrollTop;
+  sheetIz = c; setTimeout(function () { if (sheetIz === c) sheetIzKaldir(); }, 200);
+}
 function kapat() {
-  var s = $('#sheet'), app = $('#app'); s.hidden = true; s.innerHTML = ''; if (app) app.inert = false;
+  var s = $('#sheet'), app = $('#app'); sheetIzBirak(s); s.hidden = true; s.innerHTML = ''; if (app) app.inert = false;
   if (donus && donus.isConnected) donus.focus({ preventScroll: true }); else { var v = $('#view'); if (v) v.focus({ preventScroll: true }); }
   donus = null;
 }
@@ -1044,6 +1519,7 @@ setInterval(uyanikKontrol, 5000);   /* bitir/iptal gibi sayacı gizleyen her yol
 
 /* ✓ sonrası yeniden çiz; biten hareket kartı katlanınca dokunulan set parmağın altından kaymasın (kaydırmayı düzelt) */
 function yerindeCiz(d) {
+  if (sahneModu()) return render();   /* sahnede dev set yerinde kalır; sayfayı kaydırma */
   var sec = '[data-act=tamam][data-e="' + d.e + '"][data-s="' + d.s + '"]', kart = 'section.ex[data-e="' + d.e + '"]';
   var b = $(sec), y0 = b ? b.getBoundingClientRect().top : null, k = $(kart), k0 = k ? k.getBoundingClientRect().top : null;
   render();
@@ -1070,6 +1546,7 @@ function restCiz() {
     if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate([200, 100, 200]);
     if (AT.restBitti) AT.restBitti();   /* pc.js: ses */
     if (AT.duyur) AT.duyur('Dinlenme bitti');
+    sahneDinlen(null);
     setTimeout(function () { if (Date.now() >= restBitis) r.hidden = true; }, 6000); return;
   }
   var kalanMs = restBitis - Date.now(), oran = Math.max(0, Math.min(1, kalanMs / Math.max(restSure, kalanMs, 1))), ad = restEgz || '';
@@ -1089,6 +1566,7 @@ function restCiz() {
   /* son 10 sn: halka ve sayı kalan süre boyunca uyarı tonuna akar (geçiş süresi = kalan) */
   var son = kalan <= 10;
   if (r.classList.contains('son') !== son) { if (son) r.style.setProperty('--son-sure', Math.max(300, kalanMs) + 'ms'); r.classList.toggle('son', son); }
+  sahneDinlen(oran, kalanMs, ak, son);   /* telefonda sahne kartlarının zemini de aynı sürede boşalır */
 }
 var azHareket = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 
@@ -1165,8 +1643,10 @@ var islem = {
     if (rv) duyur('Yeni rekor: ' + e.ad + ', tahmini max ~' + fmt(rv) + ' kg');
     /* kısa dokunsal geri bildirim; destek ya da kullanıcı dokunuşu yoksa sessiz (tarayıcı uyarısı da çıkmasın) */
     try { var ua = navigator.userActivation; if (navigator.vibrate && (!ua || ua.hasBeenActive)) navigator.vibrate(10); } catch (er) { }
+    /* odak sahnesi: hareketin son iş seti bittiyse kısa süre sonra sıradaki harekete kay */
+    if (sahneModu() && s.tip !== 'isinma' && e.sets.every(function (x) { return x.done || x.tip === 'isinma'; })) sahneIlerle(+d.e);
     var hepsi = S.active.exs.every(function (x) { return x.sets.every(function (y) { return y.done; }); });
-    if (hepsi) {   /* son set: dinlenme yok */ clearInterval(restTimer); $('#rest').hidden = true; return; }
+    if (hepsi) {   /* son set: dinlenme yok */ clearInterval(restTimer); $('#rest').hidden = true; sahneDinlen(null); return; }
     restEgz = e.ad; restBasla(dinlenmeOf(e.ad));
   },
   /* biten hareket kartını aç/kapat: yeniden çizmeden sınıf değişir, durum render sonrası korunur */
@@ -1232,7 +1712,15 @@ var islem = {
     clearInterval(restTimer); restTimer = setInterval(restCiz, 250); restCiz();
   },
   'din-egz-sil': function () { delete S.dinlenmeEgz; kaydet(); render(); toast('Hareketlere özel süreler silindi'); },
-  'rest-kapat': function () { clearInterval(restTimer); $('#rest').hidden = true; uyanikTut(false); },
+  'rest-kapat': function () { clearInterval(restTimer); $('#rest').hidden = true; uyanikTut(false); sahneDinlen(null); },
+  /* hareket şeridi: telefonda o sahneye kayar; PC'de o karta (biten kart katlıysa açılır) */
+  'sahne-git': function (d) {
+    var i = +d.e;
+    if (sahneModu()) return sahneGit(i, true);
+    var sec = $('section.ex[data-e="' + i + '"]'); if (!sec) return;
+    if (sec.classList.contains('kapali')) islem['egz-katla']({ e: d.e });
+    sec.scrollIntoView({ behavior: azHareket.matches ? 'auto' : 'smooth', block: 'start' });
+  },
   disa: function () { indir(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), 'agirlik-yedek-' + iso(new Date()) + '.json'); toast('Yedek indirildi'); },
   ice: function () { $('#dosya').click(); },
   'ice-kesin': function () { S = pendingImport; pendingImport = null; kaydet(); kapat(); temaUygula(); render(); toast('İçe aktarıldı'); },
@@ -1253,7 +1741,7 @@ function ekle(ad) {
   var a = S.active; if (!a) return;
   var son = oncekiSetler(ad), n = Math.max(3, Math.min(son.length || 3, 6)), sets = [];
   for (var i = 0; i < n; i++) sets.push({ kg: '', reps: '', done: false });
-  a.exs.push({ ad: ad, kas: kasOf(ad), sets: sets }); kaydet(); kapat(); render();
+  a.exs.push({ ad: ad, kas: kasOf(ad), sets: sets }); sahne.i = a.exs.length - 1; kaydet(); kapat(); render();   /* telefonda yeni hareketin sahnesi */
   if (masaustu()) odakla('input[data-e="' + (a.exs.length - 1) + '"][data-s="0"][data-f="kg"]');
 }
 
@@ -1274,7 +1762,7 @@ function iceAl(ev) {
 /* ---------- olaylar ---------- */
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'sheet') kapat(); return; }
-  if (t.dataset.tab) return sekmeAc(t.dataset.tab);
+  if (t.dataset.tab) return sekmeAc(t.dataset.tab, !ev.isTrusted);   /* komut.js gibi kod tıklaması: hemen (ardından gelen işlem yeni sekmeyi bulsun) */
   var f = islem[t.dataset.act]; if (f) f(t.dataset);
 });
 /* mini geçmişin açık/kapalı hâli her ✓ sonrası yeniden çizimde korunsun ('toggle' kabarcıklanmaz: yakalama) */
@@ -1298,11 +1786,16 @@ document.addEventListener('change', function (ev) {
    1–6 sekme · N antrenman başlat / hareket ekle · ? kısayollar · Esc kapat
    set satırında Enter: kg → tekrar → (RPE) → seti tamamla, sonraki setin kg'sine geç */
 var SEKME = { '1': 'bugun', '2': 'gecmis', '3': 'ilerleme', '4': 'defter', '5': 'takviye', '6': 'ayarlar' };
-function sekmeAc(t) {
-  tab = t; render(); window.scrollTo(0, 0);
-  /* erişilebilirlik: ekran okuyucu yeni sayfayı duysun; başlık sekmeyi söylesin */
-  var b = $('#tabs [data-tab="' + tab + '"]'); document.title = (b ? b.textContent.trim() + ' · ' : '') + 'Ağırlık Takip';
-  $('#view').focus({ preventScroll: true });
+/* hemen: geçişsiz (kod tıklaması, N). Geçiş çizimi bir kare sonra çalışır; arada başka sekme seçildiyse sonuncusu kazanır */
+var sekmeHedef = null;
+function sekmeAc(t, hemen) {
+  sekmeHedef = t;
+  sekmeGecis(t, hemen, function () {
+    tab = sekmeHedef; render(); window.scrollTo(0, 0);
+    /* erişilebilirlik: ekran okuyucu yeni sayfayı duysun; başlık sekmeyi söylesin */
+    var b = $('#tabs [data-tab="' + tab + '"]'); document.title = (b ? b.textContent.trim() + ' · ' : '') + 'Ağırlık Takip';
+    $('#view').focus({ preventScroll: true });
+  });
 }
 function yaziyor(t) { return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable); }
 function odakla(sel) { var e = $(sel); if (e) { e.focus(); if (e.select) e.select(); } return e; }
@@ -1338,7 +1831,7 @@ document.addEventListener('keydown', function (ev) {
   if (acik || ev.ctrlKey || ev.metaKey || ev.altKey || yaziyor(t)) return;
   if (SEKME[ev.key]) { ev.preventDefault(); return sekmeAc(SEKME[ev.key]); }
   if (ev.key === 'n' || ev.key === 'N') {
-    ev.preventDefault(); if (tab !== 'bugun') sekmeAc('bugun');
+    ev.preventDefault(); if (tab !== 'bugun') sekmeAc('bugun', true);
     if (S.active) return egzSheet();
     var sr = siradaki(); return sr ? islem['basla-tekrar']({ id: sr.id }) : islem.basla();
   }
@@ -1352,7 +1845,7 @@ var AT = window.AT = {
   islem: islem, bolum: {}, KAS: KAS, AYLAR: AYLAR, p2: p2, iso: iso, parse: parse, h: h, num: num, fmt: fmt, tarih: tarih, uid: uid,
   e1rm: e1rm, tahminiMax: tahminiMax, MAX_TEKRAR: MAX_TEKRAR, haftaBasi: haftaBasi, $: $, kaydet: kaydet, render: render, toast: toast, sheet: sheet, kapat: kapat, onayla: onayla,
   bitenSeanslar: bitenSeanslar, yapilanSetler: yapilanSetler, tumSetler: tumSetler, hacim: hacim, seansHacim: seansHacim, kasOf: kasOf, prHesapla: prHesapla,
-  cizgi: cizgi, cubuk: cubuk, indir: indir, bos: bosDurum, duyur: duyur, geriAl: geriAl, kol: kol, masaustu: masaustu
+  cizgi: cizgi, cubuk: cubuk, sayData: sayData, indir: indir, bos: bosDurum, duyur: duyur, geriAl: geriAl, kol: kol, masaustu: masaustu
 };
 Object.defineProperty(AT, 'S', { get: function () { return S; } });
 AT.surum = function () { return surum; };   /* önbellek anahtarı (notlar.js, bulk.js) */
@@ -1373,6 +1866,8 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 var sonW = 0;
 window.addEventListener('resize', function () { clearTimeout(tickT); tickT = setTimeout(function () { var w = grafikW(); if (w !== sonW) { sonW = w; if (tab === 'ilerleme' && !yaziyor(document.activeElement)) render(); } }, 150); });
+/* antrenman açıkken PC ↔ telefon eşiği geçilirse liste ↔ sahne düzeni yeniden kurulur (yazarken değil) */
+if (window.matchMedia) matchMedia('(min-width:1024px)').addEventListener('change', function () { if (tab === 'bugun' && S.active && !yaziyor(document.activeElement)) render(); });
 if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', temaUygula);
 setInterval(function () { if (S.active) Array.prototype.forEach.call(document.querySelectorAll('#gecen,[data-gecen]'), function (g) { g.textContent = gecenSure(S.active.start); }); }, 30000);
 setInterval(function () { if (tab === 'bugun' && S.active) setVurgu(); }, 10000);

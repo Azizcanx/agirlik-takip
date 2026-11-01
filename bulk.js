@@ -272,13 +272,16 @@ function demoTag(b) { return b && b.demo ? ' <span class="tag demo">örnek</span
 function kiloGir(etiket) {
   return '<div class="row"><input id="bwkg" class="grow" inputmode="decimal" placeholder="kg, örn. 82,4" aria-label="Vücut ağırlığı kg"><button class="btn-ac" data-act="bw-ekle">' + AT.h(etiket || 'Kaydet') + '</button></div>';
 }
-function grafik(seri, ref, baslik) {
+function grafik(seri, ref, baslik, kn) {
   if (!seri.length) return '<p class="mut">Tartı ekledikçe grafik burada oluşur.</p>';
   /* çizgi = ortalama kilo; ham tartılar soluk nokta (kısa seride), dokununca o günün tartısı ve hedef çizgisinin değeri */
   var o = { baslik: baslik, birim: 'kg', seriAd: 'ortalama kilo', ham: true, ek: function (p) { return p.ham > 0 ? 'tartı ' + AT.fmt(p.ham) + ' kg' : ''; } };
   if (ref) { o.ref = ref; o.refAd = 'hedef hız'; }
+  if (kn) { o.koni = kn.koni; o.hedef = kn.hedef; }
   return AT.cizgi(seri.map(function (p) { return { x: AT.parse(p.date).getTime(), y: r10(p.kg), t: AT.tarih(p.date, 1), ham: p.ham }; }), o);
 }
+/* büyük kilo rakamı: data-say öznitelikli (app.js sayData; yoksa düz metin) */
+function buyukKg(n) { return AT.sayData ? AT.sayData(n, 1) : AT.h(AT.fmt(n)); }
 function sonKayit(l) { return l.length ? l[l.length - 1] : null; }
 /* "Günlük harcaman" anahtar-değer satırı; hiç kalori kaydı yoksa boş */
 function harcamaSatir(bugun) {
@@ -323,7 +326,7 @@ function bolumYok(l) {
   var o = '<h2>Vücut ağırlığı</h2><div class="panel">';
   var son = sonKayit(l), tr = trendSeri(l), trSon = tr.length ? ortalamaKilo(l) : null;
   if (son) {
-    o += '<div class="hero"><b>' + AT.h(AT.fmt(trSon)) + ' <small>kg</small></b><span>ortalama kilo · son tartı ' + AT.h(AT.fmt(son.kg)) + ' kg, ' + AT.h(AT.tarih(son.date, 1)) + demoTag(son) + '</span></div>';
+    o += '<div class="hero"><b>' + buyukKg(trSon) + ' <small>kg</small></b><span>ortalama kilo · son tartı ' + AT.h(AT.fmt(son.kg)) + ' kg, ' + AT.h(AT.tarih(son.date, 1)) + demoTag(son) + '</span></div>';
     o += grafik(cizgiSeri(tr), null, 'Ortalama vücut ağırlığı');
     o += '<div class="row"><button class="btn-ghost mini" data-act="bw-geri">Son kaydı sil</button></div>';
   } else {
@@ -339,6 +342,38 @@ function bolumYok(l) {
   return o;
 }
 
+/* GELECEK KONİSİ: çizginin sonundan hedefe, bugünkü hız ± 1,96·SE ile açılan olasılık konisi (varisAralik ile aynı hız/SE).
+   Varış aralığı varsa kenarlar varış aralığının iki ucunda hedefi keser (hızlı kenar sonra hedef boyunca düz; kama), eksen yavaş uca
+   ya da +12 haftaya (kısası) uzar, eksende varış bandı + "~16 Ara" (r.varis: "Bu hızla varış" satırıyla aynı tarih).
+   Aralık yoksa ('yok': yavaş uç ≤0; hedef geçildi/ters yön) koni 4 hafta ileri, varış etiketi yok. 'erken'/'veri': koni yok.
+   Dönüş: {koni, hedef} (AT.cizgi seçenekleri) ya da null. seri: grafikteki cizgiSeri; ay: hizAyrinti (hesapla ile aynı girdi) */
+var KONI_UZUN = 84, KONI_KISA = 28, GUN_MS = 864e5;
+function koniOf(seri, r, ay, bugun) {
+  if (!r || r.durum === 'erken' || r.durum === 'veri' || r.hiz == null || !ay || seri.length < 2) return null;
+  var son = seri[seri.length - 1], x0 = AT.parse(son.date).getTime(), y0 = r10(son.kg), bg = AT.parse(bugun).getTime();
+  var p = 1.96 * (ay.se > 0 ? ay.se : 0), a = r.varisAralik, hd = r.hedefKg, yon = hd < r.basKg ? -1 : 1;
+  var hedef = { y: hd, ad: 'hedef ' + AT.fmt(hd) + ' kg', alt: y0 > hd };
+  function kes(xh, x) { return y0 + (hd - y0) * (x - x0) / (xh - x0); }   /* (x0,y0)'dan (xh, hedef)'e doğru, x'teki değer */
+  if (a && a !== 'yok' && (hd - y0) * yon > 0) {
+    var h = Math.abs(r.hiz), kal = Math.abs(r.kalan);
+    var xF = bg + kal / (h + p) * 7 * GUN_MS, xS = bg + kal / (h - p) * 7 * GUN_MS, xV = r.varis ? AT.parse(r.varis).getTime() : bg + kal / h * 7 * GUN_MS;
+    var x1 = Math.min(xS, bg + KONI_UZUN * GUN_MS), vic = xV <= x1;
+    return { hedef: hedef, koni: {
+      a: xF < x1 ? [[x0, y0], [xF, hd], [x1, hd]] : [[x0, y0], [x1, kes(xF, x1)]],
+      b: [[x0, y0], [x1, xS <= x1 ? hd : kes(xS, x1)]],
+      o: [[x0, y0], vic ? [xV, hd] : [x1, kes(xV, x1)]],
+      v: vic ? [xV, hd] : null,
+      bant: xF < x1 ? [xF, x1] : null,
+      etiket: vic && r.varis ? '~' + AT.tarih(r.varis, 1) : null, ex: xV,
+      ozet: 'Tahmin: hedefe ' + (a.az === a.cok ? a.az : a.az + '–' + a.cok) + ' hafta' + (r.varis ? ', ' + AT.tarih(r.varis, 1) + ' civarı' : '')
+    } };
+  }
+  var x2 = bg + KONI_KISA * GUN_MS, gun = (x2 - x0) / GUN_MS;
+  return { hedef: hedef, koni: {
+    a: [[x0, y0], [x2, y0 + (r.hiz + p) / 7 * gun]], b: [[x0, y0], [x2, y0 + (r.hiz - p) / 7 * gun]], o: [[x0, y0], [x2, y0 + r.hiz / 7 * gun]],
+    ozet: '4 haftalık tahmin: ' + AT.fmt(y0 + (r.hiz - p) / 7 * gun) + '–' + AT.fmt(y0 + (r.hiz + p) / 7 * gun) + ' kg'
+  } };
+}
 /* "~6–9 hafta (9 Ara civarı)"; aralık yoksa tek tarih; yavaş uç belirsizse "henüz tahmin yok" */
 function varisYaz(r) {
   var a = r.varisAralik;
@@ -351,7 +386,7 @@ function bolumVar(l, b) {
   var r = oneriUygula(hesapla(l, b, AT.iso(new Date()), AT.S.kcal), b, AT.iso(new Date())), yon = yonOf(b);
   var bugun = AT.iso(new Date()), gun = Math.max(0, gunFark(bugun, b.bas));
   var o = '<h2>' + sezonAd(b) + ' <small>' + (Math.floor(gun / 7) + 1) + '. hafta</small>' + demoTag(b) + '</h2><div class="panel">';
-  o += '<div class="hero"><b>' + AT.h(AT.fmt(r.simdi)) + ' <small>kg</small></b><span>ortalama kilo · başlangıçtan <i class="fark' + (r10(r.degisim) * yon > 0 ? ' iyi' : '') + '">' + AT.h(isaret(r10(r.degisim))) + ' kg</i></span></div>';
+  o += '<div class="hero"><b>' + buyukKg(r.simdi) + ' <small>kg</small></b><span>ortalama kilo · başlangıçtan <i class="fark' + (r10(r.degisim) * yon > 0 ? ' iyi' : '') + '">' + AT.h(isaret(r10(r.degisim))) + ' kg</i></span></div>';
   var tam = r.hedefKg - r.basKg, yuzde = tam ? (r.simdi - r.basKg) / tam * 100 : 100;
   yuzde = Math.round(Math.max(0, Math.min(100, yuzde)));
   o += '<div class="ibar" role="progressbar" aria-label="Hedefe ilerleme" aria-valuenow="' + yuzde + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + yuzde + '%"></i></div>' +
@@ -371,7 +406,7 @@ function bolumVar(l, b) {
       { x: AT.parse(son.date).getTime(), y: r10(b.basKg + orta * gunFark(son.date, b.bas) / 7), t: AT.tarih(son.date, 1) }
     ];
   }
-  o += grafik(seri, ref, 'Ortalama kilo ve hedef çizgisi');
+  o += grafik(seri, ref, 'Ortalama kilo ve hedef çizgisi', koniOf(seri, r, r.durum === 'erken' || r.durum === 'veri' ? null : hizAyrinti(l, b.bas), bugun));
   o += '<div class="row">' + (l.length ? '<button class="btn-ghost mini" data-act="bw-geri">Son kaydı sil</button>' : '') +
     '<span class="grow"></span><button class="btn-ghost mini" data-act="bulk-ayar">Hedefi düzenle</button></div>';
   return o + '</div>' + kaloriGecmisi(bugun);
@@ -408,6 +443,8 @@ function cubukHtml(sinif, yuzde, eski, etiket, now, max) {
 }
 /* bugünün kalori toplamı: hedef varsa "2.740 / 3.000 kcal · 260 kaldı" + ince çubuk (aşınca dolu, "+120 fazla", sakin renk);
    hedef yoksa (ilk 14 gün, bayat tartı, hedef yok) yalnız sayı. Makro yazıldıysa altında P/K/Y şeridi (protein hedefe göre mini çubuk) */
+/* app.js sayarak yükselen sayı: öğenin içindeki ilk biçimli değer önceki gösterilenden yeniye sayar (yalnız öznitelik) */
+function sayOz(kc) { return ' data-say="' + Math.round(kc) + '" data-say-ad="bugun-kcal"'; }
 function kcalOzet(k, hedef, yon) {
   if (!k && hedef == null) return '';
   var kc = k ? +k.kcal || 0 : 0, o = '';
@@ -415,11 +452,11 @@ function kcalOzet(k, hedef, yon) {
     var fark = Math.round(hedef - kc), tam = fark <= 0, w = kc / hedef * 100, eski = kcalYuzde;
     kcalYuzde = Math.round(Math.min(100, w));
     var not = !k ? '' : fark > 0 ? AT.fmt(fark, 0) + ' kaldı' : fark < 0 ? '+' + AT.fmt(-fark, 0) + ' fazla' : 'hedef tamam';
-    o += '<div class="kc-ozet' + (tam ? ' tam' : '') + (tam && yon > 0 ? ' iyi' : '') + '"><div class="kc-ust"><span class="kc-say"><b>' + AT.h(AT.fmt(kc, 0)) + '</b> / ' + AT.h(kcalSay(hedef)) + '</span>' + demoTag(k) +
+    o += '<div class="kc-ozet' + (tam ? ' tam' : '') + (tam && yon > 0 ? ' iyi' : '') + '"><div class="kc-ust"><span class="kc-say"' + sayOz(kc) + '><b>' + AT.h(AT.fmt(kc, 0)) + '</b> / ' + AT.h(kcalSay(hedef)) + '</span>' + demoTag(k) +
       (not ? '<span class="kc-not">' + AT.h(not) + '</span>' : '') + '</div>' +
       cubukHtml('ibar kc-bar', w, eski === null ? 0 : eski, 'Bugünkü kalori, hedef ' + kcalSay(hedef), kc, hedef);
   } else {
-    o += '<div class="kc-ozet"><div class="kc-ust"><span class="kc-say"><b>' + AT.h(AT.fmt(kc, 0)) + '</b> kcal</span>' + demoTag(k) + '</div>';
+    o += '<div class="kc-ozet"><div class="kc-ust"><span class="kc-say"' + sayOz(kc) + '><b>' + AT.h(AT.fmt(kc, 0)) + '</b> kcal</span>' + demoTag(k) + '</div>';
   }
   if (makroVar(k)) {
     var ph = proteinHedef();
@@ -470,7 +507,8 @@ function tarti() {
   var b = AT.S.bulk, r = b ? oneriUygula(hesapla(l, b, bugun, AT.S.kcal), b, bugun) : null;
   var o = '<h2>Bugünkü kilo ve kalori</h2><div class="panel tarti">';
   if (t && !ac) {
-    o += '<div class="row kilo-bugun"><span class="grow">Bugün: <b>' + AT.h(AT.fmt(t.kg)) + ' kg</b> ✓' + demoTag(t) + kiloFark(l, t, bugun) + '</span><button class="btn-ghost mini" data-act="tarti-duzelt">Düzelt</button></div>';
+    var ok = l.filter(function (x) { return x.date < bugun && !x.demo === !t.demo; }).pop();
+    o += '<div class="row kilo-bugun"><span class="grow" data-say="' + (+t.kg) + '" data-say-ond="1" data-say-ad="bugun-kilo"' + (ok ? ' data-say-bas="' + (+ok.kg) + '"' : '') + '>Bugün: <b>' + AT.h(AT.fmt(t.kg)) + ' kg</b> ✓' + demoTag(t) + kiloFark(l, t, bugun) + '</span><button class="btn-ghost mini" data-act="tarti-duzelt">Düzelt</button></div>';
   } else {
     o += kiloGir(t ? 'Düzelt' : 'Kaydet');
   }
@@ -583,5 +621,5 @@ AT.bolum.bulk = function () { var l = gecerli(AT.S.bw); return AT.S.bulk ? bolum
 AT.bolum.tarti = tarti;
 AT.demoBw = demoBw;
 /* test/başka modüller için saf hesaplar */
-AT.bulkHesap = { makroKcal: makroKcal, makroOrt: makroOrt, makroYaz: makroYaz, cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, haftalikOneri: haftalikOneri, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
+AT.bulkHesap = { koni: koniOf, makroKcal: makroKcal, makroOrt: makroOrt, makroYaz: makroYaz, cizgiSeri: cizgiSeri, ortalamaKilo: ortalamaKilo, yarimGunAt: yarimGunAt, gecerli: gecerli, gunluk: gunluk, trendSeri: trendSeri, egim: egim, hiz: hizHesap, hizAyrinti: hizAyrinti, durum: durumOf, kcal: kcalOf, varis: varisOf, varisAralik: varisAralik, varsayilanHiz: varsayilanHiz, haftalikOneri: haftalikOneri, hesapla: hesapla, durumMetin: durumMetin, kcalGecerli: kcalGecerli, harcama: harcama, haftalikKcal: haftalikKcal, hedefKcal: hedefKcalOf };
 })(window.AT);
