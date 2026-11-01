@@ -26,8 +26,10 @@ var SAG = {
   deepseek: { ad: 'DeepSeek', tur: 'api', alt: 'ücretli', model: 'deepseek-flash', url: 'https://api.deepseek.com/chat/completions',
     link: 'https://platform.deepseek.com/api_keys', linkAd: 'DeepSeek\'ten anahtar al' },
   chatgpt: { ad: 'ChatGPT', tur: 'web', alt: 'Plus hesabınla, anahtarsız', q: 'https://chatgpt.com/?q=', bos: 'https://chatgpt.com/',
+    link: 'https://chatgpt.com/auth/login', linkAd: 'ChatGPT\'ye Google hesabınla giriş yap / hesap aç',
     sor: 'ChatGPT\'ye sor', soruldu: 'ChatGPT\'ye soruldu', yonelme: 'ChatGPT\'ye' },
   claude: { ad: 'Claude', tur: 'web', alt: 'abonelik hesabınla, anahtarsız', q: 'https://claude.ai/new?q=', bos: 'https://claude.ai/new',
+    link: 'https://claude.ai/login', linkAd: 'Claude\'a Google hesabınla giriş yap / hesap aç',
     sor: 'Claude\'a sor', soruldu: 'Claude\'a soruldu', yonelme: 'Claude\'a' }
 };
 /* PC yerel koç (pc/sunucu.ps1, localhost): bu PC'deki Claude aboneliği ya da ChatGPT oturumu (Codex), anahtarsız. Sözleşme:
@@ -413,7 +415,7 @@ function icerik() {
       (deneme ? '<p class="durum ' + (deneme.tip === 'bekle' ? 'bilgi' : deneme.tip) + '">' + AT.h(deneme.metin) + '</p>' : '') +
       '<p class="mut kucuk koc-giz">' + AT.h(gizlilik(q)) + '</p><button class="btn-ac btn-big" data-act="koc-dene">Bağlantıyı dene</button>';
   } else {
-    o += '<p class="mut kucuk koc-giz">' + AT.h(gizlilik(q)) + '</p><button class="btn-ac btn-big" data-act="koc-web" data-v="' + s + '">' + AT.h(q.ad) + ' ile kullan</button>';
+    o += (q.link ? '<p class="koc-link"><a href="' + q.link + '" target="_blank" rel="noopener">' + AT.h(q.linkAd) + '</a></p>' : '') + '<p class="mut kucuk koc-giz">' + AT.h(gizlilik(q)) + '</p><button class="btn-ac btn-big" data-act="koc-web" data-v="' + s + '">' + AT.h(q.ad) + ' ile kullan</button>';
   }
   return o;
 }
