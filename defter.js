@@ -67,6 +67,8 @@ function taslakYaz(v) { try { if (v) localStorage.setItem(LS_TASLAK, v); else lo
 
 /* ---------- görünüm ---------- */
 var aramaQ = '', hepsi = false;
+var secId = null;   /* PC: sağ alanda açık not (Apple Notes düzeni); telefonda hep null, düzenleme pencerede */
+function pc() { return !!(AT.masaustu && AT.masaustu()); }
 
 /* yazı alanı yazdıkça uzar; CSS max-height'a gelince kendi içinde kayar */
 function boyutla(e) {
@@ -78,10 +80,16 @@ function boyutla(e) {
   e.style.overflowY = h > mx ? 'auto' : 'hidden';
   if (window.scrollY !== y) window.scrollTo(0, y);
 }
+/* ilk satır .df-bas (Apple temasında kalın başlık), kalanı önizleme; öbür temalarda görünüm aynı */
+function baslikGovde(m, ts) {
+  var i = String(m).indexOf('\n');
+  if (i < 1) return '<span class="df-bas">' + vurgula(m, ts) + '</span>';
+  return '<span class="df-bas">' + vurgula(m.slice(0, i), ts) + '</span>\n' + vurgula(m.slice(i + 1), ts);
+}
 function notSatir(n, ts) {
   if (n.koc && AT.kocSatir) return AT.kocSatir(n, ts, saat(n.t), vurgula);
   return '<button class="satir df-not" data-act="df-ac" data-id="' + AT.h(n.id) + '"><span class="df-saat">' + saat(n.t) + '</span>' +
-    '<span class="grow df-metin">' + vurgula(n.metin, ts) + '</span>' + (n.demo ? '<span class="tag demo">örnek</span>' : '') + '</button>';
+    '<span class="grow df-metin">' + baslikGovde(n.metin, ts) + '</span>' + (n.demo ? '<span class="tag demo">örnek</span>' : '') + '</button>';
 }
 /* notlar sütunu (arama yazarken yalnız bu kısım yenilenir). İlk ILK not tam günlerle; arama hepsine bakar */
 function listeHtml() {
@@ -92,7 +100,7 @@ function listeHtml() {
   for (; n < gr.length && (hepsi || ts.length || say < ILK); n++) say += gr[n].notlar.length;
   var o = ts.length ? '<p class="df-sonuc">' + (bul.length ? bul.length + ' not bulundu' : 'Bulunamadı') + '</p>' : '';
   o += gr.slice(0, n).map(function (g) {
-    return '<h2 class="df-gun"><span class="df-say">' + g.notlar.length + ' not</span>' + AT.h(gunAdi(g.gun, bugun)) + '</h2><div class="panel liste">' + g.notlar.map(function (x) { return notSatir(x, ts); }).join('') + '</div>';
+    return '<h2 class="df-gun"><span class="df-say">' + g.notlar.length + ' not</span>' + AT.h(gunAdi(g.gun, bugun)) + '</h2><div class="panel liste">' + g.notlar.map(function (x) { var h = notSatir(x, ts); return secId != null && pc() && String(x.id) === String(secId) ? h.replace('df-not', 'df-not df-sec').replace('<button', '<button aria-current="true"') : h; }).join('') + '</div>';
   }).join('');
   if (bul.length > say) o += '<button class="btn-big btn-ghost ac" data-act="df-hepsi">Daha eski notlar (' + (bul.length - say) + ')</button>';
   return o;
@@ -100,13 +108,15 @@ function listeHtml() {
 function gorunum() {
   var l = notlar(AT.S), bugun = AT.iso(new Date());
   var o = '<h1>Defter</h1><p class="sub">' + AT.h(tamTarih(bugun, bugun)) + (l.length ? ' · ' + l.length + ' not' : '') + '</p>';
-  var a = '<div class="df-yaz"><textarea id="df-metin" class="df-alan" rows="3" maxlength="' + UZUN + '" placeholder="Aklına geleni yaz…" aria-label="Yeni not">' + AT.h(taslakOku()) + '</textarea>' +
+  var sn = secId != null && pc() ? l[sira(l, secId)] : null;
+  if (secId != null && !sn) secId = null;
+  var a = sn ? duzHtml(sn, true) : '<div class="df-yaz"><textarea id="df-metin" class="df-alan" rows="3" maxlength="' + UZUN + '" placeholder="Aklına geleni yaz…" aria-label="Yeni not">' + AT.h(taslakOku()) + '</textarea>' +
     '<div class="df-dugmeler"><button class="btn-ac btn-big" data-act="df-kaydet">Kaydet<kbd>Ctrl + Enter</kbd></button>' + (AT.bolum.kocDugme ? AT.bolum.kocDugme() : '') +
     (AT.setDil ? AT.setDil.mik('df-metin') : '') + '</div>' +
     (AT.bolum.kocAlt ? AT.bolum.kocAlt() : '') + '</div>';
-  if (l.length > ARA_ESIK) a += '<input id="df-ara" class="df-ara" type="search" placeholder="Notlarda ara" aria-label="Notlarda ara" autocomplete="off" value="' + AT.h(aramaQ) + '">';
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { boyutla(AT.$('#df-metin')); });   /* taslak varsa boyu */
-  return o + AT.kol(a, '<div id="df-liste">' + listeHtml() + '</div>', 'defter');
+  var ara = l.length > ARA_ESIK ? '<input id="df-ara" class="df-ara" type="search" placeholder="Notlarda ara" aria-label="Notlarda ara" autocomplete="off" value="' + AT.h(aramaQ) + '">' : '';
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { boyutla(AT.$(sn ? '#df-duz' : '#df-metin')); });   /* taslak varsa boyu */
+  return o + AT.kol(a, ara + '<div id="df-liste">' + listeHtml() + '</div>', 'defter');
 }
 
 /* ---------- işlemler ---------- */
@@ -122,27 +132,46 @@ AT.islem['df-kaydet'] = function (d) {
   AT.kaydet(); AT.render(); AT.toast('Not kaydedildi');
   if (AT.masaustu && AT.masaustu()) { var y = AT.$('#df-metin'); if (y && y.focus) y.focus(); }   /* PC: sıradaki nota devam */
 };
-AT.islem['df-ac'] = function (d) {
-  var l = veri(AT.S), i = sira(l, d.id); if (i < 0) return;
-  var n = l[i], bugun = AT.iso(new Date()), g = gunOf(n), alt = gunAdi(g, bugun) + ' ' + saat(n.t);
+/* düzenleme formu: telefonda pencerede, PC'de sağ alanda (aynı kayıt/silme kodu) */
+function duzHtml(n, ic) {
+  var bugun = AT.iso(new Date()), g = gunOf(n), alt = gunAdi(g, bugun) + ' ' + saat(n.t);
   if (n.duz) {
     var dg = AT.iso(new Date(+n.duz)), ad = gunAdi(dg, bugun);
     alt += ' · düzenlendi ' + (dg === g ? '' : (ad === 'Bugün' || ad === 'Dün' ? ad.toLocaleLowerCase('tr') : ad) + ' ') + saat(n.duz);
   }
   var id = AT.h(n.id);
-  AT.sheet('<h3>' + (n.koc ? 'Koç notu' : 'Notu düzenle') + (n.demo ? ' <span class="tag demo">örnek</span>' : '') + '</h3><p class="mut">' + AT.h(alt) + '</p>' +
+  return (ic ? '<div class="df-duzen"><button class="btn-ghost mini df-yeni" data-act="df-yeni">+ Yeni not</button>' : '') +
+    '<h3>' + (n.koc ? 'Koç notu' : 'Notu düzenle') + (n.demo ? ' <span class="tag demo">örnek</span>' : '') + '</h3><p class="mut">' + AT.h(alt) + '</p>' +
     (n.koc ? '<p class="koc-soru">' + AT.h(n.koc.s) + '</p>' : '') +
     '<textarea id="df-duz" class="df-alan" data-id="' + id + '" maxlength="' + UZUN + '" aria-label="Not">' + AT.h(n.metin) + '</textarea>' +
     '<div class="yigin"><button class="btn-ac btn-big" data-act="df-duz-kaydet" data-id="' + id + '">Kaydet<kbd>Ctrl + Enter</kbd></button>' +
-    '<button class="btn-big" data-act="kapat">Vazgeç</button>' +
-    '<button class="btn-big btn-ghost btn-bad" data-act="df-sil" data-id="' + id + '">Notu sil</button></div>');
-  var e = AT.$('#df-duz'); boyutla(e);
-  if (e && e.focus && AT.masaustu && AT.masaustu()) { e.focus(); try { e.setSelectionRange(e.value.length, e.value.length); } catch (x) {} }
+    '<button class="btn-big" data-act="' + (ic ? 'df-yeni' : 'kapat') + '">Vazgeç</button>' +
+    '<button class="btn-big btn-ghost btn-bad" data-act="df-sil" data-id="' + id + '">Notu sil</button></div>' + (ic ? '</div>' : '');
+}
+AT.islem['df-ac'] = function (d) {
+  var l = veri(AT.S), i = sira(l, d.id); if (i < 0) return;
+  if (pc()) {
+    var kol = document.querySelector('.duzen.defter>.kol:last-child'), y = kol ? kol.scrollTop : 0;
+    secId = l[i].id; AT.render();
+    kol = document.querySelector('.duzen.defter>.kol:last-child'); if (kol) kol.scrollTop = y;
+    var e = AT.$('#df-duz'); if (e && e.focus) { e.focus(); try { e.setSelectionRange(e.value.length, e.value.length); } catch (x) {} }
+    return;
+  }
+  AT.sheet(duzHtml(l[i], false));
+  var e2 = AT.$('#df-duz'); boyutla(e2);
+  if (e2 && e2.focus && pc()) { e2.focus(); try { e2.setSelectionRange(e2.value.length, e2.value.length); } catch (x) {} }
+};
+/* PC: açık notu bırak, yeni not kipine dön */
+AT.islem['df-yeni'] = function () {
+  var kol = document.querySelector('.duzen.defter>.kol:last-child'), y = kol ? kol.scrollTop : 0;
+  secId = null; AT.render();
+  kol = document.querySelector('.duzen.defter>.kol:last-child'); if (kol) kol.scrollTop = y;
+  var e = AT.$('#df-metin'); if (e && e.focus) e.focus();
 };
 function sil(id) {
   var l = veri(AT.S), i = sira(l, id); if (i < 0) return AT.kapat();
   var x = l.splice(i, 1)[0];
-  AT.kaydet(); AT.kapat(); AT.render();
+  secId = null; AT.kaydet(); AT.kapat(); AT.render();
   AT.geriAl('Not silindi', function () { var l2 = veri(AT.S); if (sira(l2, x.id) < 0) l2.push(x); });
 }
 AT.islem['df-sil'] = function (d) { sil(d.id); };
@@ -152,9 +181,9 @@ AT.islem['df-duz-kaydet'] = function (d) {
   if (i < 0 || !e) return AT.kapat();
   var m = temizle(e.value), eski = l[i];
   if (!m) return sil(d.id);
-  if (m === eski.metin) return AT.kapat();
+  if (m === eski.metin) { secId = null; AT.kapat(); return AT.render(); }
   l[i] = Object.assign({}, eski, { metin: m, duz: Date.now() });
-  AT.kaydet(); AT.kapat(); AT.render();
+  secId = null; AT.kaydet(); AT.kapat(); AT.render();
   AT.geriAl('Not güncellendi', function () { var l2 = veri(AT.S), k = sira(l2, eski.id); if (k >= 0) l2[k] = eski; else l2.push(eski); });
 };
 AT.islem['df-hepsi'] = function () { hepsi = true; AT.render(); };
@@ -187,7 +216,7 @@ AT.islem['demo-sil'] = function (d) {
   AT.kaydet(); AT.render();
 };
 /* "Tüm verileri sil": yarım taslak da gitsin */
-AT.islem['hepsini-kesin'] = function (d) { taslakYaz(''); aramaQ = ''; hepsi = false; if (eskiHepsi) return eskiHepsi(d); };
+AT.islem['hepsini-kesin'] = function (d) { taslakYaz(''); aramaQ = ''; hepsi = false; secId = null; if (eskiHepsi) return eskiHepsi(d); };
 
 /* ---------- olaylar ---------- */
 if (typeof document !== 'undefined') {
@@ -205,6 +234,7 @@ if (typeof document !== 'undefined') {
       else if (t.id === 'df-metin') { ev.preventDefault(); AT.islem['df-kaydet'](); }
       else if (t.id === 'df-duz') { ev.preventDefault(); AT.islem['df-duz-kaydet']({ id: t.dataset.id }); }
     } else if (ev.key === 'Escape' && t.id === 'df-metin' && t.blur) t.blur();
+    else if (ev.key === 'Escape' && t.id === 'df-duz' && secId != null && pc()) { ev.preventDefault(); AT.islem['df-yeni'](); }
   });
 }
 

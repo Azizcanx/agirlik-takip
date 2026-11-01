@@ -143,13 +143,16 @@ function kartCiz(v) {
   var c = cv.getContext('2d'), F = 'ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
   var SF = '"Iowan Old Style","Palatino Linotype",Palatino,Charter,ui-serif,Georgia,serif';
   /* uygulamanın açık paleti (style.css :root) */
-  var TX = '#26282c', MUT = '#6a6c70', DIM = '#9c9b97', AC = '#3d5d8a', IYI = '#3f8462', LN = '#e4ded2', S1 = '#fffdf9';
+  var TX = '#26282c', MUT = '#6a6c70', DIM = '#9c9b97', AC = '#3d5d8a', IYI = '#3f8462', LN = '#e4ded2', S1 = '#fffdf9', ZM = '#f7f4ee', DOLU = 'rgba(61,93,138,.08)';
+  if (document.documentElement.dataset.tema === 'apple') {   /* Apple teması paleti */
+    TX = '#ffffff'; MUT = 'rgba(235,235,245,.62)'; DIM = 'rgba(235,235,245,.4)'; AC = '#0a84ff'; IYI = '#30d158'; LN = 'rgba(84,84,88,.6)'; S1 = '#1c1c1e'; ZM = '#000000'; DOLU = 'rgba(10,132,255,.16)'; SF = F;
+  }
   function yaz(t, x, y, boy, agir, renk, hiza, serif, maxW) {
     c.font = (agir || 400) + ' ' + boy + 'px ' + (serif ? SF : F); c.fillStyle = renk || TX; c.textAlign = hiza || 'left';
     if (maxW) { while (t.length > 3 && c.measureText(t).width > maxW) t = t.slice(0, -2).trim() + '…'; }
     c.fillText(t, x, y);
   }
-  c.fillStyle = '#f7f4ee'; c.fillRect(0, 0, W, H);
+  c.fillStyle = ZM; c.fillRect(0, 0, W, H);
   var y = P + 40;
   yaz((v.bulk ? 'Bulk sezonu' : 'Son 12 hafta') + ' · ' + v.hafta + '. hafta', P, y, 42, 500, MUT); y += 40;
   if (v.kg1 != null) {
@@ -164,7 +167,7 @@ function kartCiz(v) {
       function X(i) { return ix + i / (s.length - 1) * iw; } function Y(k) { return iy + (1 - (k - mn) / (mx - mn)) * ih; }
       c.beginPath(); s.forEach(function (k, i) { if (i) c.lineTo(X(i), Y(k)); else c.moveTo(X(i), Y(k)); });
       c.strokeStyle = AC; c.lineWidth = 7; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke();
-      c.lineTo(X(s.length - 1), iy + ih); c.lineTo(X(0), iy + ih); c.closePath(); c.fillStyle = 'rgba(61,93,138,.08)'; c.fill();
+      c.lineTo(X(s.length - 1), iy + ih); c.lineTo(X(0), iy + ih); c.closePath(); c.fillStyle = DOLU; c.fill();
       c.beginPath(); c.arc(X(s.length - 1), Y(s[s.length - 1]), 14, 0, 7); c.fillStyle = S1; c.fill(); c.lineWidth = 6; c.strokeStyle = AC; c.stroke();
     }
     y = gy + gh + 30;

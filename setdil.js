@@ -6,6 +6,9 @@
    (duzenle.js doğrulaması, tam kayıt); o da yoksa yeni antrenman. Tartı AT.tartiKaydet, kalori kcal-ekle yolundan.
    Girdi: Ctrl+K (komut.js), Defter Kaydet (defter.js), Koça sor (koc.js), mikrofon (SpeechRecognition varsa).
    Kural anlamazsa ve koç (API / PC) bağlıysa yalnız JSON isteyen kısa istem (AT.kocJson); dönen JSON doğrulanır.
+   Yapay zekâ ile doldurma (1 Kas): kural anlamazsa/emin değilse (hareket tanınmadı, eksik alan, "dün"/gün adı) metin + kısa bağlam koça (PC'de ChatGPT) gider,
+   dönen {eylemler:[{tur:set|kilo|kcal …}], soru} sıkı doğrulanır (yzDogrula); sorun yoksa önizlemesiz yazılır + Geri al.
+   Yeni antrenman başlatacaksa ya da geçmiş güne yazacaksa önizleme/onay kalır.
    AT.setAyristir(metin) -> {hareket, setler:[{kg, reps}], eksik:[...]} | null · AT.setDil */
 (function (AT) {
 'use strict';
@@ -269,6 +272,13 @@ function relCoz(seg) {
     rS += ri * rd; not = (kgM ? not + ', ' : '') + (ri > 0 ? '+' : '−') + rd + ' tekrar';
     if (!tamMi(rS, 1, 200)) return { tur: 'mesaj', metin: 'Tekrar 1–200 arası olmalı' };
   }
+  /* "bir set daha 12 tekrar" / "set daha 65 kilo": açık yazılan sayı son setinkinin yerine geçer */
+  if (kopM && !kgM && !repM) {
+    var ar = /(\d+)\s*tekrar\b/.exec(t), ak = /(\d+(?:\.\d+)?)\s*(?:kg|kilo)\b/.exec(t), nt = [];
+    if (ak && +ak[1] >= 0 && +ak[1] <= 1000) { kgS = +ak[1]; nt.push(AT.fmt(kgS) + ' kg'); }
+    if (ar && tamMi(+ar[1], 1, 200)) { rS = +ar[1]; nt.push(rS + ' tekrar'); }
+    if (nt.length) not = nt.join(', ');
+  }
   var s = setSatir(son.e.ad, [{ kg: kgS, reps: rS }], son.s.tip, [not]); s.aktif = true; return s;
 }
 
@@ -375,6 +385,8 @@ function setAyristir(metin) {
 /* ---------- önizleme ---------- */
 var on = null;   /* {satirlar, kaynak: 'komut'|'defter'|'koc', metin} */
 function hedefYazi() {
+  var g = on && on.satirlar.filter(function (x) { return x.tur === 'set' && x.tarih && x.tarih < bugun(); })[0];
+  if (g) { var v = AT.S.sessions.some(function (z) { return z.date === g.tarih && !z.demo; }); return AT.tarih(g.tarih, 1) + (v ? ' tarihli antrenmana eklenir' : ' tarihli yeni antrenman olarak eklenir'); }
   if (AT.S.active) return 'Süren antrenmana eklenir';
   var b = bugunSeans(); return b ? 'Bugünkü antrenmana eklenir (' + (b.name || 'Antrenman') + ')' : 'Yeni antrenman başlar';
 }
@@ -459,6 +471,9 @@ function uygula() {
     hazir.push(y);
   }
   if (!hazir.length) return AT.toast('Eklenecek set kalmadı');
+  /* geçmiş güne yazılacak set satırları ayrı gider (o günün antrenmanına eklenir ya da yeni biten antrenman olur) */
+  var gec = hazir.filter(function (y) { return y.x.tur === 'set' && y.x.tarih && y.x.tarih < bugun(); });
+  if (gec.length) hazir = hazir.filter(function (y) { return gec.indexOf(y) < 0; });
   var ant = hazir.filter(function (y) { return y.x.tur !== 'kilo' && y.x.tur !== 'kcal'; });
   var eski = { active: kopya(S.active), sessions: S.sessions.slice(), bw: S.bw, kcal: kopya(S.kcal || []), din: S.dinlenmeEgz ? Object.assign({}, S.dinlenmeEgz) : null };
   /* bugün bitmiş antrenmana: önce doğrula, sonra hiçbir şey yazılmadıysa dur */
@@ -475,12 +490,34 @@ function uygula() {
       var hata = AT._duzenle ? AT._duzenle.dogrula(seans) : null; if (hata) return AT.toast(hata);
     }
   }
-  var kaynak = on.kaynak; on = null; AT.kapat();
-  var ozet = [], setSay = 0;
+  /* geçmiş günler: önce doğrula (hiçbir şey yazılmadan dur) */
+  var gecSeans = [];
+  if (gec.length) {
+    var gunler = {}; gec.forEach(function (y) { (gunler[y.x.tarih] = gunler[y.x.tarih] || []).push(y); });
+    for (var gk in gunler) {
+      var ls = S.sessions.filter(function (z) { return z.date === gk && !z.demo; }).sort(function (a, b) { return (a.end || a.start || 0) - (b.end || b.start || 0); }), ex = ls[ls.length - 1] || null;
+      var ys = ex ? kopya(ex) : { id: AT.uid(), date: gk, start: new Date(gk + 'T12:00:00').getTime(), end: new Date(gk + 'T12:45:00').getTime(), name: 'Antrenman', exs: [] };
+      gunler[gk].forEach(function (y) {
+        var e = null; ys.exs.forEach(function (z) { if (z.ad === y.x.ad) e = z; });
+        if (!e) { e = { ad: y.x.ad, kas: AT.kasOf(y.x.ad), sets: [] }; ys.exs.push(e); }
+        y.sets.forEach(function (s2) { var z = { kg: virgul(s2.kg), reps: String(s2.reps), done: true }; if (s2.tip) z.tip = s2.tip; e.sets.push(z); });
+      });
+      var hg = AT._duzenle ? AT._duzenle.dogrula(ys) : null; if (hg) return AT.toast(hg);
+      gecSeans.push({ yeni: ys, eskiId: ex ? ex.id : null, gun: gk, say: gunler[gk].reduce(function (t, y) { return t + y.sets.length; }, 0) });
+    }
+  }
+  var kaynak = on.kaynak, yzOn = !!on.yz; on = null; AT.kapat();
+  var ozet = [], setSay = 0, detay = [];
   hazir.forEach(function (y) {
     if (y.x.tur === 'kilo') { AT.tartiKaydet(y.v); ozet.push('tartı ' + AT.fmt(y.v) + ' kg'); }
     else if (y.x.tur === 'kcal') { AT.islem['kcal-ekle']({ v: '+' + Math.round(y.v) }); ozet.push('+' + AT.fmt(Math.round(y.v), 0) + ' kcal'); }
   });
+  gecSeans.forEach(function (g) {
+    var i2 = -1; S.sessions.forEach(function (z, k) { if (g.eskiId && z.id === g.eskiId) i2 = k; });
+    if (i2 >= 0) S.sessions[i2] = g.yeni; else S.sessions.push(g.yeni);
+    setSay += g.say; ozet.push(AT.tarih(g.gun, 1) + ' tarihine ' + g.say + ' set');
+  });
+  if (gecSeans.length) AT.kaydet();
   if (seans) { S.sessions[seansI] = seans; AT.kaydet(); ant.forEach(function (y) { setSay += y.sets.length; }); }
   else if (ant.length) {
     var yeni = !S.active;
@@ -498,7 +535,9 @@ function uygula() {
       }
     });
   }
-  if (setSay) ozet.unshift(setSay + ' set eklendi');
+  hazir.concat(gec).forEach(function (y) { if (y.x.tur === 'set' && y.sets) detay.push(y.x.ad + ' ' + y.sets.map(function (z) { return (z.kg > 0 ? AT.fmt(z.kg) + ' kg × ' : '') + z.reps; }).join(', ') + ((y.x.not || []).some(function (q) { return /tekrar varsayıldı/.test(q); }) ? ' (tekrar 10 varsayıldı)' : '')); });
+  if (yzOn && detay.length) ozet = detay.concat(ozet.filter(function (o) { return !/^\d+ set eklendi$/.test(o); }));
+  else if (setSay) ozet.unshift(setSay + ' set eklendi');
   if (kaynak === 'defter') { var t = AT.$('#df-metin'); if (t) t.value = ''; if (AT._defter) AT._defter.taslakYaz(''); }
   AT.render();
   AT.geriAl(ozet.join(' · ') || 'Eklendi', function () {
@@ -538,6 +577,174 @@ function kocla(metin, kaynak) {
     .catch(function () { AT.toast(ORNEK); return null; });
 }
 
+
+/* ---------- yapay zekâ ile doldurma ---------- */
+var YZ_ZAMAN_ESIK = 0, yzAtla = '', yzMesgul = false;
+var TARIHLI = /\b(dun|evvelki|onceki gun|gecen|pazartesi|sali|carsamba|persembe|cuma|cumartesi|pazar|\d+ gun once|hafta sonu|aksam once)\b/;
+/* metin kayıt gibi mi (sayı + set/tekrar/kilo/kalori/tartı)? Yalnız o zaman yapay zekâya gider; düz not gitmez */
+function kayitBenzeri(metin) {
+  var n = normal(metin); if (!/\d/.test(n)) return false;
+  return /\b(set\w*|tekrar\w*|rep\w*|kg|kilo\w*|kcal|kalori\w*|tart\w*)\b|\dx\d/.test(n);
+}
+/* kural çözümü yeterli mi? false → yapay zekâ denenir (varsa) */
+function eminMi(r, metin) {
+  if (!r || !r.satirlar) return false;
+  if (TARIHLI.test(normal(metin))) return false;
+  if (!r.guclu) return false;
+  return !r.satirlar.some(function (x) { return x.tur === 'set' && x.eksik && x.eksik.length; });
+}
+function yzEsle(ad) {
+  var k = kat(ad).replace(/-/g, ' ').replace(/\s+/g, ' ').trim(); if (!k) return null;
+  var bul = null;
+  katalog().forEach(function (x) { if (!bul && kat(x.ad).replace(/-/g, ' ') === k) bul = x.ad; });
+  if (bul) return bul;
+  var h = hareketBul(normal(ad).split(' ')); return h && h.puan >= 2 ? h.ad : null;
+}
+/* aynı hareketin son tekrar sayısı (bu antrenman, yoksa geçen seferin son iş seti) */
+function sonTekrar(ad) {
+  var b = sonSetAktif(ad); if (b && b.s.tip !== 'isinma' && AT.num(b.s.reps) > 0) return AT.num(b.s.reps);
+  var l = AT.bitenSeanslar();
+  for (var i = l.length - 1; i >= 0; i--) {
+    var e = l[i].exs.filter(function (x) { return x.ad === ad; })[0], ys = e ? AT.yapilanSetler(e) : [];
+    if (ys.length) return AT.num(ys[ys.length - 1].reps);
+  }
+  return null;
+}
+function gunGecerli(t, bg) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t) || AT.iso(AT.parse(t)) !== t || t > bg) return false;
+  var d = AT.parse(bg); d.setDate(d.getDate() - 365); return t >= AT.iso(d);
+}
+/* koçtan gelen JSON → {satirlar, soru, yeni}; sıkı: bilinmeyen tür, aralık dışı sayı, hareket eşleşmezse reddedilir ya da soruya döner.
+   Eski biçim {hareket, setler} de kabul (yeni:false → önizleme). null = anlaşılmadı */
+function yzDogrula(c) {
+  c = String(c == null ? '' : c); var a = c.indexOf('{'), b = c.lastIndexOf('}'); if (a < 0 || b < a) return null;
+  var j; try { j = JSON.parse(c.slice(a, b + 1)); } catch (e) { return null; }
+  if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
+  var yeni = Array.isArray(j.eylemler), liste = yeni ? j.eylemler : (typeof j.hareket === 'string' ? [{ tur: 'set', hareket: j.hareket, setler: j.setler }] : null);
+  var soru = typeof j.soru === 'string' && j.soru.trim() ? j.soru.trim().slice(0, 200) : null;
+  if (!liste) return soru ? { satirlar: [], soru: soru, yeni: true } : null;
+  if (liste.length > 6) return null;
+  var bg = bugun(), satir = [], sorular = [];
+  for (var i = 0; i < liste.length; i++) {
+    var e = liste[i]; if (!e || typeof e !== 'object') return null;
+    if (e.tur === 'kilo') {
+      if (typeof e.kg !== 'number' || !(e.kg > 20 && e.kg < 400)) return null;
+      satir.push({ tur: 'kilo', v: virgul(Math.round(e.kg * 10) / 10), not: '' });
+    } else if (e.tur === 'kcal') {
+      if (typeof e.kcal !== 'number' || !(e.kcal >= 1 && e.kcal <= 10000)) return null;
+      satir.push({ tur: 'kcal', v: String(Math.round(e.kcal)) });
+    } else if (e.tur === 'set') {
+      if (typeof e.hareket !== 'string' || !e.hareket.trim() || e.hareket.length > 80 || !Array.isArray(e.setler) || !e.setler.length || e.setler.length > 20) return null;
+      var tarih = e.tarih == null || e.tarih === '' ? bg : e.tarih;
+      if (typeof tarih !== 'string' || !gunGecerli(tarih, bg)) return null;
+      var ad = yzEsle(e.hareket);
+      if (!ad) { sorular.push('"' + e.hareket.trim().slice(0, 40) + '" hangi hareket? Adını biraz daha açık yazar mısın?'); continue; }
+      var sets = [], varsay = false;
+      for (var k = 0; k < e.setler.length; k++) {
+        var s = e.setler[k]; if (!s || typeof s !== 'object') return null;
+        var kg = s.kg == null || s.kg === '' ? null : typeof s.kg === 'number' ? s.kg : NaN;
+        var r = s.reps == null ? null : typeof s.reps === 'number' ? s.reps : NaN;
+        if (kg !== null && !(kg >= 0 && kg <= 1000)) return null;
+        if (r !== null && !tamMi(r, 1, 200)) return null;
+        if (r === null) { r = tarih === bg ? sonTekrar(ad) : null; if (r === null) { r = 10; varsay = true; } }   /* geçmişi yoksa 10 varsayılır, sonuç satırında söylenir (Geri al / set satırından düzelt) */
+        sets.push({ kg: kg, reps: r });
+      }
+      var x = setSatir(ad, sets, '', ['yapay zekâ anlamlandırdı'].concat(varsay ? ['tekrar varsayıldı: 10'] : []));
+      if (tarih < bg) x.tarih = tarih;
+      satir.push(x);
+    } else return null;
+  }
+  if (sorular.length) return { satirlar: [], soru: soru || sorular[0], yeni: yeni };
+  if (soru && !satir.length) return { satirlar: [], soru: soru, yeni: yeni };
+  return { satirlar: satir, soru: null, yeni: yeni };
+}
+/* önizlemesiz yazmak güvenli mi: yeni biçim, eksik alan yok, geçmiş gün yok, yeni antrenman başlatmıyor */
+function yzDirekt(r) {
+  if (!r || !r.yeni || !r.satirlar.length) return false;
+  var set = r.satirlar.filter(function (x) { return x.tur === 'set'; });
+  if (set.some(function (x) { return x.tarih || (x.eksik && x.eksik.length); })) return false;
+  return !set.length || !!AT.S.active || !!bugunSeans();
+}
+var GUN_AD = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+function yzBaglam() {
+  var S = AT.S, bg = bugun(), o = { bugun: bg, gun: GUN_AD[new Date().getDay()] }, a = S.active;
+  if (a) {
+    o.aktifAntrenman = a.exs.map(function (e) { return { hareket: e.ad, setler: e.sets.map(function (s) { return (s.kg === '' ? '?' : s.kg) + 'x' + (s.reps === '' ? '?' : s.reps) + (s.done ? ' (bitti)' : ' (boş)'); }) }; });
+    var ad = simdikiAd(); if (ad) o.suAnkiHareket = ad;
+  } else { var b = bugunSeans(); if (b) o.bugunBitenAntrenman = b.exs.map(function (e) { return e.ad; }); }
+  o.sonYapilanlar = sonAdlar(25);
+  return o;
+}
+function yzIstem(metin) {
+  var adlar = (window.HAREKETLER || []).map(function (x) { return x.ad; }).concat((AT.S.ozel || []).map(function (x) { return x.ad; }));
+  adlar = adlar.filter(function (x, i) { return x && adlar.indexOf(x) === i; });
+  return 'Sen bir spor salonu kayıt asistanısın. Kullanıcının Türkçe notunu uygulamanın tablolarına yazılacak eylemlere çevir. Yalnız şu JSON biçimini yaz:\n' +
+    '{"eylemler":[{"tur":"set","hareket":"<HAREKET LİSTESİNDEN aynen>","setler":[{"kg":10,"reps":8}],"tarih":"YYYY-MM-DD"},{"tur":"kilo","kg":82.4},{"tur":"kcal","kcal":700}],"soru":null}\n' +
+    'Kurallar: "3 set 60 kilo 8 tekrar" = setler listesinde 3 öğe (her biri kg 60, reps 8). "ilk set"/"son set" gibi tek set söylenirse tek öğe yaz (uygulama sıradaki boş seti doldurur). ' +
+    'kg ya da reps söylenmediyse null yaz (uygulama son değerlerden kendisi tamamlar; bunun için soru sorma). tarih yoksa yazma (bugün); "dün" = bugünden bir önceki gün, gün adı = en yakın geçmiş o gün. Gelecek tarih yazma. ' +
+    'Hareket adı listede yoksa en yakın listedeki hareketi seç (ör. "fly" için kullanıcının daha önce yaptığı fly hareketi, yoksa Dumbbell Fly); yalnız hareket gerçekten belirsizse eylemler boş, soru alanına kısa bir Türkçe soru yaz. ' +
+    'Sayı uydurma. Kayıt değilse (düz not/soru) {"eylemler":[],"soru":null}. Açıklama, kod bloğu yazma.\n' +
+    'BAĞLAM: ' + JSON.stringify(yzBaglam()) + '\nHAREKET LİSTESİ: ' + adlar.join(', ') + '\nNOT: ' + String(metin).slice(0, 300);
+}
+function yzHataMetni(e) {
+  var k = e && e.kod;
+  return k === 'cx-zaman' || k === 'zaman' ? 'Yapay zekâ zamanında cevap vermedi; hiçbir şey eklenmedi' :
+    k === 'cx-mesgul' ? 'Koç başka bir soruyu cevaplıyor; birazdan tekrar dene, hiçbir şey eklenmedi' :
+    k === 'kapali' || k === 'cx-kapali' || k === 'cx-yok' ? 'Yapay zekâya ulaşılamadı; hiçbir şey eklenmedi' : 'Anlayamadım; hiçbir şey eklenmedi';
+}
+function bekleGoster(ac) {
+  yzMesgul = ac;
+  var d = AT.$ ? AT.$('[data-act="df-kaydet"]') : null;
+  if (d) { if (ac) { d._yazi = d.innerHTML; d.textContent = 'Anlıyorum…'; d.disabled = true; d.setAttribute('aria-busy', 'true'); } else { if (d._yazi != null) d.innerHTML = d._yazi; d.disabled = false; d.removeAttribute('aria-busy'); } }
+  var kl = AT.$ ? AT.$('#komut-liste') : null, ki = AT.$ ? AT.$('#komut') : null;
+  if (kl) {   /* Spotlight çubuğu açıksa bekleme orada: parıltılı "Anlıyorum…" satırı */
+    if (ac) { kl.innerHTML = '<div class="yz-bekle" role="status"><span class="yz-nokta" aria-hidden="true"></span><span class="yz-yazi">Anlıyorum…</span></div>'; if (ki) ki.disabled = true; }
+    else if (ki) { ki.disabled = false; if (typeof Event === 'function' && ki.dispatchEvent) ki.dispatchEvent(new Event('input')); }
+  }
+  if (ac && !kl) AT.toast('Anlıyorum…', 90000);
+  else if (typeof document !== 'undefined' && document.querySelectorAll) Array.prototype.forEach.call(document.querySelectorAll('.toast'), function (x) { x.remove(); });
+}
+function soruGoster(soru, kaynak, metin) {
+  AT.sheet('<h3>Bir şey soracağım</h3><p class="sd-cevap">' + AT.h(soru) + '</p><div class="yigin">' +
+    (kaynak === 'defter' ? '<button class="btn-big" data-act="df-kaydet" data-not="1">Not olarak kaydet</button>' : '') + '<button class="btn-big btn-ghost" data-act="kapat">Tamam, yeniden yazarım</button></div>');
+}
+/* ana yol: koça gönder → doğrula → (güvenliyse) doğrudan yaz, değilse önizleme. Söz: 'yazildi' | 'onizleme' | 'soru' | 'kayit-degil' | 'hata' */
+function yz(metin, kaynak) {
+  if (!(AT.kocJsonVar && AT.kocJsonVar())) { AT.toast(ORNEK); return Promise.resolve('hata'); }
+  if (yzMesgul) return Promise.resolve('hata');
+  bekleGoster(true);
+  return AT.kocJson(yzIstem(metin)).then(function (c) {
+    bekleGoster(false);
+    var r = yzDogrula(c); if (!r) throw new Error('json');
+    if (r.soru) { AT.kapat(); soruGoster(r.soru, kaynak, metin); return 'soru'; }
+    if (!r.satirlar.length) { AT.kapat(); return 'kayit-degil'; }
+    if (yzDirekt(r)) {
+      on = { satirlar: r.satirlar, kaynak: kaynak || '', metin: metin || '', yz: true };
+      uygula(); return 'yazildi';
+    }
+    onizle(r, kaynak, metin); on.yz = true; return 'onizleme';
+  }).catch(function (e) {
+    bekleGoster(false); yzAtla = String(metin);
+    AT.toast(yzHataMetni(e) + (kaynak === 'defter' ? ' (Kaydet\'e tekrar basarsan not olarak kaydedilir)' : ''), 4500);
+    return 'hata';
+  });
+}
+/* kural çözümü güçlü + süren antrenmana yazılacaksa önizlemesiz yaz (sonuç satırı + Geri al); yoksa önizleme */
+function kuralYaz(r, kaynak, metin) {
+  var set = r.satirlar.filter(function (x) { return x.tur === 'set'; });
+  var guvenli = r.guclu && !!AT.S.active && !TARIHLI.test(normal(metin)) && !set.some(function (x) { return x.tarih || (x.eksik && x.eksik.length); }) &&
+    r.satirlar.every(function (x) { return x.tur === 'set' || x.tur === 'kilo' || x.tur === 'kcal'; });
+  if (!guvenli) return onizle(r, kaynak, metin);
+  on = { satirlar: r.satirlar, kaynak: kaynak || '', metin: metin || '', yz: true }; uygula(); return true;
+}
+/* kural emin değilse ve koç hazırsa true (iş yz'ye devredildi) */
+function yzDene(metin, kaynak, r) {
+  if (yzAtla === String(metin)) { yzAtla = ''; return false; }
+  if (!kayitBenzeri(metin) || !(AT.kocJsonVar && AT.kocJsonVar()) || eminMi(r, metin)) return false;
+  yz(metin, kaynak).then(function (s) { if (s === 'kayit-degil' && kaynak === 'defter') { yzAtla = String(metin); AT.islem['df-kaydet'] && AT.islem['df-kaydet']({}); } });
+  return true;
+}
+
 /* ---------- girdi noktaları ---------- */
 function ozetYaz(r) {
   return r.satirlar.map(function (x) {
@@ -551,14 +758,14 @@ function ozetYaz(r) {
 }
 /* Ctrl+K: [ilk öneriler, son öneriler]. Tek başına tartı/kalori komut.js'te zaten var */
 function komutOneri(q) {
-  var r = coz(q), bas = [], son = [];
+  var r = coz(q), bas = [], son = [], yzVar = false;
+  if (AT.kocJsonVar && AT.kocJsonVar() && kayitBenzeri(q) && !eminMi(r, q)) { yzVar = true; bas.push({ ad: 'Anla ve yaz: ' + String(q).trim(), alt: 'yapay zekâ · Geri al\'lı', f: function () { yz(q, 'komut'); } }); }
   if (r && r.satirlar && r.satirlar.some(function (x) { return x.tur !== 'kilo' && x.tur !== 'kcal'; }) || r && r.satirlar && r.satirlar.length > 1)
-    bas.push({ ad: (r.satirlar.some(function (x) { return x.tur === 'set'; }) ? 'Set ekle: ' : 'Uygula: ') + ozetYaz(r), alt: 'önizle, onayla', f: function () { onizle(r, 'komut', q); } });
+    bas.push({ ad: (r.satirlar.some(function (x) { return x.tur === 'set'; }) ? 'Set ekle: ' : 'Uygula: ') + ozetYaz(r), alt: AT.S.active ? 'yaz (Geri al ile)' : 'önizle, onayla', f: function () { kuralYaz(r, 'komut', q); } });
   else if (r && r.soru && r.soru.cevap) bas.push({ ad: r.soru.cevap, alt: 'cevap', f: function () { AT.kapat(); } });
   else if (r && r.soru && AT.kocBagli && AT.kocBagli() && String(q).trim().length > 6) son.push({ ad: 'Koça sor: ' + String(q).trim(), alt: 'Defter', f: function () { kocaGit(q); } });
   else if (r && r.mesaj) bas.push({ ad: r.mesaj, alt: '', f: function () { AT.toast(r.mesaj); } });
-  else if (!r && setBenzeri(q)) son.push(AT.kocJsonVar && AT.kocJsonVar() ? { ad: 'Set ekle: koç anlamlandırsın', alt: 'koça kısa istek', f: function () { kocla(q, 'komut'); } }
-    : { ad: ORNEK, alt: '', f: function () { AT.toast(ORNEK); } });
+  else if (!r && setBenzeri(q) && !yzVar) son.push({ ad: ORNEK, alt: '', f: function () { AT.toast(ORNEK); } });
   return [bas, son];
 }
 function kocaGit(q) {
@@ -566,16 +773,27 @@ function kocaGit(q) {
   if (AT.islem['koc-sor']) AT.islem['koc-sor']({ q: String(q).trim() });
 }
 /* Defter "Kaydet": güçlü uyum varsa seçim (antrenmana ekle / not olarak kaydet); soru → cevap. true = pencere açıldı */
+function sade(m) {   /* Bugün'deki düz giriş satırı: kural önce, anlamazsa koç (açıksa), ikisi de yoksa kısa ipucu */
+  m = String(m || '').trim(); if (!m) return false;
+  var r = coz(m);
+  if (yzDene(m, 'sade', r)) return true;
+  if (r && r.satirlar) return kuralYaz(r, 'sade', m);
+  if (r && r.soru && r.soru.cevap) { cevapGoster(r.soru, 'sade', m); return true; }
+  AT.toast(AT.kocJsonVar && AT.kocJsonVar() ? ORNEK : "Anlayamadım. Serbest yazman için Ayarlar'dan ChatGPT (Plus)'ı aç; ya da yaz: curl 3x10 15", 4500);
+  return false;
+}
 function defterOnce(m) {
   var r = coz(m);
-  if (r && r.satirlar && r.guclu) return onizle(r, 'defter', m);
+  if (yzDene(m, 'defter', r)) return true;
+  if (r && r.satirlar && r.guclu) return kuralYaz(r, 'defter', m);
   if (r && r.soru && r.soru.cevap) { cevapGoster(r.soru, 'defter', m); return true; }
   return false;
 }
 /* "Koça sor": set kalıbı → önizleme (koç limiti harcanmaz); soru → kural cevabı; kural anlamazsa set benzeri metinde JSON yedeği */
 function kocOnce(m) {
   var r = coz(m);
-  if (r && r.satirlar) return onizle(r, 'defter', m);
+  if (yzDene(m, 'defter', r)) return true;
+  if (r && r.satirlar) return kuralYaz(r, 'defter', m);
   if (r && r.soru && r.soru.cevap) { cevapGoster(r.soru, 'koc', m); return true; }
   if (!r && setBenzeri(m) && AT.kocJsonVar && AT.kocJsonVar()) { kocla(m, 'defter'); return true; }
   return false;
@@ -626,6 +844,10 @@ AT.islem['sd-set-sil'] = function (d) {
   ciz();
 };
 AT.islem['sd-koca'] = function (d) { kocaGit(d.q); };
+if (typeof document !== 'undefined') document.addEventListener('keydown', function (ev) {
+  var t = ev.target; if (ev.key !== 'Enter' || !t || t.id !== 'sade-yaz' || ev.isComposing) return;
+  ev.preventDefault(); var m = String(t.value || '').trim(); if (m && sade(m)) t.value = '';
+}, true);
 if (typeof document !== 'undefined') document.addEventListener('input', function (ev) {
   var t = ev.target; if (!on || !t || !t.dataset || t.dataset.sd == null) return;
   var x = on.satirlar[+t.dataset.sd]; if (!x) return;
@@ -634,6 +856,6 @@ if (typeof document !== 'undefined') document.addEventListener('input', function
 });
 
 AT.setAyristir = setAyristir;
-AT.setDil = { coz: coz, onizle: onizle, uygula: uygula, komutOneri: komutOneri, defterOnce: defterOnce, kocOnce: kocOnce, mik: mik, kocla: kocla };
-AT._setdil = { normal: normal, hareketBul: hareketBul, jsonDogrula: jsonDogrula, kocIstem: kocIstem, setBenzeri: setBenzeri, on: function () { return on; }, sonKg: sonKg };   /* test için */
+AT.setDil = { yz: yz, yzDene: yzDene, coz: coz, onizle: onizle, uygula: uygula, komutOneri: komutOneri, defterOnce: defterOnce, sade: sade, kocOnce: kocOnce, mik: mik, kocla: kocla };
+AT._setdil = { yzDogrula: yzDogrula, yzIstem: yzIstem, yzEsle: yzEsle, yzDirekt: yzDirekt, kayitBenzeri: kayitBenzeri, eminMi: eminMi, normal: normal, hareketBul: hareketBul, jsonDogrula: jsonDogrula, kocIstem: kocIstem, setBenzeri: setBenzeri, on: function () { return on; }, sonKg: sonKg };   /* test için */
 })(window.AT);

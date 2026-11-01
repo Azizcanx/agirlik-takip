@@ -281,13 +281,33 @@ function demoTag(b) { return b && b.demo ? ' <span class="tag demo">örnek</span
 function kiloGir(etiket) {
   return '<div class="row"><input id="bwkg" class="grow" inputmode="decimal" placeholder="kg, örn. 82,4" aria-label="Vücut ağırlığı kg"><button class="btn-ac" data-act="bw-ekle">' + AT.h(etiket || 'Kaydet') + '</button></div>';
 }
+/* Apple teması: kilo grafiği zaman aralığı (1A/3A/6A/1Y/Tümü); yalnız gösterim, veri 45 günden uzunsa */
+var kiloAralik = 0, ARALIKLAR = [['1A', 30], ['3A', 90], ['6A', 180], ['1Y', 365], ['Tümü', 0]];
+function aralikUygula(seri, ref) {
+  var apple = typeof document !== 'undefined' && document.documentElement.dataset.tema === 'apple';
+  if (!apple || seri.length < 2 || gunFark(seri[seri.length - 1].date, seri[0].date) <= 45) return { seri: seri, ref: ref, kontrol: '' };
+  var kontrol = '<div class="seg aralik" role="group" aria-label="Zaman aralığı">' + ARALIKLAR.map(function (a) {
+    return '<button data-act="kilo-aralik" data-v="' + a[1] + '" aria-pressed="' + (kiloAralik === a[1]) + '">' + a[0] + '</button>'; }).join('') + '</div>';
+  if (!kiloAralik) return { seri: seri, ref: ref, kontrol: kontrol };
+  var son = AT.parse(seri[seri.length - 1].date).getTime(), kes = son - kiloAralik * 864e5;
+  var s2 = seri.filter(function (p) { return AT.parse(p.date).getTime() >= kes; });
+  if (s2.length < 2) return { seri: seri, ref: ref, kontrol: kontrol };
+  var r2 = ref;
+  if (ref && ref.length > 1 && ref[0].x < kes) {
+    var a = ref[0], b = ref[ref.length - 1], k = (kes - a.x) / (b.x - a.x);
+    r2 = [{ x: kes, y: r10(a.y + (b.y - a.y) * k), t: AT.tarih(AT.iso(new Date(kes)), 1) }, b];
+  }
+  return { seri: s2, ref: r2, kontrol: kontrol };
+}
+AT.islem['kilo-aralik'] = function (d) { kiloAralik = +d.v || 0; AT.render(); };
 function grafik(seri, ref, baslik, kn) {
   if (!seri.length) return '<p class="mut">Tartı ekledikçe grafik burada oluşur.</p>';
+  var ar = aralikUygula(seri, ref); seri = ar.seri; ref = ar.ref;
   /* çizgi = ortalama kilo; ham tartılar soluk nokta (kısa seride), dokununca o günün tartısı ve hedef çizgisinin değeri */
   var o = { baslik: baslik, birim: 'kg', seriAd: 'ortalama kilo', ham: true, ek: function (p) { return p.ham > 0 ? 'tartı ' + AT.fmt(p.ham) + ' kg' : ''; } };
   if (ref) { o.ref = ref; o.refAd = 'hedef hız'; }
   if (kn) { o.koni = kn.koni; o.hedef = kn.hedef; }
-  return AT.cizgi(seri.map(function (p) { return { x: AT.parse(p.date).getTime(), y: r10(p.kg), t: AT.tarih(p.date, 1), ham: p.ham }; }), o);
+  return ar.kontrol + AT.cizgi(seri.map(function (p) { return { x: AT.parse(p.date).getTime(), y: r10(p.kg), t: AT.tarih(p.date, 1), ham: p.ham }; }), o);
 }
 /* büyük kilo rakamı: data-say öznitelikli (app.js sayData; yoksa düz metin) */
 function buyukKg(n) { return AT.sayData ? AT.sayData(n, 1) : AT.h(AT.fmt(n)); }
@@ -632,6 +652,12 @@ AT.islem['kcal-sil'] = function () {
 AT.islem['tarti-duzelt'] = function () { duzelt = true; AT.render(); var e = AT.$('#bwkg'); if (e) e.focus(); };
 
 /* ---------- dışa açılan ---------- */
+/* halka.js: bugünün kalori/protein değerleri ve hedefleri (hedef yoksa null) */
+AT.gunVeri = function () {
+  var bg = AT.iso(new Date()), k = kcalBugun(bg), b = AT.S.bulk, l = gecerli(AT.S.bw);
+  var r = b ? oneriUygula(hesapla(l, b, bg, AT.S.kcal), b, bg) : null;
+  return { kcal: k ? +k.kcal || 0 : 0, kcalHedef: r && r.hedefKcal != null ? r.hedefKcal : null, p: k && makroVar(k) ? +k.p || 0 : 0, pHedef: proteinHedef() };
+};
 AT.bulkDurum = function () { var b = AT.iso(new Date()); return oneriUygula(hesapla(AT.S.bw, AT.S.bulk, b, AT.S.kcal), AT.S.bulk, b); };
 AT.harcama = function () { return harcama(AT.S.bw, AT.S.kcal, AT.iso(new Date())); };
 AT.bolum.bulk = function () { var l = gecerli(AT.S.bw); return AT.S.bulk ? bolumVar(l, AT.S.bulk) : bolumYok(l); };

@@ -46,11 +46,13 @@ function $(s, r) { return (r || document).querySelector(s); }
 
 /* ---------- veri ---------- */
 var S;
-function bos() { return { v: 1, sessions: [], bw: [], kcal: [], takviye: { liste: [], alinan: {} }, defter: [], ozel: [], active: null, dinlenme: 90, tema: 'koyu', temaV: 2, bulk: null }; }
+function bos() { return { v: 1, sessions: [], bw: [], kcal: [], takviye: { liste: [], alinan: {} }, defter: [], ozel: [], active: null, dinlenme: 90, tema: 'koyu', temaV: 4, bulk: null }; }
 function yukle() {
   try { var r = localStorage.getItem(KEY); S = r ? Object.assign(bos(), { temaV: 0 }, JSON.parse(r)) : bos(); } catch (e) { S = bos(); }
   /* tek seferlik: eski varsayılan açık temadan koyuya (Aziz: "açık çok göz alıyor"); sonra seçim kullanıcının */
   if (!S.temaV) { if (S.tema === 'acik') S.tema = 'koyu'; S.temaV = 2; }
+  /* tek seferlik (v42): sade varsayılan Koyu; otomatik Apple'a alınanlar (temaV 3) bir kez Koyu'ya döner; Apple Ayarlar'dan seçilebilir */
+  if (S.temaV < 4) { if (S.temaV < 3 || S.tema === 'apple') S.tema = 'koyu'; S.temaV = 4; }
   /* süren antrenmanın son hâli ayrı anahtardaysa (kaydet(true)) onu al; antrenman bittiyse eski kopya yok sayılır */
   try { var a = JSON.parse(localStorage.getItem(KEY_AKTIF) || 'null'); if (a && S.active && a.id === S.active.id) S.active = a; } catch (e) { }
 }
@@ -327,6 +329,20 @@ function cizgi(pts, o) {
   var px = new Array(n), py = new Array(n), d = new Array(n);
   for (var i = 0; i < n; i++) { px[i] = Math.round(X(pts[i].x) * 10) / 10; py[i] = Math.round(Y(pts[i].y) * 10) / 10; d[i] = (i ? 'L' : 'M') + px[i] + ' ' + py[i]; }
   d = d.join(' ');
+  /* Apple teması: yumuşak (monoton kübik) eğri; tepe/dip taşmaz */
+  if (n > 2 && n <= 400 && document.documentElement.dataset.tema === 'apple') {
+    var mm = [], dx = [], sl = [], j;
+    for (j = 0; j < n - 1; j++) { dx[j] = px[j + 1] - px[j]; sl[j] = dx[j] ? (py[j + 1] - py[j]) / dx[j] : 0; }
+    mm[0] = sl[0]; mm[n - 1] = sl[n - 2];
+    for (j = 1; j < n - 1; j++) mm[j] = sl[j - 1] * sl[j] <= 0 ? 0 : (sl[j - 1] + sl[j]) / 2;
+    for (j = 0; j < n - 1; j++) {
+      if (sl[j] === 0) { mm[j] = 0; mm[j + 1] = 0; continue; }
+      var aa = mm[j] / sl[j], bb = mm[j + 1] / sl[j], hh = aa * aa + bb * bb;
+      if (hh > 9) { var tt = 3 / Math.sqrt(hh); mm[j] = tt * aa * sl[j]; mm[j + 1] = tt * bb * sl[j]; }
+    }
+    d = 'M' + px[0] + ' ' + py[0];
+    for (j = 0; j < n - 1; j++) d += ' C' + (px[j] + dx[j] / 3).toFixed(1) + ' ' + (py[j] + mm[j] * dx[j] / 3).toFixed(1) + ' ' + (px[j + 1] - dx[j] / 3).toFixed(1) + ' ' + (py[j + 1] - mm[j + 1] * dx[j] / 3).toFixed(1) + ' ' + px[j + 1] + ' ' + py[j + 1];
+  }
   if (n > 1) s += '<path class="alan" fill="url(#' + id + ')" d="' + d + ' L' + px[n - 1] + ' ' + (H - B) + ' L' + px[0] + ' ' + (H - B) + 'Z"/>';
   if (hamVar) {
     var hd = ''; pts.forEach(function (p, i) { if (p.ham > 0) hd += 'M' + px[i] + ' ' + Math.round(Y(p.ham) * 10) / 10 + 'h0'; });
@@ -636,10 +652,16 @@ function bugunCumle(bugun, sr) {
   if (sr) return bir(gunAdi(sr), g === 1 ? 'dün ' + (sadeAd(son.name) || 'antrenman') : dinlen, oran);
   return bir(g === 1 ? 'Dün: ' + (sadeAd(son.name) || 'antrenman') : dinlen, oran);
 }
+/* halka.js (Apple teması hero'su): bu hafta antrenman sayısı + hedef, haftalık seri, sıradaki antrenman */
+function halkaVeri() {
+  var bg = iso(new Date()), bas = haftaBasi(bg), n = 0;
+  S.sessions.forEach(function (s) { if (haftaBasi(s.date) === bas) n++; });
+  return { n: n, hedef: haftaHedefi(bg) || 3, seri: haftaSerisi(), sira: siradaki() };
+}
 function bugunBaslik(sr) {
   var bugun = iso(new Date()), k = surum + '|' + bugun + '|' + (sr ? sr.id : '');
   if (basOnb.k !== k) basOnb = { k: k, dalga: kiloDalga(bugun), cumle: bugunCumle(bugun, sr) };
-  return '<header class="bg-ust' + (basOnb.dalga ? ' dalgali' : '') + '">' + basOnb.dalga + '<h1>Bugün</h1><p class="sub">' + tarih(bugun) + '</p>' +
+  return '<header class="bg-ust' + (basOnb.dalga ? ' dalgali' : '') + '">' + basOnb.dalga + '<button class="bg-ara" data-act="komut" aria-label="Hızlı komut"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg></button><h1>Bugün</h1><p class="sub">' + tarih(bugun) + '</p>' +
     (basOnb.cumle ? '<p class="bg-cumle">' + h(basOnb.cumle) + '</p>' : '') + '</header>';
 }
 var IKON_BASLA = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
@@ -666,12 +688,17 @@ function simdikiEgz(a) {
   if (ei < 0) a.exs.some(function (e, i) { if (e.sets.some(function (x) { return !x.done; })) { ei = i; return true; } return false; });
   return ei;
 }
+/* Bugün'ün üstünde tek satır "yazarak kayıt" (Apple dışı temalar; Enter → setdil.js sade()) */
+function sadeYaz() {
+  if (S.tema === 'apple' || !AT.setDil || !AT.setDil.sade) return '';
+  return '<div class="sade-yaz"><input id="sade-yaz" type="text" placeholder="Yaz: bench 3x8 60, 82,4 tartıldım…" autocomplete="off" enterkeyhint="send" aria-label="Yazarak kayıt"></div>';
+}
 function vBugun() {
   var a = S.active, o = '';
   if (!a) {
     var son = bitenSeanslar().filter(function (x) { return !x.demo; }).pop() || bitenSeanslar().pop(), hic = !S.sessions.length && !S.bw.length;
     var sr = siradaki();
-    o += bugunBaslik(sr) + haftaSerit();
+    o += bugunBaslik(sr) + sadeYaz() + (AT.halka && S.tema === 'apple' ? AT.halka.html() + AT.halka.kartlar() : '') + haftaSerit();
     var a1 = (hic ? ilkAdimlar() : '') + (sr
       ? '<button class="btn-ac btn-big btn-sira" data-act="basla-tekrar" data-id="' + h(sr.id) + '"><span class="sira-yazi"><small class="sira-ust">Sıradaki</small><span class="sira-ad">' + h(sadeAd(sr.name)) + '<kbd>N</kbd></span><small>' + h(hareketOnizle(sr)) + '</small></span><span class="sira-ok">' + IKON_BASLA + '</span></button><button class="btn-ghost mini basla-baska" data-act="basla">Başka antrenman seç</button>'
       : '<button class="btn-ac btn-big btn-basla" data-act="basla"><span class="sira-ok">' + IKON_BASLA + '</span>Antrenmana başla<kbd>N</kbd></button>') + sonGunSatir(son);
@@ -705,7 +732,7 @@ function vBugun() {
   var rek = aktifRek = aktifRekor(a), etiket = false;
   var ctx = { rek: rek, yeni: yeni, hedefE: hedefE, hedefS: hedefS, rg: S.rpe ? ' rpe' : '' };
   o += '<input id="seansad" class="baslik-input" value="' + h(a.name) + '" aria-label="Antrenmanın adı (değiştirebilirsin)" autocomplete="off">';
-  o += '<p class="sub">Başladı ' + new Date(a.start).toTimeString().slice(0, 5) + ' · <span id="gecen">' + gecenSure(a.start) + '</span></p>';
+  o += '<p class="sub">Başladı ' + new Date(a.start).toTimeString().slice(0, 5) + ' · <span id="gecen">' + gecenSure(a.start) + '</span></p>' + sadeYaz();
   /* hareket başına parçalı çubuk (PC): parça genişliği set sayısı, dolu kısmı biten set; hareketi biten parça yeşil. Altında hareket şeridi */
   if (a.exs.length) o += '<div class="ilerle' + (sm ? ' sahne-ust' : '') + '">' + (topSet ? '<div class="iseg" role="progressbar" aria-label="Biten set" aria-valuemin="0" aria-valuemax="' + topSet + '" aria-valuenow="' + tamam + '">' +
     segs.map(function (x) { return x.n ? '<i style="flex-grow:' + x.n + '"' + (x.d >= x.n ? ' class="tam"' : '') + '><u style="width:' + Math.round(x.d / x.n * 100) + '%"></u></i>' : ''; }).join('') +
@@ -1297,7 +1324,7 @@ function vAyarlar() {
   if (AT.bolum.disa) a0 += '<details class="katla ay-excel"><summary>Excel ve diğer uygulamalar <small>Strong, Hevy</small></summary>' + AT.bolum.disa() + '</details>';
   /* tema: üç küçük sayfa önizlemesi (Sistem yarı yarıya) */
   /* PC'de sütunlar dengeli: Görünüm sol sütunda yedeğin altında (telefonda sıra aynı) */
-  a0 += ayBaslik('gorunum', 'Görünüm') + '<div class="tema-sec" role="group" aria-label="Tema">' + [['sistem', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu']].map(function (t) {
+  a0 += ayBaslik('gorunum', 'Görünüm') + '<div class="tema-sec" role="group" aria-label="Tema">' + [['sistem', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu'], ['apple', 'Apple']].map(function (t) {
     return '<button data-act="tema" data-v="' + t[0] + '" aria-pressed="' + ((S.tema || 'sistem') === t[0]) + '"><span class="tema-on ' + t[0] + '" aria-hidden="true"><i></i><i></i><i></i></span>' + t[1] + '</button>'; }).join('') + '</div>';
   var dEgz = Object.keys(S.dinlenmeEgz || {});
   var o = ayBaslik('antrenman', 'Antrenman') + '<div class="panel"><label class="alan"><span>Setler arası dinlenme (saniye)</span><input id="din" inputmode="numeric" value="' + S.dinlenme + '"></label>' +
@@ -1322,7 +1349,9 @@ function temaGecis() {
 }
 function temaUygula() {
   var r = document.documentElement;
-  if (S.tema === 'acik' || S.tema === 'koyu') r.dataset.theme = S.tema; else delete r.dataset.theme;
+  /* Apple teması koyu değişkenlerin üstüne biner: data-theme=koyu + data-tema=apple */
+  if (S.tema === 'apple') { r.dataset.theme = 'koyu'; r.dataset.tema = 'apple'; }
+  else { delete r.dataset.tema; if (S.tema === 'acik' || S.tema === 'koyu') r.dataset.theme = S.tema; else delete r.dataset.theme; }
   var m = document.querySelector('meta[name=theme-color]'); if (m) m.content = getComputedStyle(r).getPropertyValue('--bg').trim();
 }
 function render() {
@@ -1760,7 +1789,7 @@ var islem = {
   },
   ay: function (d) { gecmisAy = new Date(gecmisAy.getFullYear(), gecmisAy.getMonth() + (+d.d), 1); render(); },
   'egz-sec': function (d) { secEgz = d.ad; render(); },
-  tema: function (d) { S.tema = d.v; S.temaV = 2; kaydet(); temaGecis(); render(); },
+  tema: function (d) { S.tema = d.v; S.temaV = 4; kaydet(); temaGecis(); render(); },
   'tema-cevir': function () { var koyu = document.documentElement.dataset.theme === 'koyu'; islem.tema({ v: koyu ? 'acik' : 'koyu' }); },
   /* a12: yanlış tartı koruması. 824 → "82,4 mü?"; son tartıdan (14 gün içinde) 3 kg+ farkta onay. Kayıt yine kullanıcının */
   'bw-ekle': function () {
@@ -1939,7 +1968,7 @@ var AT = window.AT = {
   e1rm: e1rm, tahminiMax: tahminiMax, MAX_TEKRAR: MAX_TEKRAR, haftaBasi: haftaBasi, $: $, kaydet: kaydet, render: render, toast: toast, sheet: sheet, kapat: kapat, onayla: onayla,
   bitenSeanslar: bitenSeanslar, yapilanSetler: yapilanSetler, tumSetler: tumSetler, hacim: hacim, seansHacim: seansHacim, kasOf: kasOf, ikincilOf: ikincilOf, prHesapla: prHesapla,
   cizgi: cizgi, cubuk: cubuk, sayData: sayData, indir: indir, bos: bosDurum, duyur: duyur, geriAl: geriAl, kol: kol, masaustu: masaustu,
-  aktifSetEkle: aktifSetEkle, sonTarti: sonTarti, tartiKaydet: tartiKaydet, dinlenmeOf: dinlenmeOf
+  aktifSetEkle: aktifSetEkle, halkaVeri: halkaVeri, sonTarti: sonTarti, tartiKaydet: tartiKaydet, dinlenmeOf: dinlenmeOf
 };
 Object.defineProperty(AT, 'S', { get: function () { return S; } });
 AT.surum = function () { return surum; };   /* önbellek anahtarı (notlar.js, bulk.js) */

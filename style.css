@@ -1982,3 +1982,425 @@ kbd{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--mut);back
 .mik.dinliyor{color:var(--on-ac);background:var(--ac);border-color:var(--ac);animation:sd-nabiz 1.2s ease-in-out infinite}
 @keyframes sd-nabiz{50%{box-shadow:0 0 0 6px var(--ac2)}}
 @media (prefers-reduced-motion:reduce){.mik.dinliyor{animation:none}}
+
+/* ==========================================================================================
+   TEMA: APPLE (v41) — iOS 17 / macOS koyu görünümü. Yalnız görsel katman.
+   Seçim: Ayarlar > Görünüm > Apple (S.tema = 'apple'); app.js temaUygula() <html>'e data-theme=koyu + data-tema=apple koyar,
+   yani koyu tema değişkenleri taban, burada üstüne biner. Diğer temalara dokunmaz. Varsayılan (temaV 3'te bir kez).
+   ========================================================================================== */
+:root[data-tema=apple]{
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --serif:var(--sans);
+  --bg:#000;--s1:#1c1c1e;--s2:#2c2c2e;--s3:#3a3a3c;
+  --line:rgba(84,84,88,.6);--kenar:rgba(84,84,88,.4);--kenar-g:rgba(84,84,88,.75);
+  --tx:#fff;--mut:rgba(235,235,245,.62);--dim:rgba(235,235,245,.4);
+  --ac:#0a84ff;--on-ac:#fff;--act:rgba(10,132,255,.15);--ac2:rgba(10,132,255,.24);--acl:rgba(10,132,255,.55);
+  --btn:#0a84ff;--on-btn:#fff;
+  --iyi:#30d158;--iyit:rgba(48,209,88,.15);--warn:#ff9f0a;--warnt:rgba(255,159,10,.16);
+  --bad:#ff453a;--badt:rgba(255,69,58,.15);--badl:rgba(255,69,58,.4);
+  --nav:rgba(28,28,30,.72);--scrim:rgba(0,0,0,.5);--pop:0 20px 50px -10px rgba(0,0,0,.7),0 0 0 .5px rgba(255,255,255,.08);
+  --toast-bg:#2c2c2e;--toast-tx:#fff;--toast-ac:#64d2ff;
+  --alan-bg:#1c1c1e;--dugme-bg:rgba(118,118,128,.24);
+  --golge-1:none;--golge-2:none;--isik:none;
+  --r:12px;--yaricap:10px;--yaricap-k:8px;
+  --altin:#ffd60a;--altint:rgba(255,214,10,.15);--isaret:rgba(255,214,10,.38);
+  --cal1:rgba(10,132,255,.16);--cal2:rgba(10,132,255,.36);--cal3:#0a84ff;--cal3-tx:#fff;
+  --marj:rgba(255,69,58,.28);--parilti:rgba(10,132,255,.09);
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.003em;
+}
+:root[data-tema=apple] body{background:transparent;font-size:17px;line-height:1.38}
+:root[data-tema=apple]{background:#000}
+
+/* büyük başlık (iOS large title) */
+:root[data-tema=apple] h1{font-size:34px;font-weight:700;letter-spacing:-.022em;line-height:1.1;margin:0 0 4px}
+:root[data-tema=apple] .sub{color:var(--mut);font-size:15px;margin:0 0 22px}
+@media (min-width:900px){ :root[data-tema=apple] h1{font-size:34px} }
+:root[data-tema=apple] h2{font-size:13px;font-weight:400;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin:30px 0 8px 16px}
+:root[data-tema=apple] h2 small{font-size:13px;text-transform:none}
+:root[data-tema=apple] h3{font-weight:600}
+:root[data-tema=apple] #sheet h2{margin-left:0}
+:root[data-tema=apple] .hero b{font-weight:700;letter-spacing:-.025em}
+
+/* gruplu kartlar */
+:root[data-tema=apple] div.panel,:root[data-tema=apple] .card{background:var(--s1);border:0;border-radius:12px;box-shadow:none;padding:14px 16px}
+:root[data-tema=apple] div.panel+div.panel{border-top:0;margin-top:12px}
+:root[data-tema=apple] div.panel.liste{padding:0 0 0 16px}
+:root[data-tema=apple] .satir{border-top:.5px solid var(--line);padding-right:16px}
+:root[data-tema=apple] button.satir{border-top:.5px solid var(--line);min-height:52px;padding:11px 16px 11px 0}
+:root[data-tema=apple] .liste>.satir:first-child,:root[data-tema=apple] .liste>button.satir:first-child{border-top:0}
+:root[data-tema=apple] button.satir:hover{background:rgba(255,255,255,.04);border-color:var(--line)}
+:root[data-tema=apple] button.satir:hover .grow>b{color:inherit}
+:root[data-tema=apple] button.satir:active{background:rgba(255,255,255,.08);opacity:1}
+:root[data-tema=apple] button.satir::after{width:8px;height:8px;border-width:2px;border-color:rgba(235,235,245,.3);margin:0 0 0 2px}
+:root[data-tema=apple] .kv>div,:root[data-tema=apple] .notlar li{border-top-width:.5px}
+:root[data-tema=apple] .panel{border-color:var(--line)}
+:root[data-tema=apple] section.panel{background:none}
+:root[data-tema=apple] details.katla{background:var(--s1);border:0;border-radius:12px}
+:root[data-tema=apple] .tag{background:rgba(118,118,128,.24);border-radius:6px;font-weight:600;font-size:11.5px}
+:root[data-tema=apple] .tag.demo{background:var(--warnt)}
+:root[data-tema=apple] .durum{border-radius:12px}
+:root[data-tema=apple] .ibar{background:rgba(118,118,128,.24)}
+
+/* düğmeler: dolu = accent, ikincil = gri tint */
+:root[data-tema=apple] button{border-color:transparent;border-radius:10px;font-weight:500}
+:root[data-tema=apple] button:hover{border-color:transparent;background-color:rgba(118,118,128,.34)}
+:root[data-tema=apple] button:active{transform:scale(.98)}
+:root[data-tema=apple] .btn-ac,:root[data-tema=apple] .btn-ac:hover{background:var(--btn);color:var(--on-btn);border-color:transparent;font-weight:600}
+:root[data-tema=apple] .btn-ac:hover{filter:brightness(1.1)}
+:root[data-tema=apple] .btn-ac:active{filter:brightness(.88)}
+:root[data-tema=apple] .btn-big{border-radius:14px;min-height:50px;font-size:17px}
+:root[data-tema=apple] .btn-bad,:root[data-tema=apple] .btn-bad:hover{color:var(--bad);border-color:transparent;background:var(--badt)}
+:root[data-tema=apple] .btn-ghost,:root[data-tema=apple] .btn-ghost:hover{background:transparent;border-color:transparent}
+:root[data-tema=apple] .btn-ghost:hover{background:rgba(118,118,128,.18)}
+:root[data-tema=apple] .btn-ghost.btn-bad:hover{background:var(--badt)}
+:root[data-tema=apple] .mini{border-radius:99px}
+:root[data-tema=apple] .chip{background:rgba(118,118,128,.24);border-color:transparent}
+:root[data-tema=apple] .chip[aria-pressed=true]{background:var(--ac);color:#fff;border-color:transparent}
+
+/* alanlar */
+:root[data-tema=apple] input,:root[data-tema=apple] select,:root[data-tema=apple] textarea{background:#1c1c1e;border:.5px solid var(--kenar-g);border-radius:10px}
+:root[data-tema=apple] div.panel input,:root[data-tema=apple] div.panel select,:root[data-tema=apple] div.panel textarea,
+:root[data-tema=apple] #sheet input,:root[data-tema=apple] #sheet select,:root[data-tema=apple] #sheet textarea{background:#2c2c2e;border-color:transparent}
+:root[data-tema=apple] input:hover,:root[data-tema=apple] select:hover,:root[data-tema=apple] textarea:hover{border-color:var(--kenar-g)}
+:root[data-tema=apple] input:focus,:root[data-tema=apple] select:focus,:root[data-tema=apple] textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac2)}
+:root[data-tema=apple] .alan>span{font-size:13px;color:var(--mut)}
+
+/* segmentli kontrol */
+:root[data-tema=apple] .seg{background:rgba(118,118,128,.24);border-radius:9px;padding:2px;gap:0}
+:root[data-tema=apple] .seg button{min-height:32px;border-radius:7px;color:var(--tx);font-size:14px;font-weight:500;background:transparent}
+:root[data-tema=apple] .seg button:hover{background:transparent;color:var(--tx)}
+:root[data-tema=apple] .seg button[aria-pressed=true]{font-weight:600}
+:root[data-tema=apple] .seg::before{top:2px!important;bottom:2px!important;left:2px!important;border-radius:7px!important;background:#636366!important;box-shadow:0 3px 8px rgba(0,0,0,.3),0 3px 1px rgba(0,0,0,.04)!important}
+:root[data-tema=apple] .seg:has(>button[aria-pressed=true]):not(:has(>button:nth-child(3)))::before{width:calc((100% - 4px)/2)!important}
+:root[data-tema=apple] .seg:has(>button:nth-child(3))::before{width:calc((100% - 4px)/3)!important}
+:root[data-tema=apple] .seg:has(>button:nth-child(2)[aria-pressed=true])::before{transform:translateX(100%)!important}
+:root[data-tema=apple] .seg:has(>button:nth-child(3)[aria-pressed=true])::before{transform:translateX(200%)!important}
+:root[data-tema=apple] .seg:has(>button:nth-child(4))>button[aria-pressed=true]{background:#636366!important;box-shadow:0 3px 8px rgba(0,0,0,.3)}
+
+/* iOS anahtarı (onay kutuları) */
+:root[data-tema=apple] input[type=checkbox]{-webkit-appearance:none;appearance:none;position:relative;flex:none;width:51px!important;height:31px!important;min-height:0;padding:0;margin:0;
+  border:0;border-radius:99px;background:rgba(120,120,128,.4);cursor:pointer;transition:background-color .25s}
+:root[data-tema=apple] input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.25),0 1px 1px rgba(0,0,0,.16);transition:transform .25s cubic-bezier(.3,.9,.3,1)}
+:root[data-tema=apple] input[type=checkbox]:checked{background:#30d158}
+:root[data-tema=apple] input[type=checkbox]:checked::after{transform:translateX(20px)}
+:root[data-tema=apple] input[type=checkbox]:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* telefon: iOS sekme çubuğu */
+@media (max-width:1023px){
+  :root[data-tema=apple] #tabs{left:0;right:0;bottom:0;max-width:none;border:0;border-top:.5px solid rgba(84,84,88,.65);border-radius:0;box-shadow:none;
+    background:rgba(28,28,30,.72);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+    padding:6px 4px calc(4px + env(safe-area-inset-bottom))}
+  :root[data-tema=apple] #tabs button{min-height:49px;gap:2px;border-radius:8px;background:none;color:rgba(235,235,245,.55);font-size:10.5px;font-weight:500;letter-spacing:.01em}
+  :root[data-tema=apple] #tabs button:hover{background:none}
+  :root[data-tema=apple] #tabs button[data-tab]{font-size:10.5px}
+  :root[data-tema=apple] #tabs button::before{display:none}
+  :root[data-tema=apple] #tabs button[aria-current=page]{color:var(--ac);font-weight:500}
+  :root[data-tema=apple] #tabs button[aria-current=page] svg{stroke-width:1.7}
+  :root[data-tema=apple] #tabs button[aria-current=page] svg .d{fill-opacity:.9}
+  :root[data-tema=apple] #rest{bottom:calc(72px + env(safe-area-inset-bottom))}
+  :root[data-tema=apple] #view{padding-top:calc(24px + env(safe-area-inset-top))}
+}
+
+/* PC: macOS kenar çubuğu */
+@media (min-width:1024px){
+  :root[data-tema=apple] #app{padding-left:220px}
+  :root[data-tema=apple] #tabs{width:220px;padding:44px 10px 12px;gap:1px;border-right:.5px solid rgba(84,84,88,.65);
+    background:rgba(30,30,30,.7);-webkit-backdrop-filter:blur(40px) saturate(180%);backdrop-filter:blur(40px) saturate(180%)}
+  :root[data-tema=apple] .marka{font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:0;padding:0 10px 18px;color:var(--mut);gap:8px}
+  :root[data-tema=apple] .marka img{width:22px;height:22px;border-radius:6px;box-shadow:none}
+  :root[data-tema=apple] #tabs button{min-height:30px;padding:0 8px;gap:8px;border-radius:7px;font-size:13px;font-weight:400;color:var(--tx);background:none}
+  :root[data-tema=apple] #tabs button svg{width:18px;height:18px;color:var(--ac)}
+  :root[data-tema=apple] #tabs button:hover{background:rgba(255,255,255,.06);color:var(--tx)}
+  :root[data-tema=apple] #tabs button[aria-current=page],:root[data-tema=apple] #tabs button[aria-current=page]:hover{background:rgba(10,132,255,.28);color:#fff;font-weight:500}
+  :root[data-tema=apple] #tabs button[aria-current=page] svg{color:#64b5ff}
+  :root[data-tema=apple] #tabs button[data-tab]::after{border:0;color:var(--dim);font-size:11px;padding:0}
+  :root[data-tema=apple] #tabs button[aria-current=page]::after{color:rgba(255,255,255,.6);border:0}
+  :root[data-tema=apple] #tabs .tema-dugme,:root[data-tema=apple] #tabs .kisayol{font-size:12px;color:var(--mut)}
+  :root[data-tema=apple] #view{padding:40px 44px 72px}
+}
+
+/* pencereler: iOS sheet */
+:root[data-tema=apple] #sheet{-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+:root[data-tema=apple] #sheet .in,:root[data-tema=apple] #sheet .in[role=dialog]{background:#1c1c1e;border-radius:14px 14px 0 0;box-shadow:var(--pop)}
+:root[data-tema=apple] #sheet .in::before{top:6px;height:5px;width:36px;margin-left:-18px;background:rgba(235,235,245,.3)}
+:root[data-tema=apple] #sheet h3{font-weight:700;font-size:22px;letter-spacing:-.02em}
+:root[data-tema=apple] #sheet .panel,:root[data-tema=apple] #sheet div.panel{background:#2c2c2e}
+@media (min-width:1024px){
+  :root[data-tema=apple] #sheet .in,:root[data-tema=apple] #sheet .in[role=dialog]{border-radius:14px}
+  :root[data-tema=apple] #sheet .in::before{display:none}
+}
+:root[data-tema=apple] .toast{border-radius:14px}
+
+/* Defter: Apple Notes */
+:root[data-tema=apple] #view[data-sekme=defter]{--ac:#ffd60a;--on-ac:#000;--act:rgba(255,214,10,.13);--ac2:rgba(255,214,10,.22);--acl:rgba(255,214,10,.55);--btn:#ffd60a;--on-btn:#000}
+:root[data-tema=apple] #view[data-sekme=defter] .btn-ac{color:#000}
+:root[data-tema=apple] h2.df-gun{font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--tx);margin:22px 0 6px 16px}
+:root[data-tema=apple] h2.df-gun .df-say{margin-right:0}
+:root[data-tema=apple] #view[data-sekme=defter] h2.df-gun{margin:22px 0 6px 16px}
+:root[data-tema=apple] #view[data-sekme=defter] #df-liste{margin-top:18px}
+:root[data-tema=apple] #view[data-sekme=defter] .df-alan,:root[data-tema=apple] #sheet .in .df-alan{background:var(--s1);border:0;border-radius:12px;padding:14px 16px;line-height:1.45;font-size:17px}
+:root[data-tema=apple] #sheet .df-alan{background:#2c2c2e}
+:root[data-tema=apple] #view[data-sekme=defter] div.panel.liste{padding:0 0 0 16px}
+:root[data-tema=apple] #view[data-sekme=defter] button.satir.df-not{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 16px 10px 0;min-height:0;align-items:start;border-radius:0}
+:root[data-tema=apple] button.satir.df-not::after{display:none}
+:root[data-tema=apple] .df-not .df-metin{grid-column:1 / -1;grid-row:1;font-size:15px;line-height:1.35;color:var(--mut);-webkit-line-clamp:2;overflow-wrap:anywhere}
+:root[data-tema=apple] .df-not .df-bas{font-weight:600;color:var(--tx)}
+:root[data-tema=apple] .df-not .df-saat{grid-column:1;grid-row:2;width:auto;padding:0;font-size:13px;color:var(--mut)}
+:root[data-tema=apple] .df-not .tag{grid-row:2;grid-column:2;font-size:11px}
+:root[data-tema=apple] button.satir.df-not:hover,:root[data-tema=apple] button.satir.df-not:focus-visible{background:rgba(255,214,10,.1)}
+:root[data-tema=apple] .df-metin mark{background:rgba(255,214,10,.35);color:#fff}
+:root[data-tema=apple] .df-ara{background:rgba(118,118,128,.24);border:0;border-radius:10px;min-height:36px;margin:0 0 8px;padding-left:14px}
+@media (min-width:1024px){
+  :root[data-tema=apple] .duzen.defter{grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;align-items:start}
+  :root[data-tema=apple] .duzen.defter>.kol:last-child{order:-1;position:sticky;top:24px;max-height:calc(100vh - 150px);overflow:auto;padding-right:2px}
+  :root[data-tema=apple] .duzen.defter>.kol:first-child{position:static}
+  :root[data-tema=apple] #view[data-sekme=defter] #df-liste{margin-top:0}
+  :root[data-tema=apple] .df-alan{min-height:46vh}
+}
+
+@media (prefers-reduced-motion:reduce){
+  :root[data-tema=apple] *,:root[data-tema=apple] *::before,:root[data-tema=apple] *::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
+:root[data-tema=apple] button.satir{border-radius:0}
+:root[data-tema=apple] .sekme-hap{display:none!important}
+/* ---------- Apple turu 2 ---------- */
+/* Defter: PC'de açık not sağ alanda, listede seçili satır sarı tint */
+:root[data-tema=apple] button.satir.df-sec,:root[data-tema=apple] button.satir.df-sec:hover{background:rgba(255,214,10,.18);border-radius:10px;margin:0 8px 0 -8px;padding-left:8px;padding-right:8px;border-top-color:transparent}
+:root[data-tema=apple] button.satir.df-sec+button.satir,:root[data-tema=apple] button.satir.df-sec+.df-koc-sar{border-top-color:transparent}
+:root[data-tema=apple] .df-duzen h3{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:0 0 4px}
+:root[data-tema=apple] .df-duzen>.mut{margin:0 0 16px;font-size:13px}
+:root[data-tema=apple] .df-duzen .df-yeni{margin:0 0 8px -12px;color:var(--ac);font-weight:600}
+:root[data-tema=apple] .df-duzen .yigin{display:flex;gap:8px;flex-wrap:wrap}
+:root[data-tema=apple] .df-duzen .yigin>*+*{margin-top:0}
+:root[data-tema=apple] .df-duzen .yigin>.btn-ac{flex:1 1 100%}
+:root[data-tema=apple] .df-duzen .yigin>.btn-big:not(.btn-ac){flex:1 1 0}
+/* koç notları: soru = kalın başlık, cevap = önizleme */
+:root[data-tema=apple] .df-koc{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:start}
+:root[data-tema=apple] .koc-not{grid-column:1 / -1;grid-row:1;border-left:0;padding-left:0;gap:2px}
+:root[data-tema=apple] .satir .grow.koc-not>.koc-soru{font-size:15px;font-weight:600;color:var(--tx);-webkit-line-clamp:1}
+:root[data-tema=apple] .satir .grow.koc-not>.koc-cevap{font-size:15px;line-height:1.35;color:var(--mut);-webkit-line-clamp:2}
+:root[data-tema=apple] .koc-etiket{display:none}
+:root[data-tema=apple] #view[data-sekme=defter] .df-koc-sar{border-top:0}
+/* sabit renkli kartlar: Apple sistem tonları */
+:root[data-tema=apple] .hikaye{--hk-oran:16%}
+:root[data-tema=apple] .hikaye[data-kart=kapak],:root[data-tema=apple] .hikaye[data-kart=son]{--hk-ton:#0a84ff}
+:root[data-tema=apple] .hikaye[data-kart=ton]{--hk-ton:#30d158}
+:root[data-tema=apple] .hikaye[data-kart=rekor]{--hk-ton:#ffd60a}
+:root[data-tema=apple] .hikaye[data-kart=kilo]{--hk-ton:#bf5af2}
+:root[data-tema=apple] .hikaye[data-kart=kas]{--hk-ton:#64d2ff}
+:root[data-tema=apple] .hikaye.yil[data-kart=hareket]{--hk-ton:#64d2ff}
+:root[data-tema=apple] .hikaye.yil[data-kart=seri]{--hk-ton:#ff9f0a}
+:root[data-tema=apple] .hikaye.yil[data-kart=defter]{--hk-ton:#ffd60a}
+:root[data-tema=apple] .cal .g.rek.t3::after{background:#ffd60a}
+:root[data-tema=apple] #sheet .in:has(.ozet-son.rekorlu){box-shadow:0 0 0 1px rgba(255,214,10,.5),0 -10px 60px -20px rgba(255,214,10,.45),var(--pop)}
+/* 8 pt ritmi, basma durumları */
+:root[data-tema=apple] h2{margin-top:32px}
+:root[data-tema=apple] .sub{margin-bottom:24px}
+:root[data-tema=apple] div.panel{margin-bottom:16px}
+:root[data-tema=apple] div.panel+div.panel{margin-top:0}
+:root[data-tema=apple] button:active{opacity:.78}
+:root[data-tema=apple] .btn-ac:active{opacity:1}
+@media (max-width:1023px){
+  :root[data-tema=apple] .seg button{min-height:36px}
+  :root[data-tema=apple] .seg button::before{inset:-4px 0}
+  :root[data-tema=apple] .df-ara{min-height:44px}
+  :root[data-tema=apple] .chip{min-height:40px}
+}
+@media (prefers-reduced-motion:reduce){ :root[data-tema=apple] button:active,:root[data-tema=apple] .btn-ac:active{transform:none} }
+
+/* antrenman: başlık alanı, set sayıları, dinlenme halkası, plaka/ozet pencereleri */
+:root[data-tema=apple] .baslik-input,:root[data-tema=apple] .baslik-input:hover{background:transparent;border-color:transparent;padding-left:0;font-weight:700;letter-spacing:-.022em}
+:root[data-tema=apple] .baslik-input:focus{background:rgba(118,118,128,.24);padding-left:12px}
+:root[data-tema=apple] .sahneler .setgrid.dev input[data-f=kg],:root[data-tema=apple] .sahneler .setgrid.dev input[data-f=reps]{font-weight:700;letter-spacing:-.03em;border:0;box-shadow:none;background:rgba(118,118,128,.18);border-radius:12px}
+:root[data-tema=apple] .sahneler .setgrid.dev input[data-f=kg]:focus,:root[data-tema=apple] .sahneler .setgrid.dev input[data-f=reps]:focus{background:var(--act);box-shadow:0 0 0 2px var(--ac)}
+:root[data-tema=apple] .setgrid.rekor-yeni .done,:root[data-tema=apple] section.ex.rekor-yeni{--tik:#ffd60a}
+:root[data-tema=apple] #rest{background:rgba(28,28,30,.82);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border:.5px solid rgba(84,84,88,.65);border-radius:16px}
+:root[data-tema=apple] #rest .t{font-weight:600;font-size:34px;letter-spacing:-.02em}
+:root[data-tema=apple] #rest .halka{width:48px;height:48px;color:var(--ac)}
+:root[data-tema=apple] #rest .halka svg{width:48px;height:48px}
+:root[data-tema=apple] #rest .halka circle{stroke-width:4}
+:root[data-tema=apple] #rest .halka .iz{stroke:rgba(118,118,128,.32)}
+:root[data-tema=apple] #rest .halka .dolu{stroke:var(--ac)}
+:root[data-tema=apple] #rest button{background:rgba(118,118,128,.24);border-radius:99px;min-height:44px}
+:root[data-tema=apple] #rest button.btn-ac{background:var(--btn)}
+:root[data-tema=apple] section.panel.sd-grup,:root[data-tema=apple] #sheet section.panel{background:#2c2c2e;border:0;border-radius:12px;padding:12px 16px}
+:root[data-tema=apple] #sheet table{border-collapse:collapse}
+
+:root[data-tema=apple] #view[data-sekme=defter] button.satir.df-sec,:root[data-tema=apple] #view[data-sekme=defter] button.satir.df-sec:hover{background:rgba(255,214,10,.18);border-radius:10px;margin:0 8px 0 -8px;padding:10px 8px;border-top-color:transparent}
+:root[data-tema=apple] input[type=checkbox]{background:rgba(120,120,128,.4)!important;border:0!important}
+:root[data-tema=apple] input[type=checkbox]:checked{background:#30d158!important}
+:root[data-tema=apple] .sd-grup,:root[data-tema=apple] .sd-grup+.sd-grup{margin:0 0 10px}
+:root[data-tema=apple] .sd-ust{gap:14px}
+
+/* koç: servis seçimi (iOS seçim kartları) */
+:root[data-tema=apple] .koc-sec{gap:8px}
+:root[data-tema=apple] .koc-sec button{background:rgba(118,118,128,.24);border:0;border-radius:12px;min-height:56px}
+:root[data-tema=apple] .koc-sec button:hover{background:rgba(118,118,128,.34)}
+:root[data-tema=apple] .koc-sec button[aria-checked=true]{background:var(--act);box-shadow:inset 0 0 0 2px var(--ac)}
+:root[data-tema=apple] .koc-sec button[aria-checked=true] b{color:var(--ac)}
+:root[data-tema=apple] .koc-sec button small{color:var(--mut)}
+
+/* Ayarlar > Görünüm: dört seçenek */
+.tema-sec{grid-template-columns:repeat(4,1fr)}
+.tema-on.apple{background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+.tema-on.apple i{background:#2c2c2e}
+.tema-on.apple i:first-child{background:#0a84ff}
+@media (max-width:420px){ .tema-sec{gap:8px!important} .tema-sec button{font-size:13px;padding:10px 4px 8px!important} }
+
+/* ---------- Apple turu 3: Fitness halkaları (halka.js) ---------- */
+.halka-hero{display:none}
+:root[data-tema=apple] .halka-hero{display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center;margin:4px 0 20px;padding:20px 22px;border-radius:22px;
+  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,0) 40%),#1c1c1e;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.09),inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.4),0 14px 32px -12px rgba(0,0,0,.75)}
+:root[data-tema=apple] .halkalar{width:170px;height:170px;display:block;overflow:visible}
+:root[data-tema=apple] .h-iz{fill:none;stroke:rgba(118,118,128,.22)}
+:root[data-tema=apple] .h-yay{fill:none;stroke-linecap:round;animation:halka-ac 1.1s cubic-bezier(.2,.8,.2,1.05) both}
+:root[data-tema=apple] .h-yay.h-ust{filter:drop-shadow(0 0 3px rgba(0,0,0,.65));animation-delay:.35s}
+@keyframes halka-ac{from{stroke-dasharray:0 100}}
+:root[data-tema=apple] .halka-say{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+:root[data-tema=apple] .halka-say li{display:grid;grid-template-columns:auto 1fr auto;column-gap:8px;align-items:baseline;line-height:1.15}
+:root[data-tema=apple] .halka-say i{width:9px;height:9px;border-radius:50%;align-self:center;grid-row:1/3}
+:root[data-tema=apple] .h-ant i{background:linear-gradient(135deg,#fa114f,#ff6a3d)}
+:root[data-tema=apple] .h-kcal i{background:linear-gradient(135deg,#a6ff00,#30d158)}
+:root[data-tema=apple] .h-prot i{background:linear-gradient(135deg,#00f0ff,#0a84ff)}
+:root[data-tema=apple] .h-et{font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+:root[data-tema=apple] .halka-say .h-ant .h-et{color:#ff5a6e}
+:root[data-tema=apple] .halka-say .h-kcal .h-et{color:#b6f23a}
+:root[data-tema=apple] .halka-say .h-prot .h-et{color:#4fd8ff}
+:root[data-tema=apple] .halka-say b{grid-column:2;font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+:root[data-tema=apple] .halka-say b small{font-size:13px;font-weight:500;color:var(--mut);letter-spacing:0}
+:root[data-tema=apple] .halka-say em{grid-column:3;grid-row:1/3;font-style:normal;font-size:13px;font-weight:600;color:var(--mut);align-self:center}
+@media (max-width:420px){
+  :root[data-tema=apple] .halka-hero{gap:16px;padding:18px 16px}
+  :root[data-tema=apple] .halkalar{width:138px;height:138px}
+  :root[data-tema=apple] .halka-say b{font-size:21px}
+  :root[data-tema=apple] .halka-say em{display:none}
+}
+@media (prefers-reduced-motion:reduce){ :root[data-tema=apple] .h-yay{animation:none} }
+@media (min-width:1024px){ :root[data-tema=apple] .halka-hero{grid-template-columns:auto minmax(0,300px);justify-content:start;gap:40px;padding:24px 36px;width:fit-content;max-width:100%} :root[data-tema=apple] .halkalar{width:190px;height:190px} }
+
+/* ---------- Apple turu 3: macOS pencere hissi (≥1024px) + katmanlı yüzeyler ---------- */
+.mac-bar{display:none}
+:root[data-tema=apple] body::before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
+  background:radial-gradient(38% 34% at 18% 12%,rgba(10,132,255,.20),transparent 70%),radial-gradient(34% 30% at 86% 18%,rgba(48,209,88,.10),transparent 70%),
+    radial-gradient(40% 36% at 70% 92%,rgba(255,159,10,.09),transparent 70%),radial-gradient(30% 26% at 8% 86%,rgba(100,210,255,.10),transparent 70%);
+  animation:arka-sur 48s ease-in-out infinite alternate}
+@keyframes arka-sur{from{transform:translate3d(-2%,-1%,0) scale(1)}to{transform:translate3d(2.5%,2%,0) scale(1.06)}}
+:root[data-tema=apple] #app{position:relative;z-index:0}
+:root[data-tema=apple] div.panel,:root[data-tema=apple] details.katla{
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.35),0 10px 24px -12px rgba(0,0,0,.7);
+  background-image:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0) 55%)}
+:root[data-tema=apple] #sheet div.panel,:root[data-tema=apple] #sheet section.panel{box-shadow:inset 0 0 0 .5px rgba(255,255,255,.06)}
+@media (min-width:1024px){
+  :root[data-tema=apple] #tabs{background:rgba(32,32,36,.52);-webkit-backdrop-filter:blur(44px) saturate(210%);backdrop-filter:blur(44px) saturate(210%);
+    box-shadow:inset -1px 0 0 rgba(255,255,255,.05)}
+  :root[data-tema=apple] #view{padding-top:78px}
+  :root[data-tema=apple] .mac-bar{display:flex;position:fixed;top:0;left:0;right:0;height:52px;z-index:6;align-items:center;pointer-events:none}
+  :root[data-tema=apple] .mac-bar::before{content:"";position:absolute;left:220px;right:0;top:0;bottom:0;background:rgba(18,18,20,.55);
+    -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);border-bottom:.5px solid rgba(84,84,88,.55)}
+  :root[data-tema=apple] .mac-nokta{position:relative;display:flex;gap:8px;margin-left:18px;width:62px}
+  :root[data-tema=apple] .mac-nokta i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.25),inset 0 1px 1px rgba(255,255,255,.28)}
+  :root[data-tema=apple] .mac-nokta i:nth-child(1){background:#ff5f57}
+  :root[data-tema=apple] .mac-nokta i:nth-child(2){background:#febc2e}
+  :root[data-tema=apple] .mac-nokta i:nth-child(3){background:#28c840}
+  :root[data-tema=apple] .mac-baslik{position:relative;margin-left:calc(220px - 80px + 28px);font-size:15px;font-weight:600;letter-spacing:-.01em;color:#fff}
+  :root[data-tema=apple] .mac-baslik small{margin-left:10px;font-size:12.5px;font-weight:400;color:var(--mut)}
+  :root[data-tema=apple] #view[data-sekme=bugun]~.mac-bar .mac-baslik::after{content:"Bugün"}
+  :root[data-tema=apple] #view[data-sekme=gecmis]~.mac-bar .mac-baslik::after{content:"Geçmiş"}
+  :root[data-tema=apple] #view[data-sekme=ilerleme]~.mac-bar .mac-baslik::after{content:"İlerleme"}
+  :root[data-tema=apple] #view[data-sekme=defter]~.mac-bar .mac-baslik::after{content:"Defter"}
+  :root[data-tema=apple] #view[data-sekme=takviye]~.mac-bar .mac-baslik::after{content:"Takviye"}
+  :root[data-tema=apple] #view[data-sekme=ayarlar]~.mac-bar .mac-baslik::after{content:"Ayarlar"}
+  :root[data-tema=apple] .mac-ara{position:relative;pointer-events:auto;margin:0 24px 0 auto;display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px 0 10px;border-radius:8px;
+    background:rgba(118,118,128,.24);color:var(--mut);font-size:13px;font-weight:400;border:0;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.08)}
+  :root[data-tema=apple] .mac-ara:hover{background:rgba(118,118,128,.36);color:#fff}
+  :root[data-tema=apple] .mac-ara svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  :root[data-tema=apple] .mac-ara kbd{font-size:11px;padding:1px 5px;border-radius:5px;background:rgba(255,255,255,.08);color:var(--mut);border:0}
+  :root[data-tema=apple] #tabs .marka{padding-top:6px}
+  :root[data-tema=apple] #tabs{padding-top:60px}
+}
+@media (prefers-reduced-motion:reduce){ :root[data-tema=apple] body::before{animation:none} }
+
+/* ---------- Apple turu 3: macOS widget kartları ---------- */
+.wg-sira-grup{display:none}
+:root[data-tema=apple] .wg-sira-grup{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 22px}
+@media (min-width:900px){ :root[data-tema=apple] .wg-sira-grup{grid-template-columns:repeat(4,minmax(0,1fr))} }
+:root[data-tema=apple] .wg{position:relative;display:flex;flex-direction:column;gap:2px;min-height:112px;padding:14px 16px 14px;border-radius:20px;overflow:hidden;
+  background:linear-gradient(160deg,var(--wg-a,rgba(255,255,255,.07)),rgba(255,255,255,0) 62%),#1c1c1e;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.09),inset 0 1px 0 rgba(255,255,255,.07),0 1px 2px rgba(0,0,0,.4),0 12px 26px -14px rgba(0,0,0,.8)}
+:root[data-tema=apple] .wg-kilo{--wg-a:rgba(10,132,255,.22);--wg-c:#4da3ff}
+:root[data-tema=apple] .wg-seri{--wg-a:rgba(255,106,61,.22);--wg-c:#ff7a4d}
+:root[data-tema=apple] .wg-rekor{--wg-a:rgba(255,214,10,.2);--wg-c:#ffd60a}
+:root[data-tema=apple] .wg-sira{--wg-a:rgba(48,209,88,.2);--wg-c:#4ee07a}
+:root[data-tema=apple] .wg-ust{display:flex;align-items:center;gap:6px;color:var(--wg-c);font-size:12px;font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+:root[data-tema=apple] .wg-ust svg{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+:root[data-tema=apple] .wg-say{margin-top:auto;font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.05;font-variant-numeric:tabular-nums}
+:root[data-tema=apple] .wg-say small{font-size:14px;font-weight:500;color:var(--mut);letter-spacing:0}
+:root[data-tema=apple] .wg-say.wg-metin{font-size:19px;letter-spacing:-.02em;line-height:1.15}
+:root[data-tema=apple] .wg-alt{font-size:12.5px;color:var(--mut);line-height:1.25}
+:root[data-tema=apple] .wg-alt.art{color:#ff9f0a}
+:root[data-tema=apple] .wg-alt.azal{color:#64d2ff}
+@media (max-width:420px){ :root[data-tema=apple] .wg{min-height:104px;padding:12px 14px} :root[data-tema=apple] .wg-say{font-size:26px} :root[data-tema=apple] .wg-say.wg-metin{font-size:17px} }
+
+/* ---------- Apple turu 3: Spotlight benzeri komut çubuğu + yapay zekâ durumu ---------- */
+.bg-ara{display:none}
+:root[data-tema=apple] #sheet:has(.komut-ust){align-items:flex-start;justify-content:center;padding:12vh 16px 0}
+:root[data-tema=apple] #sheet:has(.komut-ust) .in{max-width:640px;max-height:70vh;padding:10px 10px 12px;border-radius:20px;background:rgba(36,36,40,.78);
+  -webkit-backdrop-filter:blur(44px) saturate(200%);backdrop-filter:blur(44px) saturate(200%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.1),0 30px 80px -10px rgba(0,0,0,.8);animation:spot-ac .38s cubic-bezier(.2,.8,.2,1.12)}
+:root[data-tema=apple] #sheet:has(.komut-ust) .in::before{display:none}
+@keyframes spot-ac{from{opacity:0;transform:translateY(-10px) scale(.96)}}
+:root[data-tema=apple] .komut-ust{padding:0 38px 0 0;gap:0;position:relative}
+:root[data-tema=apple] .komut-ust::before{content:"";position:absolute;left:16px;top:50%;width:20px;height:20px;margin-top:-10px;opacity:.6;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5L20 20'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-tema=apple] .komut-kutu,:root[data-tema=apple] #sheet .komut-kutu{background:transparent;border:0;box-shadow:none;font-size:22px;font-weight:400;min-height:56px;padding-left:48px;letter-spacing:-.01em}
+:root[data-tema=apple] .komut-kutu:focus{box-shadow:none;border:0}
+:root[data-tema=apple] .komut-liste{margin-top:4px;padding-top:6px;border-top:.5px solid rgba(255,255,255,.1)}
+:root[data-tema=apple] button.satir.komut{border-radius:10px;min-height:48px;padding:8px 12px}
+:root[data-tema=apple] button.satir.komut.ilk{background:var(--ac);color:#fff}
+:root[data-tema=apple] button.satir.komut.ilk .grow>span{color:rgba(255,255,255,.75)}
+:root[data-tema=apple] button.satir.komut.ilk kbd{background:rgba(255,255,255,.2);color:#fff}
+:root[data-tema=apple] .yz-bekle{display:flex;align-items:center;gap:12px;padding:16px 14px}
+:root[data-tema=apple] .yz-nokta{width:10px;height:10px;border-radius:50%;background:conic-gradient(#0a84ff,#64d2ff,#30d158,#ffd60a,#ff6a3d,#0a84ff);animation:yz-don 1.1s linear infinite;box-shadow:0 0 10px rgba(10,132,255,.7)}
+:root[data-tema=apple] .yz-yazi{font-size:17px;font-weight:500;background:linear-gradient(90deg,rgba(255,255,255,.35) 20%,#fff 50%,rgba(255,255,255,.35) 80%) 0 0/220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:yz-parilti 1.5s linear infinite}
+@keyframes yz-don{to{transform:rotate(360deg)}}
+@keyframes yz-parilti{from{background-position:120% 0}to{background-position:-120% 0}}
+/* sonuç çipi (Geri al'lı bildirim) */
+:root[data-tema=apple] body>.toast{border-radius:99px;padding:11px 18px 11px 20px;background:rgba(44,44,48,.82);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14),0 14px 40px -8px rgba(0,0,0,.7);animation:chip-ac .45s cubic-bezier(.2,.8,.2,1.15)}
+@keyframes chip-ac{from{opacity:0;transform:translateX(-50%) translateY(14px) scale(.92)}}
+:root[data-tema=apple] .toast button{color:var(--ac);font-weight:600;background:transparent;min-height:32px}
+/* telefon: Bugün başlığında arama düğmesi */
+@media (max-width:1023px){
+  :root[data-tema=apple] .bg-ust{position:relative}
+  :root[data-tema=apple] .bg-ara{display:grid;place-items:center;position:absolute;right:0;top:2px;width:44px;height:44px;padding:0;border-radius:50%;background:rgba(118,118,128,.24);z-index:2;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  :root[data-tema=apple] .bg-ara svg{fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round}
+}
+@media (prefers-reduced-motion:reduce){ :root[data-tema=apple] .yz-nokta,:root[data-tema=apple] .yz-yazi,:root[data-tema=apple] #sheet:has(.komut-ust) .in,:root[data-tema=apple] body>.toast{animation:none} }
+
+/* ---------- Apple turu 3: Health tarzı grafikler, yaylı hareket ---------- */
+:root[data-tema=apple] .chart .grid{stroke:rgba(255,255,255,.07);stroke-dasharray:0}
+:root[data-tema=apple] .chart text{fill:rgba(235,235,245,.5);font-size:11.5px}
+:root[data-tema=apple] .chart .ln{stroke-width:2.75;stroke-linecap:round;stroke-linejoin:round}
+:root[data-tema=apple] .chart .alan{opacity:.9}
+:root[data-tema=apple] .seg.aralik{margin:0 0 12px;max-width:340px}
+:root[data-tema=apple] .seg.aralik button{font-size:13px;font-weight:600}
+@keyframes sheet-yay{from{transform:translateY(40px) scale(.97);opacity:0}60%{opacity:1}}
+@keyframes sheet-yay-pc{from{transform:translateY(14px) scale(.94);opacity:0}}
+:root[data-tema=apple] #sheet .in{animation:sheet-yay .55s cubic-bezier(.2,.85,.25,1.08) both}
+@media (min-width:1024px){ :root[data-tema=apple] #sheet .in{animation-name:sheet-yay-pc} }
+:root[data-tema=apple] button{transition:transform .35s cubic-bezier(.3,1.4,.5,1),background-color .16s,opacity .16s,filter .16s}
+:root[data-tema=apple] button:active{transform:scale(.96);transition-duration:.08s}
+@media (prefers-reduced-motion:reduce){ :root[data-tema=apple] #sheet .in{animation:none} :root[data-tema=apple] button:active{transform:none} }
+:root[data-tema=apple] #view[data-sekme=ilerleme] .seg.sekme{box-shadow:none;background:rgba(58,58,62,.72);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%)}
+
+/* SADE: yazarak kayıt */
+.sade-yaz{margin:0 0 14px}
+.sade-yaz input{width:100%;min-height:48px;padding:10px 14px;font-size:16px;background:var(--s1);color:var(--tx);border:1px solid var(--line);border-radius:12px}
+.sade-yaz input::placeholder{color:var(--mut)}
+.sade-yaz input:focus{outline:2px solid var(--ac);outline-offset:1px}
+:root:not([data-tema=apple]) #sheet:has(.komut-ust){align-items:flex-start;padding-top:10vh}
+:root:not([data-tema=apple]) #sheet:has(.komut-ust) .in{max-width:560px;max-height:70vh}
+:root[data-tema=apple] .sade-yaz{display:none}

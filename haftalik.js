@@ -553,7 +553,11 @@ function yilKartCiz(v, cumle) {
   var c = cv.getContext('2d'), F = 'ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
   var SF = '"Iowan Old Style","Palatino Linotype",Palatino,Charter,ui-serif,Georgia,serif';
   /* koyu tema paleti (style.css :root[data-theme=koyu]) + hikâye tonları */
-  var BG = '#111215', S1 = '#191a1e', LN = '#2a2d32', TX = '#e6e2da', MUT = '#a3a099', DIM = '#8a8882', AC = '#9db6e6', ALT = '#d9b46e';
+  var BG = '#111215', S1 = '#191a1e', LN = '#2a2d32', TX = '#e6e2da', MUT = '#a3a099', DIM = '#8a8882', AC = '#9db6e6', ALT = '#d9b46e', G1 = 'rgba(61,107,209,', G2 = 'rgba(200,149,44,', G1a = '.34', G2a = '.14';
+  if (document.documentElement.dataset.tema === 'apple') {   /* Apple teması paleti (style.css TEMA: APPLE) */
+    BG = '#000000'; S1 = '#1c1c1e'; LN = 'rgba(84,84,88,.6)'; TX = '#ffffff'; MUT = 'rgba(235,235,245,.62)'; DIM = 'rgba(235,235,245,.4)'; AC = '#0a84ff'; ALT = '#ffd60a';
+    G1 = 'rgba(10,132,255,'; G2 = 'rgba(255,214,10,'; G1a = '.30'; G2a = '.10'; SF = F;
+  }
   var rr = AT.pngKart && AT.pngKart.rr;
   function yaz(t, x, y, boy, agir, renk, hiza, serif, maxW) {
     c.font = (agir || 400) + ' ' + boy + 'px ' + (serif ? SF : F); c.fillStyle = renk || TX; c.textAlign = hiza || 'left';
@@ -566,9 +570,9 @@ function yilKartCiz(v, cumle) {
     if (s) out.push(s); return out;
   }
   c.fillStyle = BG; c.fillRect(0, 0, W, H);
-  var g = c.createRadialGradient(W * 0.92, -60, 0, W * 0.92, -60, 1150); g.addColorStop(0, 'rgba(61,107,209,.34)'); g.addColorStop(1, 'rgba(61,107,209,0)');
+  var g = c.createRadialGradient(W * 0.92, -60, 0, W * 0.92, -60, 1150); g.addColorStop(0, G1 + G1a + ')'); g.addColorStop(1, G1 + '0)');
   c.fillStyle = g; c.fillRect(0, 0, W, H);
-  var g2 = c.createRadialGradient(-80, H + 40, 0, -80, H + 40, 900); g2.addColorStop(0, 'rgba(200,149,44,.14)'); g2.addColorStop(1, 'rgba(200,149,44,0)');
+  var g2 = c.createRadialGradient(-80, H + 40, 0, -80, H + 40, 900); g2.addColorStop(0, G2 + G2a + ')'); g2.addColorStop(1, G2 + '0)');
   c.fillStyle = g2; c.fillRect(0, 0, W, H);
   var ilkAy = v.ilk ? +v.ilk.slice(5, 7) - 1 : 0, y = P + 36;
   yaz('AĞIRLIK TAKİP', P, y, 30, 700, AC);

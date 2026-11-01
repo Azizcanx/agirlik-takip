@@ -37,9 +37,9 @@ var SAG = {
    POST /__koc (X-Koc-Anahtar: jeton) {istem, motor} → {cevap} | {hata}
    (401/403 jeton, 409 meşgul, 413 büyük, 500, 504 sunucuda 120 sn). Jeton yalnız bellekte; 401'de bir kez tazelenir. Akış yok. */
 SAG['pc-claude'] = { ad: 'Claude', tur: 'yerel', motor: 'claude', yonelme: 'Claude\'a', alt: 'bu PC\'deki abonelik (anahtarsız)' };
-SAG.codex = { ad: 'Codex', tur: 'yerel', motor: 'codex', yonelme: 'Codex\'e', alt: 'bu PC\'deki ChatGPT oturumu (anahtarsız)' };
+SAG.codex = { ad: 'ChatGPT (Plus)', tur: 'yerel', motor: 'codex', yonelme: 'ChatGPT\'ye', alt: 'bu PC\'deki ChatGPT Plus aboneliği (anahtarsız)' };
 var CODEX_ZAMAN = 130000;
-var SIRA = ['pc-claude', 'codex', 'gemini', 'openai', 'deepseek', 'chatgpt', 'claude'];
+var SIRA = ['codex', 'pc-claude', 'chatgpt', 'gemini', 'openai', 'deepseek', 'claude'];   /* PC'de ChatGPT Plus (Codex) öntanım; telefonda anahtarsız "ChatGPT'ye sor" */
 var CIPLER = ['Bugün ne yapayım?', 'Bulk nasıl gidiyor?', 'Hangi kası ihmal ediyorum?'];
 var GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 
@@ -73,7 +73,7 @@ function bagli() {
 
 /* ---------- Codex durumu (yalnız localhost; telefonda/GitHub Pages'te hiç sorulmaz) ---------- */
 var codex = null, codexSorgu = null;   /* codex: {var, anahtar, model, neden} son durum (yalnız bellek) */
-function yerelMi() { try { return /^(localhost|127.0.0.1)$/.test(location.hostname) && location.port === '8770'; } catch (e) { return false; } }   /* yalnız pc/sunucu.ps1 (8770); test sunucularında yoklama yok */
+function yerelMi() { try { return /^(localhost|127.0.0.1)$/.test(location.hostname) && (location.port === '8770' || window.__kocYerel === true); } catch (e) { return false; } }   /* yalnız pc/sunucu.ps1 (8770); test sunucularında yoklama yok */
 /* yerel motor sunucuda var mı (s: 'pc-claude' | 'codex') */
 function yerelVar(s) { return yerelMi() && !!codex && !!codex.var && !!SAG[s] && codex.motorlar.indexOf(SAG[s].motor) >= 0; }
 function ilkYerel() { for (var i = 0; i < SIRA.length; i++) if (SAG[SIRA[i]].tur === 'yerel' && yerelVar(SIRA[i])) return SIRA[i]; return null; }
@@ -83,8 +83,15 @@ function codexDurum(tazele) {
   codexSorgu = Promise.resolve().then(function () { return fetch('/__koc/durum', { cache: 'no-store', credentials: 'same-origin' }); })
     .then(function (r) { return r && r.ok ? r.json() : null; })
     .then(function (j) { codex = j && j.var === true && typeof j.anahtar === 'string' ? { var: true, anahtar: j.anahtar, model: String(j.model || ''), motorlar: Array.isArray(j.motorlar) ? j.motorlar.map(String) : ['codex'] } : { var: false, neden: j && j.neden ? String(j.neden) : '' }; return codex; },
-      function () { codex = { var: false, neden: '' }; return codex; });
+      function () { codex = { var: false, neden: '' }; return codex; })
+    .then(function (k) { eskiSecimTasi(); return k; });
   return codexSorgu;
+}
+/* kayıtlı eski öntanım (PC'de Claude) bir kez ChatGPT'ye (Codex) geçer; ChatGPT yoksa olduğu gibi kalır, sonra seçim kullanıcının */
+function eskiSecimTasi() {
+  var a = ayar(); if (!a || a.v) return;
+  if (a.s === 'pc-claude' && yerelVar('codex')) a.s = 'codex';
+  if (a.s === 'codex' || a.s === 'pc-claude' ? yerelVar(a.s) : true) { a.v = 1; ayarYaz(a); }
 }
 function codexIstek(s, istem, o) {
   var ctl = new AbortController(), zaman = false;
@@ -350,7 +357,7 @@ function cagir(s, anahtar, model, sistem, metin, o) {
   return dene(model || SAG[s].model, true);
 }
 function hataMetni(k, s) {
-  var p = SAG[s] || {}, yad = p.tur === 'yerel' ? p.ad : 'Codex';
+  var p = SAG[s] || {}, yad = p.tur === 'yerel' ? p.ad : 'ChatGPT (Plus)';
   return k === 'anahtar' ? 'Anahtar geçersiz; Ayarlar > Yapay zekâ koçu\'ndan yeniden gir' :
     k === 'kota' ? 'Günlük ücretsiz kota doldu, yarın tekrar dene' :
     k === 'sik' ? 'Çok sık soruldu; bir dakika sonra tekrar dene' :
@@ -363,7 +370,7 @@ function hataMetni(k, s) {
     k === 'bos' ? 'Koç boş cevap döndü; tekrar dene' :
     k === 'param' ? 'Servis isteği kabul etmedi; uygulamayı güncelle' :
     k === 'cx-mesgul' ? 'Koç başka bir soruyu cevaplıyor, birazdan tekrar dene' :
-    k === 'cx-zaman' ? yad + ' 2 dakikada cevap vermedi' :
+    k === 'cx-zaman' ? yad + ' zamanında cevap vermedi' :
     k === 'cx-jeton' ? yad + ' bağlantısı reddedildi; uygulamayı PC kısayolundan yeniden aç' :
     k === 'cx-buyuk' ? 'Soru çok uzun; kısaltıp tekrar dene' :
     k === 'cx-kapali' ? 'Bu PC\'de ' + yad + ' şu an kullanılamıyor' :
@@ -404,7 +411,7 @@ function icerik() {
       '<div class="row">' + (p.tur === 'api' ? '<button class="btn-ghost mini" data-act="koc-dene">Bağlantıyı dene</button>' : '') + '<span class="grow"></span>' +
       '<button class="btn-ghost mini" data-act="koc-sil">' + (p.tur === 'api' ? 'Anahtarı sil' : 'Koçu kapat') + '</button></div>';
   }
-  var s = secim && (SAG[secim].tur !== 'yerel' || yerelVar(secim)) ? secim : ilkYerel() || 'gemini', q = SAG[s];
+  var s = secim && (SAG[secim].tur !== 'yerel' || yerelVar(secim)) ? secim : ilkYerel() || 'chatgpt', q = SAG[s];
   var o = '<div class="koc-sec" role="radiogroup" aria-label="Yapay zekâ servisi">' + SIRA.filter(function (k) { return SAG[k].tur !== 'yerel' || yerelVar(k); }).map(function (k) {
     return '<button role="radio" aria-checked="' + (k === s) + '" data-act="koc-sec" data-v="' + k + '"><b>' + AT.h(SAG[k].ad) + '</b><small>' + AT.h(SAG[k].alt) + '</small></button>';
   }).join('') + '</div>';
