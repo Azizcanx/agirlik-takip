@@ -53,6 +53,11 @@ function egzKg(ex) {
   }
   return 60;
 }
+/* ekranda "X kg olur" denen, gerçekten yüklenebilen ağırlık; set kutularına bu yazılır */
+function yuklenebilir(kg, bar) {
+  var p = plakalar(kg, bar); if (p.kalan < 0) return kg;
+  return p.kalan > 0 ? yuv(bar + 2 * p.yan.reduce(function (t, x) { return t + x; }, 0)) : kg;
+}
 function plakaSheet() {
   var ex = AT.S.active && AT.S.active.exs[pd.e]; if (!ex) return AT.kapat();
   var p = plakalar(pd.kg, pd.bar), o = '<h3>Plaka · ' + AT.h(ex.ad) + '</h3>';
@@ -72,7 +77,7 @@ function plakaSheet() {
       return '<div><dt>' + AT.fmt(x.kg, 2) + ' kg × ' + x.r + '</dt><dd>' + AT.h(x.kg === pd.bar ? 'boş bar' : plakaYazi(x.kg, pd.bar)) + '</dd></div>';
     }).join('') + '</dl>';
   }
-  o += '<button class="btn-ac btn-big" data-act="plaka-yaz" style="margin-top:14px">Boş setlere ' + AT.fmt(pd.kg, 2) + ' kg yaz</button>';
+  o += '<button class="btn-ac btn-big" data-act="plaka-yaz" style="margin-top:14px">Boş setlere ' + AT.fmt(yuklenebilir(pd.kg, pd.bar), 2) + ' kg yaz</button>';
   o += '<button class="btn-ghost btn-big" data-act="kapat" style="margin-top:8px">Kapat</button>';
   AT.sheet(o);
 }
@@ -92,8 +97,10 @@ AT.islem['plaka-d'] = function (d) { pd.kg = Math.max(0, yuv(pd.kg + (+d.d))); p
 AT.islem['plaka-bar'] = function (d) { pd.bar = +d.v; plakaSheet(); };
 AT.islem['plaka-yaz'] = function () {
   var ex = AT.S.active && AT.S.active.exs[pd.e]; if (!ex) return AT.kapat();
-  var n = 0; ex.sets.forEach(function (s) { if (!s.done) { s.kg = String(pd.kg); n++; } });
-  AT.kaydet(); AT.kapat(); AT.render(); AT.toast(n ? n + ' sete ' + AT.fmt(pd.kg, 2) + ' kg yazıldı' : 'Boş set yok');
+  /* yalnız kg'ı BOŞ setler dolar; kullanıcının yazdığı değerler korunur (tur7) */
+  var kg = yuklenebilir(pd.kg, pd.bar), n = 0, korunan = 0;
+  ex.sets.forEach(function (s) { if (s.done) return; if (String(s.kg).trim() === '') { s.kg = String(kg).replace('.', ','); n++; } else korunan++; });
+  AT.kaydet(); AT.kapat(); AT.render(); AT.toast(n ? n + ' sete ' + AT.fmt(kg, 2) + ' kg yazıldı' + (korunan ? ' · ' + korunan + ' set kendi değerinde kaldı' : '') : (korunan ? 'Boş set yok; yazdıkların korundu' : 'Boş set yok'));
 };
 
 /* ---------- sezon kartı ---------- */
@@ -120,10 +127,14 @@ function kartVeri() {
   }
   var ex = {};
   ses.forEach(function (s) {
+    /* seans başına tek gözlem: aynı seansta aynı hareketin blokları birleşir (tur7) */
+    var bu = {};
     s.exs.forEach(function (e) {
       var m = 0; AT.yapilanSetler(e).forEach(function (z) { m = Math.max(m, (AT.tahminiMax || AT.e1rm)(AT.num(z.kg), AT.num(z.reps), z.rpe)); });
-      if (!(m > 0)) return;
-      var x = ex[e.ad] || (ex[e.ad] = { ad: e.ad, n: 0, ilk: m, en: 0 });
+      if (m > 0) bu[e.ad] = Math.max(bu[e.ad] || 0, m);
+    });
+    Object.keys(bu).forEach(function (ad) {
+      var m = bu[ad], x = ex[ad] || (ex[ad] = { ad: ad, n: 0, ilk: m, en: 0 });
       x.n++; x.en = Math.max(x.en, m);
     });
   });
@@ -144,6 +155,11 @@ function kartCiz(v) {
   var SF = '"Iowan Old Style","Palatino Linotype",Palatino,Charter,ui-serif,Georgia,serif';
   /* uygulamanın açık paleti (style.css :root) */
   var TX = '#26282c', MUT = '#6a6c70', DIM = '#9c9b97', AC = '#3d5d8a', IYI = '#3f8462', LN = '#e4ded2', S1 = '#fffdf9', ZM = '#f7f4ee', DOLU = 'rgba(61,93,138,.08)';
+  /* koyu tema (Koyu ya da Sistem + koyu cihaz): kart da uygulamanın koyu paletiyle çizilir (tur3 D) */
+  var th = document.documentElement.dataset.theme;
+  if (th === 'koyu' || (th !== 'acik' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) {
+    TX = '#e6e2da'; MUT = '#a3a099'; DIM = '#8a8882'; AC = '#9db6e6'; IYI = '#86c4a3'; LN = '#2a2d32'; S1 = '#191a1e'; ZM = '#111215'; DOLU = 'rgba(157,182,230,.14)';
+  }
   if (document.documentElement.dataset.tema === 'apple') {   /* Apple teması paleti */
     TX = '#ffffff'; MUT = 'rgba(235,235,245,.62)'; DIM = 'rgba(235,235,245,.4)'; AC = '#0a84ff'; IYI = '#30d158'; LN = 'rgba(84,84,88,.6)'; S1 = '#1c1c1e'; ZM = '#000000'; DOLU = 'rgba(10,132,255,.16)'; SF = F;
   }
@@ -217,5 +233,5 @@ AT.islem['kart-indir'] = function () { if (!kartBlob) return AT.toast('Hazırlan
 AT.islem['kart-paylas'] = function () { pngPaylas(kartBlob, kartAd(), 'Sezon kartı'); };
 AT.pngKart = { rr: rr, paylasilir: dosyaPaylasilir, paylas: pngPaylas };
 
-AT._ekstra = { plakalar: plakalar, isinma: isinma, kartVeri: kartVeri };
+AT._ekstra = { yuklenebilir: yuklenebilir, plakalar: plakalar, isinma: isinma, kartVeri: kartVeri };
 })(window.AT);

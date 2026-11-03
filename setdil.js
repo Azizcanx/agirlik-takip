@@ -51,6 +51,7 @@ function sayiKelime(s) {
 function normal(m) {
   var s = kat(m).replace(/['’`´][a-z]*/g, '').replace(/\r?\n/g, ', ').replace(/[!?]/g, ' ').replace(/\s+/g, ' ').trim();
   s = s.replace(/(\d)\s*(kg|kilo|kcal|dk|sn)(?=[\s,.;]|$)/g, '$1 $2');
+  s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bdumbell\b/g, 'dumbbell').replace(/\blat pull down\b/g, 'lat pulldown').replace(/\btricep\b/g, 'triceps');
   s = sayiKelime(s);
   s = s.replace(/(\d+(?:[.,]\d+)?)\s+bucuk\b/g, function (x, a) { return String(+a.replace(',', '.') + 0.5); });
   s = s.replace(/\b\d{1,2}(?:\s*,\s*\d{1,2}){2,}\b/g, function (x) { return x.replace(/\s*,\s*/g, ' '); });   /* 8,8,7 → tekrar listesi */
@@ -62,7 +63,12 @@ function normal(m) {
 /* ---------- hareket eşleşmesi ---------- */
 var ESANLAM = { curl: 'Biceps Curl', pazi: 'Biceps Curl', biceps: 'Biceps Curl', bench: 'Bench Press', barfiks: 'Pull-up', sinav: 'Push-up',
   squat: 'Squat', deadlift: 'Deadlift', ohp: 'Overhead Press', 'omuz pres': 'Overhead Press', row: 'Barbell Row', kurek: 'Barbell Row',
-  dips: 'Dips', lat: 'Lat Pulldown', 'leg press': 'Leg Press', 'yana acis': 'Lateral Raise', triceps: 'Triceps Pushdown' };
+  dips: 'Dips', lat: 'Lat Pulldown', 'leg press': 'Leg Press', 'yana acis': 'Lateral Raise', triceps: 'Triceps Pushdown',
+  /* salon dili (v52): kısa söylenen ad -> listedeki hareket (yalnız eşitlikte ağırlık taşır, yakın eşleşmeyi bozmaz) */
+  fly: 'Dumbbell Fly', flye: 'Dumbbell Fly', kelebek: 'Pec Deck', 'gogus press': 'Chest Press Machine', 'gogus pres': 'Chest Press Machine',
+  'shoulder press': 'Dumbbell Shoulder Press', pushdown: 'Triceps Pushdown',
+  'calf raise': 'Standing Calf Raise', calf: 'Standing Calf Raise', baldir: 'Standing Calf Raise', 'hip thrust': 'Hip Thrust', 'kalca itisi': 'Hip Thrust',
+  'bacak pres': 'Leg Press', 'bacak acma': 'Leg Extension', 'bacak bukme': 'Leg Curl', 'hamstring curl': 'Leg Curl', 'face pull': 'Face Pull' };
 /* tek başına hareket sayılmayan genel kelimeler */
 var GENEL = kume('arka on ust alt tek kol gogus omuz sirt bacak karin kalca makine makinesi kablo oturarak ayakta egimli dar genis ters yana pres press dumbbell barbell dambil agirlik vucut son set ilk');
 /* yok sayılan dolgu: fiiller, hitap, birim artığı */
@@ -160,6 +166,16 @@ function sonKg(ad) {
   }
   return null;
 }
+/* hareketin son iş setinin tekrarı (bu antrenman, yoksa geçmiş); yoksa 0 */
+function sonTekrar(ad) {
+  var b = sonSetAktif(ad); if (b && b.s.tip !== 'isinma' && AT.num(b.s.reps) > 0) return AT.num(b.s.reps);
+  var l = AT.bitenSeanslar();
+  for (var i = l.length - 1; i >= 0; i--) {
+    var e = l[i].exs.filter(function (x) { return x.ad === ad; })[0], ys = e ? AT.yapilanSetler(e) : [];
+    if (ys.length) return AT.num(ys[ys.length - 1].reps);
+  }
+  return 0;
+}
 function bugunSeans() {
   var t = bugun(), l = AT.S.sessions.filter(function (s) { return s.date === t && !s.demo; });
   return l.sort(function (a, b) { return (a.end || a.start || 0) - (b.end || b.start || 0); })[l.length - 1] || null;
@@ -183,13 +199,13 @@ function tamMi(v, a, b) { return isFinite(v) && v % 1 === 0 && v >= a && v <= b;
 function setCoz(seg) {
   var tip = '', t = ' ' + seg + ' ';
   if (/\bisinma\b/.test(t)) { tip = 'isinma'; t = t.replace(/\bisinma( seti)?\b/g, ' '); }
-  var tok = t.trim().split(/\s+/).filter(Boolean), kg = null, reps = null, setN = null, bare = [], axb = [], kel = [];
+  var tok = t.trim().split(/\s+/).filter(Boolean), kg = null, kgAcik = false, reps = null, setN = null, bare = [], axb = [], kel = [];
   for (var i = 0; i < tok.length; i++) {
     var w = tok[i], nx = tok[i + 1] || '';
     if (/^\d+(\.\d+)?x\d+(\.\d+)?(x\d+(\.\d+)?)?$/.test(w)) { axb.push(w.split('x').map(Number)); continue; }
     if (/^\d+(\.\d+)?$/.test(w)) {
       var v = +w;
-      if (KG_B[nx]) { kg = v; i++; } else if (REP_B[nx]) { reps = v; i++; } else if (SET_B[nx]) { setN = v; i++; } else if (SURE_B[nx]) i++;
+      if (KG_B[nx]) { kg = v; kgAcik = true; i++; } else if (REP_B[nx]) { reps = v; i++; } else if (SET_B[nx]) { setN = v; i++; } else if (SURE_B[nx]) i++;
       else bare.push({ v: v, i: i });
       continue;
     }
@@ -221,7 +237,7 @@ function setCoz(seg) {
   if (liste) setler = liste.map(function (r) { return { kg: kg, reps: r }; });
   else if (!setler && reps != null) { var n = setN == null ? 1 : setN; if (!tamMi(n, 1, 20)) return null; setler = []; for (var k = 0; k < n; k++) setler.push({ kg: kg, reps: reps }); }
   var h = hareketBul(kel);
-  return { ad: h && h.ad, kalan: h ? h.kalan : kel.filter(function (w) { return !DOLGU[w]; }).length, setler: setler, tip: tip,
+  return { ad: h && h.ad, kalan: h ? h.kalan : kel.filter(function (w) { return !DOLGU[w]; }).length, setler: setler, tip: tip, kg: kgAcik ? kg : null,
     gecerli: !!setler && setler.every(function (s) { return tamMi(s.reps, 1, 200) && (s.kg == null || (s.kg >= 0 && s.kg <= 1000)); }) };
 }
 
@@ -238,7 +254,10 @@ function relCoz(seg) {
   var kopM = /\b(1 set daha|set daha|aynisi|ayni set\w*|ayni sekilde|1 daha)\b/.test(t);
   if (!(dinM || rpeM || zor || silM || duzM || kgM || repM || kopM)) return null;
   if (!a) return { tur: 'mesaj', metin: 'Süren antrenman yok' };
-  var w = t.trim().split(' ').filter(function (x) { return !/\d/.test(x); }), h = hareketBul(w), ad = h && h.puan >= 2 ? h.ad : simdikiAd();
+  var w = t.trim().split(' ').filter(function (x) { return !/\d/.test(x); }), h = hareketBul(w), ad = h && h.puan >= 2 ? h.ad : null;
+  /* yeni set açan komut (bir set daha, +kg, +tekrar) hareket söylenmediyse ekranda görünen hareketi hedefler; düzelt/sil/zorluk son bitmiş seti (tur3 #6) */
+  var yeniSet = !(silM || duzM || rpeM || zor || dinM);
+  if (!ad) ad = (yeniSet && AT.gorunenEgz && AT.gorunenEgz()) || simdikiAd();
   if (!ad) return { tur: 'mesaj', metin: 'Önce bir hareket ekle' };
   if (dinM) {
     var sn = Math.round(+dinM[1] * (/^(dakika|dk)$/.test(dinM[2]) ? 60 : 1));
@@ -367,6 +386,11 @@ function coz(metin) {
     var s = setCoz(seg), r = s.ad && s.setler && s.gecerli ? null : relCoz(seg);
     if (r) { if (r.tur === 'mesaj') mesaj = mesaj || r.metin; else satir.push(r); return; }
     if (!s.ad && s.setler && AT.S.active && s.kalan === 0) s.ad = simdikiAd();
+    /* "fly 10 kg": tekrar yok -> geçen seferin tekrarı, o da yoksa kutu boş kalır (tekrar yaz) */
+    if (s.ad && !s.setler && s.kg != null && s.kg >= 0 && s.kg <= 1000 && s.kalan <= 2) {
+      var sr = sonTekrar(s.ad), y = setSatir(s.ad, [{ kg: s.kg, reps: sr ? sr : '' }], s.tip, sr ? ['tekrar geçen seferden'] : []);
+      if (!sr) y.eksik.push('tekrar'); satir.push(y); return;
+    }
     if (s.ad && s.setler && s.gecerli) { var x = setSatir(s.ad, s.setler, s.tip); if (s.kalan > 2) guclu = false; satir.push(x); return; }
     /* tek başına tartı: "82,4" / "82,4 kg" (ondalıklı) */
     var k = /^(\d{2,3}\.\d)\s*(kg|kilo)?$/.exec(seg);
@@ -395,6 +419,7 @@ function satirHtml(x, i, cok) {
   if (x.tur === 'set') {
     var alt = [x.setler.length + ' set'].concat(x.tip === 'isinma' ? ['ısınma'] : [], x.not || []);
     if (x.eksik.indexOf('kg') >= 0) alt.push('kg yaz');
+    if (x.eksik.indexOf('tekrar') >= 0) alt.push('tekrar yaz');
     o += '<div class="sd-ust">' + sec + '<b class="grow">' + AT.h(x.ad) + '</b></div><p class="sd-alt">' + AT.h(alt.join(' · ')) + '</p>' +
       '<div class="setgrid dz"><span class="lbl">Set</span><span class="lbl">kg</span><span class="lbl">Tekrar</span><span class="lbl">Sil</span></div>';
     x.setler.forEach(function (s, k) {
@@ -822,7 +847,7 @@ function sade(m) {   /* Bugün'deki düz giriş satırı: kural önce, anlamazsa
   if (yzDene(m, 'sade', r)) return true;
   if (r && r.satirlar) return kuralYaz(r, 'sade', m);
   if (r && r.soru && r.soru.cevap) { cevapGoster(r.soru, 'sade', m); return true; }
-  AT.toast(AT.kocJsonVar && AT.kocJsonVar() ? ORNEK : "Anlayamadım. Serbest yazman için Ayarlar'dan ChatGPT (Plus)'ı aç; ya da yaz: curl 3x10 15", 4500);
+  AT.toast(AT.kocJsonVar && AT.kocJsonVar() ? ORNEK : AT.masaustu && AT.masaustu() ? "Anlayamadım. Serbest yazman için Ayarlar'dan ChatGPT (Plus)'ı aç; ya da yaz: curl 3x10 15" : "Anlayamadım. Şöyle yaz: bench 60 8 · curl 3x10 15 · bir set daha · 82,4", 4500);
   return false;
 }
 function defterOnce(m) {

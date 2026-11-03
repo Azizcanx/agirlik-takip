@@ -44,8 +44,10 @@ var KCAL_BASLIK = ['Tarih', 'Kalori (kcal)', 'Protein (g)', 'Karbonhidrat (g)', 
 function antrenmanSatirlari(sessions) {
   var out = [];
   sirala(sessions || []).forEach(function (se) {
+    var say = Object.create(null);   /* set numarası aynı seansta aynı hareketin blokları boyunca sürer (1,2,3 | 4,5) */
     (se.exs || []).forEach(function (ex) {
-      AT.yapilanSetler(ex).forEach(function (s, i) {
+      AT.yapilanSetler(ex).forEach(function (s) {
+        var i = say[ex.ad] = (say[ex.ad] || 0) + 1; i--;
         var kg = AT.num(s.kg), r = AT.num(s.reps), e1 = AT.e1rm(kg, r, s.rpe);
         out.push([se.date, se.name || 'Antrenman', ex.ad, ex.kas || AT.kasOf(ex.ad), i + 1, kg, r,
           { n: kg * r, d: 1 }, e1 > 0 ? { n: e1, d: 1 } : '', se.demo ? 'evet' : '']);

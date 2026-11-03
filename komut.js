@@ -62,7 +62,7 @@ function ciz() {
   }).join('') : '<p class="mut">Eşleşen komut yok</p>';
 }
 function ac() {
-  AT.sheet('<div class="komut-ust"><input id="komut" class="komut-kutu" placeholder="Komut yaz: 82,4 · +650 · curl 3x10 15" autocomplete="off" aria-label="Hızlı komut">' +
+  AT.sheet('<div class="komut-ust"><input id="komut" class="komut-kutu" placeholder="Komut yaz: 82,4 · +650 · curl 3x10 15" autocomplete="off" aria-label="Yazarak kaydet: hızlı komut">' +
     (AT.setDil ? AT.setDil.mik('komut') : '') + '</div><div id="komut-liste" class="liste komut-liste"></div>');
   var e = AT.$('#komut'); e.addEventListener('input', ciz); e.focus(); ciz();
 }

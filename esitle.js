@@ -10,8 +10,8 @@
 
 var LS_AYAR = 'agirlik-esit', LS_TABAN = 'agirlik-esit-taban', ACIKLAMA = 'agirlik-takip-esitleme', DOSYA = 'agirlik-takip.json';
 var API = 'https://api.github.com', TEL_ADRES = 'https://azizcanx.github.io/agirlik-takip/';
-var VERI = ['sessions', 'bw', 'kcal', 'ozel', 'takviye', 'bulk', 'active', 'dinlenme', 'dinlenmeEgz', 'rpe', 'ses', 'kcalOneri', 'defter'];
-var LISTE = { sessions: 'id', bw: 'id', kcal: 'date', ozel: 'ad', defter: 'id' };   /* kalori günde tek: tarihle */
+var VERI = ['sessions', 'bw', 'kcal', 'ozel', 'takviye', 'bulk', 'active', 'dinlenme', 'dinlenmeEgz', 'rpe', 'ses', 'kcalOneri', 'defter', 'sablon', 'dinlenmeSecildi', 'donem', 'donemGecmis', 'ikiz', 'kocRapor'];
+var LISTE = { sessions: 'id', bw: 'id', kcal: 'date', ozel: 'ad', defter: 'id', sablon: 'id', donemGecmis: 'id', ikiz: 'id' };   /* kalori günde tek: tarihle */
 var DESTEK = !!(window.crypto && crypto.subtle && window.fetch && window.TextEncoder);
 
 /* ---------- saf: birleştirme ---------- */
@@ -70,7 +70,7 @@ function birlestir(b, l, r) {
     else if (k === 'takviye') {
       var tb = b[k] || {}, tl = l[k] || {}, tr = r[k] || {};
       o[k] = { liste: liste(tb.liste, tl.liste, tr.liste, 'id'), alinan: harita(tb.alinan, tl.alinan, tr.alinan) };
-    } else if (k === 'dinlenmeEgz') o[k] = harita(b[k], l[k], r[k]);
+    } else if (k === 'dinlenmeEgz' || k === 'kocRapor') o[k] = harita(b[k], l[k], r[k]);
     else { var v = sec(b[k], l[k], r[k]); if (v !== undefined) o[k] = v; }
   });
   return o;
@@ -139,12 +139,12 @@ function uzakOku(a) {
 var calisiyor = false, bekliyor = false, zaman = null, uygulaniyor = false, sonHata = null;
 function taban() { try { return JSON.parse(localStorage.getItem(LS_TABAN) || 'null'); } catch (e) { return null; } }
 function esitle(elle) {
-  var a = ayar(); if (!a || !DESTEK) return Promise.resolve(false);
+  var a = ayar(); if (!a || !DESTEK || !a.sifre) return Promise.resolve(false);
   if (calisiyor) { bekliyor = true; return Promise.resolve(false); }
   if (!navigator.onLine && !elle) return Promise.resolve(false);
   calisiyor = true; ciz('Eşitleniyor…');
   /* derin kopya: eşitleme sürerken yerinde değişen diziler/nesneler bu fotoğrafı bozmasın */
-  var yerel = JSON.parse(J(veriAl(AT.S))), uzakRev = 0, tabanRev = +a.rev || 0;
+  var yerel = JSON.parse(J(veriAl(AT.S))), uzakRev = 0, tabanRev = +a.rev || 0, hata0 = AT.kayitHataSay ? AT.kayitHataSay() : 0, kayitOk = true;
   return gistBul(a).then(function (id) {
     if (!id) return null;
     a.gist = id;
@@ -182,11 +182,11 @@ function esitle(elle) {
       var simdi = veriAl(AT.S), yeni = son;
       if (J(simdi) !== J(yerel)) { yeni = birlestir(yerel, simdi, son); bekliyor = true; }
       var yerelDegisti = J(yeni) !== J(simdi);
-      if (yerelDegisti) { uygulaniyor = true; try { AT.yeniDurum(Object.assign({}, AT.S, JSON.parse(J(yeni)))); } finally { uygulaniyor = false; } }
+      if (yerelDegisti) { uygulaniyor = true; try { kayitOk = AT.yeniDurum(Object.assign({}, AT.S, JSON.parse(J(yeni)))) !== false; } finally { uygulaniyor = false; } }
       a.son = Date.now(); a.hata = null; a.rev = yeniRev; ayarYaz(a); sonHata = null;
       return yerelDegisti;
     });
-  }).then(function (d) { calisiyor = false; yarisma = 0; ciz(); if (elle) AT.toast(d ? 'Eşitlendi, yeni kayıtlar geldi' : 'Eşitlendi'); if (bekliyor) { bekliyor = false; planla(2000); } return d; },
+  }).then(function (d) { calisiyor = false; yarisma = 0; ciz(); if (elle && kayitOk && (!AT.kayitHataSay || AT.kayitHataSay() === hata0)) AT.toast(d ? 'Eşitlendi, yeni kayıtlar geldi' : 'Eşitlendi');   /* bu işlem sırasında kayıt başarısız olduysa "Eşitlendi" denmez (eşzamansız sınırdan bağımsız) */ if (bekliyor) { bekliyor = false; planla(2000); } return d; },
     function (e) {
       calisiyor = false;
       if (e.kod === 'yarisma' && (yarisma = yarisma + 1) <= 3) { planla(1500); return false; }   /* öbür cihaz araya girdi: kısa süre sonra yeniden */
@@ -208,6 +208,8 @@ function saat(t) { var d = new Date(t); return AT.tarih(AT.iso(d), 1) + ' ' + AT
 function icerik(durum) {
   var a = ayar();
   if (!DESTEK) return '<p class="mut">Bu tarayıcı eşitlemeyi desteklemiyor.</p>';
+  if (a && !a.sifre) return '<p class="durum uyari">' + AT.h(hataMetni('sifre')) + '</p><label class="alan"><span>Şifre (iki cihazda aynı)</span><input id="es-sifre" type="password" autocomplete="new-password" placeholder="en az 6 karakter"></label>' +
+    '<div class="row"><button class="btn-ac" data-act="es-bagla">Bağla</button><span class="grow"></span><button class="btn-ghost mini" data-act="es-kaldir">Kaldır</button></div>';   /* anahtar saklı, yalnız şifre istenir */
   if (!a) return '<p class="mut">Kayıtların PC ve telefonda aynı olsun: GitHub hesabındaki gizli bir dosyada, kendi şifrenle kilitli durur. Ücretsiz.</p>' +
     '<p class="mut"><a href="https://github.com/settings/tokens/new?scopes=gist&description=Agirlik%20Takip%20esitleme" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;min-height:44px">GitHub\'da anahtar al</a> <small>(süre olarak “No expiration” seç)</small></p>' +
     '<label class="alan"><span>GitHub anahtarı ya da PC\'den gelen link</span><input id="es-token" type="password" autocomplete="off" placeholder="ghp_… ya da bağlantı linki"></label>' +
@@ -240,9 +242,14 @@ function bagla(token, sifre) {
   localStorage.removeItem(LS_TABAN);   /* yeni bağlantı: iki taraf birleşir, silme yok */
   ciz('Bağlanıyor…');
   /* yalnız şifre/anahtar yanlışsa bağlantı geri alınır; internet sorunu geçicidir, bağlantı kalır ve sonra eşitlenir */
-  esitle(true).then(function () { var a = ayar(); if (a && (a.hata === 'sifre' || a.hata === 'anahtar')) { ayarYaz(null); ciz(); } else AT.render(); });
+  esitle(true).then(function () {
+    var a = ayar();
+    if (a && a.hata === 'sifre') { ayarYaz({ token: a.token, sifre: '', hata: 'sifre' }); ciz(); }   /* yanlış şifre: anahtar kalır, yalnız şifre yeniden istenir */
+    else if (a && a.hata === 'anahtar') { ayarYaz(null); ciz(); }
+    else AT.render();
+  });
 }
-AT.islem['es-bagla'] = function () { var t = AT.$('#es-token'), s = AT.$('#es-sifre'); bagla(t && t.value, s && s.value); };
+AT.islem['es-bagla'] = function () { var t = AT.$('#es-token'), s = AT.$('#es-sifre'), a = ayar(); bagla((t && t.value) || (a && a.token) || '', s && s.value); };
 AT.islem['es-simdi'] = function () { esitle(true); };
 AT.islem['es-kaldir'] = function () {
   AT.onayla('Eşitleme kaldırılsın mı?', 'Bu cihazdaki kayıtlar yerinde kalır; GitHub\'daki gizli dosya silinmez.', 'es-kaldir-kesin', 'Kaldır');

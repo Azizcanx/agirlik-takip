@@ -523,6 +523,7 @@ function ozetVeri(S, ant, kilo, kcal) {
   }
   var sesTar = (S.sessions || []).map(function (se) { return se && se.date; }).filter(function (d) { return isFinite(seri(d)); }).sort();
   sirali(S.sessions).forEach(function (se) {
+    var buSes = Object.create(null);   /* hareketin bu seanstaki en iyisi (bloklar birleşik): "ilk" = ilk SEANSIN en iyisi */
     (se.exs || []).forEach(function (ex) {
       var sets = AT.yapilanSetler(ex); if (!sets.length) return;
       var h = m[ex.ad];
@@ -534,8 +535,9 @@ function ozetVeri(S, ant, kilo, kcal) {
         if (v > buMax) buMax = v;
         if (v > h.max + 1e-9) { h.max = v; h.kg = kg; h.r = r; h.tarih = se.date; }
       });
-      if (!h.ilk && buMax > 0) h.ilk = buMax;
+      buSes[ex.ad] = Math.max(buSes[ex.ad] || 0, buMax);
     });
+    Object.keys(buSes).forEach(function (ad) { var hh = m[ad]; if (hh && !hh.ilk && buSes[ad] > 0) hh.ilk = buSes[ad]; });
   });
   var har = l.filter(function (h) { return h.max > 0; })
     .sort(function (a, b) { return b.seans - a.seans || b.max - a.max || (a.ad < b.ad ? -1 : 1); }).slice(0, ANA_N)

@@ -59,8 +59,19 @@ function tekrarlar(sets) { return sets.map(function (s) { return AT.num(s.reps);
 /* [5,5,5] -> "3×5", [8,7,6] -> "8-7-6" */
 function kisaSet(rs) { return rs.every(function (r) { return r === rs[0]; }) ? rs.length + '×' + rs[0] : rs.join('-'); }
 function ort(a) { return a.reduce(function (t, x) { return t + x; }, 0) / a.length; }
-/* tekrar aralığı: çalışma setlerinin hepsi 6 ve altıysa 3–6, değilse 8–12 */
-function aralik(rs) { return Math.max.apply(0, rs) <= 6 ? [3, 6] : [8, 12]; }
+/* tekrar aralığı: çalışma setlerinin hepsi 6 ve altıysa 3–6, değilse 8–12.
+   Kullanıcının kendi aralığı (tur3 S1): son 2 seansın bütün çalışma setleri 15+ tekrarsa (15–20 gibi yüksek tekrarlı çalışma)
+   aralık ona uyar: tepe = en yüksek tekrar 5'in katına yukarı (en az 20), alt = tepe − 5; 8–12'ye zorlanmaz.
+   Tek seans ya da 13–14 tekrar (8–12'nin üstüne taşan ilerleme, a6) standart kalır. l: hareketin geçmişi (en yeni sonda) */
+function aralik(rs, l) {
+  var tepe0 = Math.max.apply(0, rs); if (tepe0 <= 6) return [3, 6];
+  var son2 = (l || []).slice(-2), peak = tepe0;
+  if (son2.length === 2 && son2.every(function (z) { var w = calisma(z.sets); return w.length && w.every(function (s) { return AT.num(s.reps) >= 15; }); })) {
+    son2.forEach(function (z) { calisma(z.sets).forEach(function (s) { peak = Math.max(peak, AT.num(s.reps)); }); });
+    var tp = Math.max(20, Math.ceil(peak / 5) * 5); return [tp - 5, tp];
+  }
+  return [8, 12];
+}
 /* d8: vücut ağırlığı hareketi (son seansın bütün iş setleri 0 kg): tekrar ilerlemesi. Hedef = en zayıf set + 1, en çok TEPE_VA;
    önceki 0 kg seansın hedefi tutmadıysa o hedef kalır (bu seansın en iyi setini aşmadan, en zayıf + 1'in altına inmeden).
    Hepsi TEPE_VA'ya varınca "ağırlık ekle".
@@ -191,7 +202,7 @@ function oneriler(h, bugun) {
     var ne = AT.tarih(son.date, true), gs = g === 0 ? 'Bugün' : 'Geçen sefer (' + ne + ')';
     if (ws.length >= 2 && kg === 0) { m[a] = vaOneri(a, l, ws, g, gs); return; }   /* d8: bütün setler 0 kg */
     if (ws.length < 2 || !(kg > 0)) return;
-    var rs = tekrarlar(ws), ilk = rs[0], mn = Math.min.apply(0, rs), ar = aralik(rs), alt = ar[0], tepe = ar[1];
+    var rs = tekrarlar(ws), ilk = rs[0], mn = Math.min.apply(0, rs), ar = aralik(rs, l), alt = ar[0], tepe = ar[1];
     var rpe = rpeOf(ws[ws.length - 1]), rpeYaz = rpe != null ? 'son set RPE ' + AT.fmt(rpe) : '';
     var n = ws.length, ek = artis(son.ex, kg), yeni = kg + ek;
     var bolge = (altVucut(son.ex) ? 'Alt vücut' : 'Üst vücut') + ': +' + AT.fmt(ek, 2) + ' kg';
@@ -326,6 +337,26 @@ AT.notlar = function (bugun) {
   return v;
 };
 AT.notlarHesapla = hesapla;   // test için saf giriş
+/* G25: AT.hedefSet ile aynı motor, tarihli saf giriş; rapor önceliği ayrıca çözülür. */
+AT.notlarRapor = function (seanslar, bugun) {
+  var h = gecmis(seanslar), o = oneriler(h, bugun), d = durgunlar(h, bugun), out = [];
+  Object.keys(h).forEach(function (ad) {
+    var x = o[ad], dur = d.filter(function (z) { return z.ad === ad; })[0], son = h[ad][h[ad].length - 1];
+    if (!x && !dur) return;
+    var tur = x && x.sinif === 0 ? 'deload' : dur ? 'duraganlik' : 'artis';
+    var hedef = x && x.hedef, neden = x && x.not.aciklama;
+    if (tur === 'duraganlik') {
+      var ws = calisma(dur.son.sets), s = enIyiSet(ws);
+      if (!s) return;   /* 12 tekrar üstü çalışma setlerinden tahmini max hedefi çıkarma. */
+      /* Mevcut nottaki iki seçenekten tekrar aralığını değiştirmeyi seç. */
+      hedef = { kg: AT.num(s.kg), tekrar: AT.num(s.reps) >= 8 ? 6 : 10, n: ws.length };
+      neden = dur.k + ' seanstır rekor yok; en iyi tahmini max ' + AT.fmt(dur.e1, 1) + ' kg; tekrar aralığını değiştir';
+    }
+    out.push({ ad: ad, tur: tur, hedef: hedef, neden: neden, seans: h[ad].length,
+      set: son.sets.length, son: son.date, duragan: dur ? dur.k : 0 });
+  });
+  return out;
+};
 /* bugünkü hedef (öneriyle aynı kural): ad -> {kg, tekrar, n, va?} ya da null (va: vücut ağırlığı, kg 0) (son seans 14 günden eski / yeterli set yok).
    app.js antrenman ekranında soluk sayıları (placeholder) bununla doldurur. Seans listesi değişmedikçe önbellekte. */
 var hedefOnb = { k: null, m: null };

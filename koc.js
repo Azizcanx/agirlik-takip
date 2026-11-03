@@ -363,7 +363,7 @@ function hataMetni(k, s) {
     k === 'sik' ? 'Çok sık soruldu; bir dakika sonra tekrar dene' :
     k === 'bakiye' ? (p.ad || 'Servis') + ' hesabında bakiye yok (API ücretli)' :
     k === 'zaman' ? 'Cevap 30 sn içinde gelmedi; tekrar dene' :
-    k === 'ag' ? 'İnternet yok ya da servise ulaşılamadı' :
+    k === 'ag' ? 'İnternet gerekli: bağlantı yok ya da servise ulaşılamadı' :
     k === 'yogun' ? 'Servis şu an yoğun; biraz sonra tekrar dene' :
     k === 'model' ? 'Model bulunamadı; uygulamayı güncelle' :
     k === 'engel' ? 'Servis bu soruyu cevaplamadı; farklı sor' :
@@ -480,9 +480,11 @@ AT.bolum.kocDugme = function () {
   var a = ayar();
   return '<button class="btn-big koc-dugme" data-act="koc-sor">' + AT.h(etiket(a.s)) + '<kbd>Ctrl + Shift + Enter</kbd></button>';
 };
+/* yeniden denemenin işe yarayabileceği hatalar (geçici/ağ); anahtar, bakiye, model, param, engel, büyük, kapalı için değil */
+function tekrarMi(k) { return !/^(anahtar|bakiye|model|param|engel|cx-buyuk|cx-kapali|cx-jeton|cx-yok)$/.test(String(k)); }
 function durumHtml() {
   if (!is) return '';
-  if (is.durum === 'hata') return '<p class="durum uyari koc-hata" role="alert">' + AT.h(hataMetni(is.hata, is.s)) + ' <button class="btn-ghost mini" data-act="koc-tamam">Tamam</button></p>';
+  if (is.durum === 'hata') return '<p class="durum uyari koc-hata" role="alert">' + AT.h(hataMetni(is.hata, is.s)) + ' ' + (tekrarMi(is.hata) && is.soru ? '<button class="btn-ac mini" data-act="koc-tekrar">Tekrar dene</button> ' : '') + '<button class="btn-ghost mini" data-act="koc-tamam">Tamam</button></p>';
   return '<div class="koc-bekle" role="status"><div class="koc-ust"><span class="koc-nokta" aria-hidden="true"></span><span class="grow">' + (is.metin ? 'Koç yazıyor…' : 'Koç düşünüyor…') + '</span>' +
     '<button class="btn-ghost mini" data-act="koc-iptal">İptal</button></div><p class="koc-soru">' + AT.h(is.soru) + '</p><div id="koc-akis" class="koc-cevap">' + bicim(is.metin) + '</div></div>';
 }
@@ -554,6 +556,7 @@ AT.islem['koc-sor'] = function (d) {
 };
 function iptalEt() { if (is) { is.iptal = true; if (is.ctl) try { is.ctl.abort(); } catch (e) {} } is = null; }
 AT.islem['koc-iptal'] = function () { if (!is) return; var s = is.soru; iptalEt(); geriKoy(s); durumCiz(); };
+AT.islem['koc-tekrar'] = function () { var q = is && is.soru; is = null; durumCiz(); return q ? AT.islem['koc-sor']({ q: q }) : undefined; };
 AT.islem['koc-tamam'] = function () { is = null; durumCiz(); if (!bagli()) yenile(); };
 
 /* ---------- anahtarsız mod (ChatGPT / Claude): pano + ?q= adresi ---------- */

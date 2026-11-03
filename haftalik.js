@@ -48,7 +48,7 @@ function hesap(S, bas, pr) {
   }
   var tk = S.takviye;
   if (tk && tk.liste && tk.liste.length) {
-    var tam = 0; for (var i = 0; i < 7; i++) { var g = gunEkle(bas, i), al = tk.alinan[g] || []; if (tk.liste.every(function (x) { return al.indexOf(x.id) >= 0; })) tam++; }
+    var tam = 0; for (var i = 0; i < 7; i++) { var g = gunEkle(bas, i), al = tk.alinan[g] || [], gl = AT.takviyeGunListe ? AT.takviyeGunListe(tk, g) : tk.liste; if (gl.length && gl.every(function (x) { return al.indexOf(x.id) >= 0; })) tam++; }   /* o günün listesi (bugünküyle değil) */
     o.takviye = tam;
   }
   return o;
@@ -400,7 +400,7 @@ function yilHesap(S, yil, pr) {
     var tam = 0, herhangi = 0;
     Object.keys(tk.alinan).forEach(function (g) {
       var al = tk.alinan[g] || []; if (!ic(g) || !al.length) return;
-      herhangi++; if (tk.liste.every(function (x) { return al.indexOf(x.id) >= 0; })) tam++;
+      herhangi++; var gl = AT.takviyeGunListe ? AT.takviyeGunListe(tk, g) : tk.liste; if (gl.length && gl.every(function (x) { return al.indexOf(x.id) >= 0; })) tam++;
     });
     if (herhangi) o.takviye = { tam: tam, gun: herhangi };
   }
@@ -661,6 +661,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var sh = AT.$('#sheet'); if (sh && !sh.hidden) return;
     var yk = yilKontrol(S, AT.iso(new Date()), AT.prHesapla());
     if (yk) { S.yilGoruldu = yk.yil; AT.kaydet(); yilAc(yk.yil, yk.v); return; }
+    if (AT.kocRapor) return;   /* G25 yalnız haftalık açılışı devralır; yıl hikâyesi korunur. */
     if (S.haftaGoruldu === bas) return;
     var v = hesap(S, bas, AT.prHesapla()), ilk = S.haftaGoruldu == null;
     S.haftaGoruldu = bas; AT.kaydet();

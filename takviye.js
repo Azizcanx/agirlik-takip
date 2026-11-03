@@ -61,13 +61,32 @@ function gecmis(t, bugun) {
       '<span class="tk-say' + (o.seri >= 7 ? ' iyi' : '') + '"><b>' + o.say + '/' + GUN30 + '</b><span>' + (o.seri ? o.seri + ' gün seri' : 'seri yok') + '</span></span></div>';
   }).join('') + '</div>';
 }
+/* o gün listede olan takviyeler (haftalık karne geçmiş günleri bugünkü listeyle ölçmesin): eklendi tarihi yoksa ilk alındığı gün, hiç alınmamışsa bugün */
+function gunListesi(t, g) {
+  var bugun = AT.iso(new Date());
+  return (t.liste || []).filter(function (x) {
+    var b = x.eklendi;
+    if (!b) { var ds = Object.keys(t.alinan || {}).filter(function (d) { return (t.alinan[d] || []).indexOf(x.id) >= 0; }).sort(); b = ds[0] || bugun; }
+    return b <= g;
+  });
+}
+var duzId = null, duzTaslak = null;   /* duzTaslak: düzenlenen öğenin yazılmış ama kaydedilmemiş doz/zamanı (yeniden çizimde kaybolmasın) */
+function duzKapat() { duzId = null; duzTaslak = null; }
+if (typeof document !== 'undefined') {
+  document.addEventListener('input', function (ev) { var t = ev.target; if (duzId && t && t.id === 'tk-d-doz') duzTaslak = { id: duzId, doz: t.value, zaman: duzTaslak && duzTaslak.id === duzId ? duzTaslak.zaman : null }; });
+  document.addEventListener('change', function (ev) { var t = ev.target; if (duzId && t && t.id === 'tk-d-zaman') { var d = AT.$('#tk-d-doz'); duzTaslak = { id: duzId, doz: d ? d.value : (duzTaslak && duzTaslak.doz) || '', zaman: t.value }; } });
+}
+AT.sekmeDegisti = function (t) { if (t !== 'takviye') { duzKapat(); duzenle = false; } };   /* sekmeden çıkınca yarım düzenleme atılır */
 function duzenleBolum(t) {
   var var_ = t.liste.map(function (x) { return x.ad.toLocaleLowerCase('tr'); });
   var hazir = HAZIR.filter(function (x) { return var_.indexOf(x[0].toLocaleLowerCase('tr')) < 0; });
   var o = '';
   if (t.liste.length) o += '<div class="panel liste">' + t.liste.map(function (x) {
+    if (x.id === duzId) return '<div class="satir tk-duz"><span class="grow"><b>' + AT.h(x.ad) + '</b><span class="alanlar"><label class="alan"><span>Doz</span><input id="tk-d-doz" value="' + AT.h(duzTaslak && duzTaslak.id === x.id ? duzTaslak.doz : (x.doz || '')) + '" autocomplete="off"></label>' +
+      '<label class="alan"><span>Ne zaman</span><select id="tk-d-zaman">' + ZAMAN.map(function (z) { return '<option value="' + z[0] + '"' + (z[0] === (duzTaslak && duzTaslak.id === x.id && duzTaslak.zaman ? duzTaslak.zaman : x.zaman) ? ' selected' : '') + '>' + z[1] + '</option>'; }).join('') + '</select></label></span></span>' +
+      '<button class="btn-ac mini" data-act="tk-kaydet" data-id="' + AT.h(x.id) + '">Kaydet</button><button class="btn-ghost mini" data-act="tk-iptal">Vazgeç</button></div>';
     return '<div class="satir"><span class="grow"><b>' + AT.h(x.ad) + '</b><span>' + AT.h([x.doz, zamanAd(x.zaman)].filter(Boolean).join(' · ')) + '</span></span>' +
-      '<button class="btn-ghost mini btn-bad" data-act="tk-sil" data-id="' + AT.h(x.id) + '">Çıkar</button></div>';
+      '<button class="btn-ghost mini" data-act="tk-duz" data-id="' + AT.h(x.id) + '" aria-label="' + AT.h(x.ad) + ' düzenle">Düzenle</button><button class="btn-ghost mini btn-bad" data-act="tk-sil" data-id="' + AT.h(x.id) + '">Çıkar</button></div>';
   }).join('') + '</div>';
   if (hazir.length) o += '<h3 class="tk-h3">Hızlı ekle</h3><div class="chips">' + hazir.map(function (x, i) {
     return '<button class="chip" data-act="tk-hazir" data-i="' + HAZIR.indexOf(x) + '">+ ' + AT.h(x[0]) + '</button>'; }).join('') + '</div>';
@@ -100,7 +119,7 @@ function ekle(ad, doz, zaman) {
   var t = veri(AT.S); ad = String(ad || '').trim().slice(0, 40); doz = String(doz || '').trim().slice(0, 30);
   if (!ad) return AT.toast('Ad yaz');
   if (t.liste.some(function (x) { return x.ad.toLocaleLowerCase('tr') === ad.toLocaleLowerCase('tr'); })) return AT.toast(ad + ' zaten listede');
-  t.liste.push({ id: AT.uid(), ad: ad, doz: doz, zaman: ZAMAN.some(function (z) { return z[0] === zaman; }) ? zaman : 'gun' });
+  t.liste.push({ id: AT.uid(), eklendi: AT.iso(new Date()), ad: ad, doz: doz, zaman: ZAMAN.some(function (z) { return z[0] === zaman; }) ? zaman : 'gun' });
   AT.kaydet(); AT.render(); AT.toast(ad + ' eklendi');
 }
 AT.islem['tk-al'] = function (d) {
@@ -109,7 +128,17 @@ AT.islem['tk-al'] = function (d) {
   var b = alindi && AT.$('[data-act="tk-al"][data-id="' + String(d.id).replace(/"/g, '') + '"]'); if (b && b.classList) b.classList.add('az');   /* yalnız yeni işaretlenen kutu canlanır */
   if (alindi && t.liste.every(function (k) { return alindiMi(t, k.id, AT.iso(new Date())); })) AT.toast('Bugünkü takviyeler tamam');
 };
-AT.islem['tk-duzenle'] = function () { duzenle = !duzenle; AT.render(); };
+AT.islem['tk-duzenle'] = function () { duzenle = !duzenle; duzKapat(); AT.render(); };
+/* mevcut takviyenin doz / zamanı yerinde düzenlenir; id ve geçmiş (alinan) aynen kalır */
+AT.islem['tk-duz'] = function (d) { duzId = d.id; duzTaslak = null; AT.render(); };
+AT.islem['tk-iptal'] = function () { duzKapat(); AT.render(); };
+AT.islem['tk-kaydet'] = function (d) {
+  var t = veri(AT.S), x = t.liste.filter(function (k) { return k.id === d.id; })[0]; if (!x) { duzKapat(); return AT.render(); }
+  var dz = AT.$('#tk-d-doz'), zm = AT.$('#tk-d-zaman');
+  x.doz = String(dz ? dz.value : x.doz || '').trim().slice(0, 30);
+  if (zm && ZAMAN.some(function (z) { return z[0] === zm.value; })) x.zaman = zm.value;
+  duzKapat(); AT.kaydet(); AT.render();
+};
 AT.islem['tk-hazir'] = function (d) { var x = HAZIR[+d.i]; if (x) ekle(x[0], x[1], x[2]); };
 AT.islem['tk-ekle'] = function () { var g = function (id) { var e = AT.$('#' + id); return e ? e.value : ''; }; ekle(g('tk-ad'), g('tk-doz'), g('tk-zaman')); };
 AT.islem['tk-sil'] = function (d) {
@@ -127,5 +156,6 @@ AT.islem['tk-sil-kesin'] = function () {
 
 AT.gorunum = AT.gorunum || {};
 AT.gorunum.takviye = gorunum;
-AT._takviye = { veri: veri, ozet: ozet, degistir: degistir, alindiMi: alindiMi, HAZIR: HAZIR };   /* test için */
+AT.takviyeGunListe = function (t, g) { return gunListesi(t, g); };
+AT._takviye = { gunListesi: gunListesi, veri: veri, ozet: ozet, degistir: degistir, alindiMi: alindiMi, HAZIR: HAZIR };   /* test için */
 })(window.AT);

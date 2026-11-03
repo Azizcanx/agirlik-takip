@@ -111,7 +111,7 @@ function gorunum() {
   var sn = secId != null && pc() ? l[sira(l, secId)] : null;
   if (secId != null && !sn) secId = null;
   var a = sn ? duzHtml(sn, true) : '<div class="df-yaz"><textarea id="df-metin" class="df-alan" rows="3" maxlength="' + UZUN + '" placeholder="Aklına geleni yaz…" aria-label="Yeni not">' + AT.h(taslakOku()) + '</textarea>' +
-    '<div class="df-dugmeler"><button class="btn-ac btn-big" data-act="df-kaydet">Kaydet<kbd>Ctrl + Enter</kbd></button>' + (AT.bolum.kocDugme ? AT.bolum.kocDugme() : '') +
+    '<div class="df-dugmeler"><button class="btn-ac btn-big" data-act="df-kaydet">Not olarak kaydet<kbd>Ctrl + Enter</kbd></button>' + (AT.bolum.kocDugme ? AT.bolum.kocDugme() : '') +
     (AT.setDil ? AT.setDil.mik('df-metin') : '') + '</div>' +
     (AT.bolum.kocAlt ? AT.bolum.kocAlt() : '') + '</div>';
   var ara = l.length > ARA_ESIK ? '<input id="df-ara" class="df-ara" type="search" placeholder="Notlarda ara" aria-label="Notlarda ara" autocomplete="off" value="' + AT.h(aramaQ) + '">' : '';
