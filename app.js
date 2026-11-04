@@ -46,13 +46,15 @@ function $(s, r) { return (r || document).querySelector(s); }
 
 /* ---------- veri ---------- */
 var S;
-function bos() { return { v: 1, sessions: [], bw: [], kcal: [], takviye: { liste: [], alinan: {} }, defter: [], ozel: [], sablon: [], active: null, dinlenme: 90, tema: 'koyu', temaV: 4, bulk: null }; }
+function bos() { return { v: 1, sessions: [], bw: [], kcal: [], takviye: { liste: [], alinan: {} }, defter: [], ozel: [], sablon: [], active: null, dinlenme: 90, tema: 'murekkep', temaV: 5, bulk: null }; }
 function yukle() {
   try { var r = localStorage.getItem(KEY); S = r ? Object.assign(bos(), { temaV: 0 }, JSON.parse(r)) : bos(); } catch (e) { S = bos(); }
   /* tek seferlik: eski varsayılan açık temadan koyuya (Aziz: "açık çok göz alıyor"); sonra seçim kullanıcının */
   if (!S.temaV) { if (S.tema === 'acik') S.tema = 'koyu'; S.temaV = 2; }
   /* tek seferlik (v42): sade varsayılan Koyu; otomatik Apple'a alınanlar (temaV 3) bir kez Koyu'ya döner; Apple Ayarlar'dan seçilebilir */
   if (S.temaV < 4) { if (S.tema === 'apple') S.tema = 'koyu'; S.temaV = 4; }   /* yalnız otomatik Apple döner; açık/sistem seçimleri kalır, Ayarlar'dan seçilen Apple temaV 4 ile kalır */
+  /* tek seferlik (v68, G27): yeni varsayılan Mürekkep; Koyu'da kalanlar bir kez geçer, açık/sistem/apple seçimi kalır; Ayarlar'dan seçilen her tema temaV 5 ile kalır */
+  if (S.temaV < 5) { if (S.tema === 'koyu') S.tema = 'murekkep'; S.temaV = 5; }
   /* süren antrenmanın son hâli ayrı anahtardaysa (kaydet(true)) onu al; antrenman bittiyse eski kopya yok sayılır */
   try { var a = JSON.parse(localStorage.getItem(KEY_AKTIF) || 'null'); if (a && S.active && a.id === S.active.id) S.active = a; } catch (e) { }
   if (S.active && !Array.isArray(S.active.exs)) S.active = null;   /* bozuk süren antrenman ekranı çökertmesin (render dışındaki setVurgu/sahneKur) */
@@ -61,6 +63,7 @@ function yukle() {
 function temaGoc() {
   if (!S.temaV) { if (S.tema === 'acik') S.tema = 'koyu'; S.temaV = 2; }
   if (S.temaV < 4) { if (S.tema === 'apple') S.tema = 'koyu'; S.temaV = 4; }
+  if (S.temaV < 5) { if (S.tema === 'koyu') S.tema = 'murekkep'; S.temaV = 5; }
 }
 /* kaydet(true): yalnız süren antrenman değişti (set kutusu, ✓, set ekle/tipi, ad, not). Bütün veriyi yeniden yazmak yerine
    ~2 KB'lık S.active ayrı anahtara yazılır; eşitleme tetiklenmez (antrenman bitince tam kayıt). 5 yıllık veride telefonda
@@ -1464,7 +1467,7 @@ function vAyarlar() {
   if (AT.bolum.disa) a0 += '<details class="katla ay-excel"><summary>Excel ve diğer uygulamalar <small>Strong, Hevy</small></summary>' + AT.bolum.disa() + '</details>';
   /* tema: üç küçük sayfa önizlemesi (Sistem yarı yarıya) */
   /* PC'de sütunlar dengeli: Görünüm sol sütunda yedeğin altında (telefonda sıra aynı) */
-  a0 += ayBaslik('gorunum', 'Görünüm') + '<div class="tema-sec" role="group" aria-label="Tema">' + [['sistem', 'Sistem'], ['acik', 'Açık'], ['koyu', 'Koyu'], ['apple', 'Apple']].map(function (t) {
+  a0 += ayBaslik('gorunum', 'Görünüm') + '<div class="tema-sec" role="group" aria-label="Tema">' + [['murekkep', 'Mürekkep'], ['koyu', 'Koyu'], ['acik', 'Açık'], ['sistem', 'Sistem'], ['apple', 'Apple']].map(function (t) {
     return '<button data-act="tema" data-v="' + t[0] + '" aria-pressed="' + ((S.tema || 'sistem') === t[0]) + '"><span class="tema-on ' + t[0] + '" aria-hidden="true"><i></i><i></i><i></i></span>' + t[1] + '</button>'; }).join('') + '</div>';
   var dEgz = Object.keys(S.dinlenmeEgz || {});
   var o = ayBaslik('antrenman', 'Antrenman') + '<div class="panel"><label class="alan"><span>Setler arası dinlenme (saniye)</span><input id="din" inputmode="numeric" value="' + S.dinlenme + '"></label>' +
@@ -1490,7 +1493,7 @@ function temaGecis() {
 function temaUygula() {
   var r = document.documentElement;
   /* Apple teması koyu değişkenlerin üstüne biner: data-theme=koyu + data-tema=apple */
-  if (S.tema === 'apple') { r.dataset.theme = 'koyu'; r.dataset.tema = 'apple'; }
+  if (S.tema === 'apple' || S.tema === 'murekkep') { r.dataset.theme = 'koyu'; r.dataset.tema = S.tema; }   /* Mürekkep de koyu tabanın üstüne biner */
   else { delete r.dataset.tema; if (S.tema === 'acik' || S.tema === 'koyu') r.dataset.theme = S.tema; else delete r.dataset.theme; }
   var m = document.querySelector('meta[name=theme-color]'); if (m) m.content = getComputedStyle(r).getPropertyValue('--bg').trim();
 }
@@ -1987,8 +1990,8 @@ var islem = {
   },
   ay: function (d) { gecmisAy = new Date(gecmisAy.getFullYear(), gecmisAy.getMonth() + (+d.d), 1); render(); },
   'egz-sec': function (d) { secEgz = d.ad; render(); },
-  tema: function (d) { S.tema = d.v; S.temaV = 4; kaydet(); temaGecis(); render(); },
-  'tema-cevir': function () { var koyu = document.documentElement.dataset.theme === 'koyu'; islem.tema({ v: koyu ? 'acik' : 'koyu' }); },
+  tema: function (d) { S.tema = d.v; S.temaV = 5; kaydet(); temaGecis(); render(); },
+  'tema-cevir': function () { var koyu = document.documentElement.dataset.theme === 'koyu'; islem.tema({ v: koyu ? 'acik' : 'murekkep' }); },
   /* a12: yanlış tartı koruması. 824 → "82,4 mü?"; son tartıdan (14 gün içinde) 3 kg+ farkta onay. Kayıt yine kullanıcının */
   'bw-ekle': function () {
     var v = num($('#bwkg').value);
@@ -2070,7 +2073,7 @@ var islem = {
     p.then(function (r) { if (r === 'iptal') return; toast(sonuc(r === 'paylas' ? 'Yedek hazır' : 'Yedek indirildi')); if (tab === 'ayarlar' || tab === 'bugun') render(); });
   },
   ice: function () { $('#dosya').click(); },
-  'ice-kesin': function () { if (!pendingImport) return kapat(); S = pendingImport; pendingImport = null; temaGoc(); kaydet(); if (AT.arsiv) AT.arsiv.sinandi(); kapat(); temaUygula(); render(); toast('Yedek geri yüklendi'); },
+  'ice-kesin': function () { if (!pendingImport) return kapat(); S = pendingImport; pendingImport = null; temaGoc(); if (AT.tabanSifirla) AT.tabanSifirla(); kaydet(); if (AT.arsiv) AT.arsiv.sinandi(); kapat(); temaUygula(); render(); toast('Yedek geri yüklendi'); },
   'demo-yukle': function () { var d = demoUret(); S.sessions = S.sessions.concat(d.sessions); S.bw = S.bw.concat(d.bw); S.kcal = (S.kcal || []).concat(d.kcal.filter(function (k) { return !(S.kcal || []).some(function (x) { return x.date === k.date; }); })); if (d.bulk && !S.bulk) S.bulk = d.bulk; kaydet(); render(); toast('Örnek veri yüklendi'); },
   'demo-sil': function () { S.kcalOneri = null;   /* örnek veriden türeyen haftalık kalori önerisi gerçek hedefte kalmasın */
     S.sessions = S.sessions.filter(function (s) { return !s.demo; }); S.bw = S.bw.filter(function (b) { return !b.demo; }); S.kcal = (S.kcal || []).filter(function (k) { return !k.demo; }); if (S.bulk && S.bulk.demo) S.bulk = null; secEgz = null; kaydet(); render(); toast('Örnek veri silindi'); },
@@ -2125,7 +2128,7 @@ function iceAl(ev) {
     if (!a) { try { var j = JSON.parse(r.result); a = Array.isArray(j.sessions) ? { ok: true, veri: j } : { ok: false, neden: 'Bu bir Ağırlık Takip yedeği değil' }; } catch (e) { a = { ok: false, neden: 'Dosya okunamadı: geçerli bir JSON değil' }; } }
     if (!a.ok) { pendingImport = null; sheet('<h3>Yedek geri yüklenemedi</h3><p class="mut">' + h(a.neden) + '.</p><p class="mut">Mevcut verine dokunulmadı.</p><div class="yigin"><button class="btn-big" data-act="kapat">Tamam</button></div>'); return; }
     pendingImport = Object.assign(bos(), { temaV: 0 }, a.veri);
-    sheet('<h3>Yedek geri yüklensin mi?</h3><p class="mut arsiv-ozet">' + h(AT.arsiv ? AT.arsiv.onayMetni(a, S) : 'Mevcut verinin yerine geçer.') + '</p><div class="yigin"><button class="btn-big btn-bad" data-act="ice-kesin">Geri yükle</button><button class="btn-big btn-ghost" data-act="kapat">Vazgeç</button></div>');
+    sheet('<h3>Yedek geri yüklensin mi?</h3><p class="mut arsiv-ozet">' + h(AT.arsiv ? AT.arsiv.onayMetni(a, S) : 'Mevcut verinin yerine geçer.') + '</p>' + (AT.esitleBagli && AT.esitleBagli() ? '<p class="mut">Eşitleme yeniden hizalanır.</p>' : '') + '<div class="yigin"><button class="btn-big btn-bad" data-act="ice-kesin">Geri yükle</button><button class="btn-big btn-ghost" data-act="kapat">Vazgeç</button></div>');
   };
   ev.target.value = '';
   r.readAsText(f);

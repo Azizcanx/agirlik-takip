@@ -10,10 +10,10 @@
 (function (AT) {
 'use strict';
 
-var SEMA = 1, UYGULAMA = 'agirlik-v67';
+var SEMA = 1, UYGULAMA = 'agirlik-v69';
 var K_DOGR = 'agirlik-yedek-dogrulandi', K_SINA = 'agirlik-geri-yukleme-sinandi', K_CIHAZ = 'agirlik-cihaz-id';
 var GOC = {};   /* GOC[n] = function (veri) { ...; return veriN+1 } */
-var AD = [['antrenman', 'antrenman'], ['set', 'set'], ['tarti', 'tartı'], ['kcal', 'kalori günü'], ['defter', 'not'], ['takviye', 'takviye'], ['donem', 'dönem']];
+var AD = [['antrenman', 'antrenman'], ['set', 'set'], ['tarti', 'tartı'], ['kcal', 'kalori günü'], ['defter', 'not'], ['takviye', 'takviye'], ['donem', 'dönem'], ['ozel', 'özel hareket'], ['sablon', 'program'], ['ikiz', 'senaryo'], ['kocRapor', 'koç raporu']];
 
 /* ---------- özet (hash) ---------- */
 var K256 = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -54,7 +54,8 @@ function sayim(S) {
   var set = 0; liste(S.sessions).forEach(function (se) { liste(se && se.exs).forEach(function (e) { liste(e && e.sets).forEach(function (x) { if (x && x.done) set++; }); }); });
   return {
     antrenman: liste(S.sessions).length, set: set, tarti: liste(S.bw).length, kcal: liste(S.kcal).length, defter: liste(S.defter).length,
-    takviye: liste(S.takviye && S.takviye.liste).length, donem: liste(S.donemGecmis).length + (S.donem ? 1 : 0)
+    takviye: liste(S.takviye && S.takviye.liste).length, donem: liste(S.donemGecmis).length + (S.donem ? 1 : 0),
+    ozel: liste(S.ozel).length, sablon: liste(S.sablon).length, ikiz: liste(S.ikiz).length, kocRapor: S.kocRapor && typeof S.kocRapor === 'object' ? Object.keys(S.kocRapor).length : 0
   };
 }
 function aralik(S) {
@@ -82,7 +83,8 @@ function semaGoc(veri, nereden, nereye) {
   }
   return veri;
 }
-function esit(a, b) { return Object.keys(a).every(function (k) { return a[k] === b[k]; }) && Object.keys(b).length === Object.keys(a).length; }
+/* yalnız zarftaki (a) sayım anahtarları kıyaslanır: eski sürümün yazdığı zarfta sonradan eklenen sayımlar yoktur, bu bozukluk değil */
+function esit(a, b) { return Object.keys(a).every(function (k) { return a[k] === b[k]; }); }
 function hata(neden) { return { ok: false, neden: neden }; }
 /* metin → {ok, zarfli, veri, sayim, aralik, zarf} | {ok:false, neden}. Hiçbir şeyi değiştirmez. */
 function ac(metin) {

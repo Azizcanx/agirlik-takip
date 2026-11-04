@@ -2662,10 +2662,27 @@ svg.chart .donemn{fill:var(--bg, #111);stroke:var(--ac);stroke-width:2}
 :root[data-tema=murekkep] :is(div.panel,section.ex,section.ex.sirada,.hero,.ozet,.durum){background-color:transparent!important;background-image:none!important;box-shadow:none!important}
 :root[data-tema=murekkep] .durum{border:1px dashed var(--line);border-radius:var(--r)}
 :root[data-tema=murekkep] #tabs button::before{background:transparent!important}
-:root[data-tema=murekkep] #tabs button[aria-current=page]::after{content:"";position:absolute;bottom:2px;left:50%;width:20px;height:2px;margin-left:-10px;background:var(--tx)}
+@media (max-width:899px){ :root[data-tema=murekkep] #tabs button[aria-current=page]::after{content:"";position:absolute;bottom:2px;left:50%;width:20px;height:2px;margin-left:-10px;background:var(--tx)} }
 :root[data-tema=murekkep] .setgrid{background:transparent}
 .tema-on.murekkep{background:#0e0d0b;box-shadow:inset 0 0 0 1px rgba(236,230,217,.18)}
 .tema-on.murekkep i{background:#34312a}.tema-on.murekkep i:first-child{background:#ece6d9}
 .tema-sec{grid-template-columns:repeat(3,1fr)}
 @media (min-width:600px){ .tema-sec{grid-template-columns:repeat(5,1fr)} }
 :root[data-tema=murekkep] #tabs button[aria-current=page],:root[data-tema=murekkep] #tabs button[aria-current=page]:hover{background:transparent!important}
+/* G28: Mürekkep cila. (1) Kayan menü hapı: telefonda yerine ince alt çizgi (sekme ::after), PC kenar çubuğunda sönük mürekkep zemin kalır */
+@media (max-width:899px){ :root[data-tema=murekkep] .sekme-hap{display:none!important} }
+:root[data-tema=murekkep] .sekme-hap{background:var(--act);border-radius:var(--r)}
+/* (2) kas haritası tek ton: fildişi kademeleri (opaklık = set yükü), "tamam" yeşil değil tam fildişi; sayılar ve çubuklar yazı rengi */
+:root[data-tema=murekkep] .kh-govde{fill:var(--s2);stroke:var(--s2)}
+:root[data-tema=murekkep] .kh-b.tamam{fill:var(--tx)}
+:root[data-tema=murekkep] .kh-b.sifir{stroke:var(--mut)}
+:root[data-tema=murekkep] .kasbar .tamam .ibar i{background:var(--tx)}
+:root[data-tema=murekkep] .kasbar .tamam b{color:var(--tx)}
+/* (3) etkin hareket kartı: yuvarlak kart yok; hairline üst/alt, dinlenme dolgusu sönük fildişi, rekor halkası/parıltısı yok (rekor = yalnız renk geçişi) */
+:root[data-tema=murekkep] .sahneler>section.panel.ex,:root[data-tema=murekkep] .sahneler>.sahne-son{background:transparent;border:0;border-top:var(--hair);border-bottom:var(--hair);border-radius:0;box-shadow:none}
+:root[data-tema=murekkep] .sahneler>section.ex::before{background-color:color-mix(in srgb,var(--tx) 6%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 30%,transparent)}
+:root[data-tema=murekkep] .sahneler.dinlen.son>section.ex::before{background-color:color-mix(in srgb,var(--tx) 9%,transparent);box-shadow:inset 0 1px 0 var(--tx)}
+:root[data-tema=murekkep] .sahneler>section.rekor-yeni{animation:none}
+:root[data-tema=murekkep] .kh-s.tamam b{color:var(--tx)}
+:root[data-tema=murekkep] .kh-s.tamam i::before{background:var(--tx)}
+:root[data-tema=murekkep] .kh-sw i.tamam{background:var(--tx);opacity:.9}

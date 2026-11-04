@@ -12,6 +12,7 @@ var LS_AYAR = 'agirlik-esit', LS_TABAN = 'agirlik-esit-taban', ACIKLAMA = 'agirl
 var API = 'https://api.github.com', TEL_ADRES = 'https://azizcanx.github.io/agirlik-takip/';
 var VERI = ['sessions', 'bw', 'kcal', 'ozel', 'takviye', 'bulk', 'active', 'dinlenme', 'dinlenmeEgz', 'rpe', 'ses', 'kcalOneri', 'defter', 'sablon', 'dinlenmeSecildi', 'donem', 'donemGecmis', 'ikiz', 'kocRapor'];
 var LISTE = { sessions: 'id', bw: 'id', kcal: 'date', ozel: 'ad', defter: 'id', sablon: 'id', donemGecmis: 'id', ikiz: 'id' };   /* kalori günde tek: tarihle */
+var ESV = 1;   /* eşitleme şeması: bilinmeyen (daha yeni sürümün) üst anahtarları aynen geçer; esv gelen en yüksek değeri korur */
 var DESTEK = !!(window.crypto && crypto.subtle && window.fetch && window.TextEncoder);
 
 /* ---------- saf: birleştirme ---------- */
@@ -73,6 +74,9 @@ function birlestir(b, l, r) {
     } else if (k === 'dinlenmeEgz' || k === 'kocRapor') o[k] = harita(b[k], l[k], r[k]);
     else { var v = sec(b[k], l[k], r[k]); if (v !== undefined) o[k] = v; }
   });
+  /* eski sürümlü cihaz yeni alanları silmesin: VERI'de olmayan üst anahtarlar (uzaktaki) olduğu gibi geçer */
+  Object.keys(r || {}).forEach(function (k) { if (k !== 'esv' && VERI.indexOf(k) < 0 && !(k in o)) o[k] = r[k]; });   /* yalnız uzak: yerel durumdaki cihaza özel alanlar (tema...) sızmasın */
+  o.esv = Math.max(ESV, +(r && r.esv) || 0);
   return o;
 }
 
@@ -136,13 +140,14 @@ function uzakOku(a) {
 }
 
 /* ---------- eşitleme ---------- */
+var nesil = 0;   /* G28: tabanSifirla() artırır; önceki nesilde başlamış işlem taban/durum yazmadan sonlanır */
 var calisiyor = false, bekliyor = false, zaman = null, uygulaniyor = false, sonHata = null;
 function taban() { try { return JSON.parse(localStorage.getItem(LS_TABAN) || 'null'); } catch (e) { return null; } }
 function esitle(elle) {
   var a = ayar(); if (!a || !DESTEK || !a.sifre) return Promise.resolve(false);
   if (calisiyor) { bekliyor = true; return Promise.resolve(false); }
   if (!navigator.onLine && !elle) return Promise.resolve(false);
-  calisiyor = true; ciz('Eşitleniyor…');
+  calisiyor = true; ciz('Eşitleniyor…'); var n0 = nesil;
   /* derin kopya: eşitleme sürerken yerinde değişen diziler/nesneler bu fotoğrafı bozmasın */
   var yerel = JSON.parse(J(veriAl(AT.S))), uzakRev = 0, tabanRev = +a.rev || 0, hata0 = AT.kayitHataSay ? AT.kayitHataSay() : 0, kayitOk = true;
   return gistBul(a).then(function (id) {
@@ -156,7 +161,7 @@ function esitle(elle) {
       return coz(m, a.sifre);
     });
   }).then(function (uzak) {
-    if (!ayar()) return false;   /* eşitleme bu arada kaldırıldıysa hiçbir şey yazma */
+    if (!ayar() || n0 !== nesil) return false;   /* eşitleme kaldırıldı ya da yedek geri yüklendi (nesil değişti): hiçbir şey yazma */
     var tb = taban();
     /* aynı rev ama içerik tabandan farklı: iki cihaz aynı anda yazmış, biri öbürünü ezmiş. Silme çıkarmadan birleştir */
     if (uzak && tb && uzakRev === tabanRev && J(uzak) !== J(tb)) tb = null;
@@ -175,20 +180,21 @@ function esitle(elle) {
         return istek(a, '/gists/' + a.gist, 'PATCH', govde);
       });
     }) : Promise.resolve()).then(function () {
-      if (!ayar()) return false;
+      if (!ayar() || n0 !== nesil) return false;   /* yazma sürerken geri yükleme: eski birleşimi uygulama, taban yazma */
       localStorage.setItem(LS_TABAN, JSON.stringify(son));
       /* eşitleme sürerken bu cihazda girilen kayıtlar (kilo, set, kalori) kaybolmasın: fotoğraftan bu yana olan
          değişiklikler, gelen hâlin üstüne üç yönlü eklenir; bir sonraki eşitlemede gönderilir */
       var simdi = veriAl(AT.S), yeni = son;
       if (J(simdi) !== J(yerel)) { yeni = birlestir(yerel, simdi, son); bekliyor = true; }
+      yeni = veriAl(yeni);   /* bilinmeyen anahtarlar yalnız uzakta/tabanda kalır, bu cihazın durumuna yazılmaz */
       var yerelDegisti = J(yeni) !== J(simdi);
       if (yerelDegisti) { uygulaniyor = true; try { kayitOk = AT.yeniDurum(Object.assign({}, AT.S, JSON.parse(J(yeni)))) !== false; } finally { uygulaniyor = false; } }
       a.son = Date.now(); a.hata = null; a.rev = yeniRev; ayarYaz(a); sonHata = null;
       return yerelDegisti;
     });
-  }).then(function (d) { calisiyor = false; yarisma = 0; ciz(); if (elle && kayitOk && (!AT.kayitHataSay || AT.kayitHataSay() === hata0)) AT.toast(d ? 'Eşitlendi, yeni kayıtlar geldi' : 'Eşitlendi');   /* bu işlem sırasında kayıt başarısız olduysa "Eşitlendi" denmez (eşzamansız sınırdan bağımsız) */ if (bekliyor) { bekliyor = false; planla(2000); } return d; },
+  }).then(function (d) { calisiyor = false; if (n0 !== nesil) { planla(300); d = false; } yarisma = 0; ciz(); if (elle && kayitOk && (!AT.kayitHataSay || AT.kayitHataSay() === hata0)) AT.toast(d ? 'Eşitlendi, yeni kayıtlar geldi' : 'Eşitlendi');   /* bu işlem sırasında kayıt başarısız olduysa "Eşitlendi" denmez (eşzamansız sınırdan bağımsız) */ if (bekliyor) { bekliyor = false; planla(2000); } return d; },
     function (e) {
-      calisiyor = false;
+      calisiyor = false; if (n0 !== nesil) { planla(300); return false; }   /* eski nesil: hata kaydı yok, yeni taban sıfırdan eşitlenir */
       if (e.kod === 'yarisma' && (yarisma = yarisma + 1) <= 3) { planla(1500); return false; }   /* öbür cihaz araya girdi: kısa süre sonra yeniden */
       yarisma = 0; sonHata = e.kod === 'yarisma' ? 'ag' : e.kod || 'ag'; var a2 = ayar(); if (a2) { a2.hata = sonHata; ayarYaz(a2); }
       ciz(); if (elle) AT.toast(hataMetni(sonHata)); return false;
@@ -201,6 +207,9 @@ function hataMetni(k) {
   return k === 'sifre' ? 'Şifre öbür cihazdakiyle aynı değil' : k === 'anahtar' ? 'GitHub anahtarı geçersiz ya da süresi dolmuş' : 'İnternet yok; bağlanınca eşitlenir';
 }
 AT.esitBagli = function () { return !!ayar(); };
+/* yedek geri yüklenince eski taban geçersiz: silme sanılmasın, bir sonraki eşitleme tabansız (birleşim) başlar */
+AT.tabanSifirla = function () { nesil++; try { localStorage.removeItem(LS_TABAN); } catch (e) {} };
+AT.esitleBagli = function () { return !!ayar(); };
 AT.degisti = function () { if (!uygulaniyor && ayar()) planla(3000); };
 
 /* ---------- Ayarlar bölümü ---------- */
